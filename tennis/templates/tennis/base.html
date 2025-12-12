@@ -1,0 +1,32 @@
+{# tennis/templates/tennis/base.html #}
+{% load static %}
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <title>{% block title %}テニスサークル{% endblock %}</title>
+
+    {# ここで共通CSSを読み込む #}
+    <link rel="stylesheet" href="{% static 'tennis/style.css' %}">
+
+    <style>
+        body { font-family: system-ui, sans-serif; margin: 20px; }
+        a { text-decoration: none; color: #0066cc; }
+        table { border-collapse: collapse; width: 100%; margin-top: 10px; }
+        th, td { border: 1px solid #ccc; padding: 4px 8px; font-size: 14px; text-align: center; }
+        .btn { padding: 4px 10px; border: 1px solid #0066cc; border-radius: 4px; background: #eef6ff; cursor: pointer; }
+        .btn-primary { background: #0066cc; color: #fff; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .field { margin-bottom: 8px; }
+        label { display: inline-block; min-width: 80px; }
+    </style>
+
+    {% block extra_head %}{% endblock %}
+</head>
+<body>
+<div class="container">
+    <h1><a href="{% url 'tennis:index' %}">🎾 テニスサークル</a></h1>
+    {% block content %}{% endblock %}
+</div>
+</body>
+</html>

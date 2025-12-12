@@ -1,0 +1,22 @@
+{# tennis/templates/tennis/_stats_block.html #}
+{% if stats %}
+<h3>出場回数・休憩回数サマリー</h3>
+<table>
+    <tr>
+        <th>名前</th>
+        <th>試合数</th>
+        <th>休憩数</th>
+        <th>最大連続試合数</th>
+        <th>最大連続休憩数</th>
+    </tr>
+    {% for s in stats %}
+    <tr>
+        <td>{{ s.name }}</td>
+        <td>{{ s.matches }}</td>
+        <td>{{ s.rests }}</td>
+        <td>{{ s.max_play_streak }}</td>
+        <td>{{ s.max_rest_streak }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% endif %}

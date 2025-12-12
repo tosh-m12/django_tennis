@@ -1,0 +1,280 @@
+{# tennis/templates/tennis/event_admin.html #}
+{% extends "tennis/base.html" %}
+{% load static %}
+
+{% block title %}{{ event.title }} - 幹事用{% endblock %}
+
+{% block extra_head %}
+<script src="{% static 'tennis/admin.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+<h2>幹事用画面：{{ event.title }}</h2>
+<p>{{ event.date }} @ {{ event.place }}</p>
+
+<h3>出席者リスト</h3>
+<div class="flag-add-area">
+    <button type="button"
+            id="add-flag-btn"
+            class="flag-add-btn"
+            data-event-id="{{ event.id }}"
+            data-add-flag-url="{% url 'tennis:add_flag' %}"
+            {% if flags|length >= max_flags %}disabled{% endif %}>
+        フラグ追加
+    </button>
+    <button type="button"
+            id="delete-flag-btn"
+            class="flag-delete-btn"
+            data-event-id="{{ event.id }}"
+            data-delete-flag-url="{% url 'tennis:delete_flag' %}"
+            {% if flags|length == 0 %}disabled{% endif %}>
+        フラグ削除
+    </button>
+    <br>
+    <small class="flag-note">
+        任意のフラグを５つまで追加できます。ボール・かご持ち帰りなどの当番管理にご活用ください。<br>（クリックするとフラグ名を変更できます）
+    </small>
+</div>
+{% if participants %}
+<table id="participants-table"
+       class="participants-table"
+       data-update-url="{% url 'tennis:update_participation_flag' %}"
+       data-toggle-flag-url="{% url 'tennis:toggle_flag' %}"
+       data-rename-flag-url="{% url 'tennis:rename_flag' %}">
+    <colgroup>
+        <col style="width: 40px;">     <!-- 連番列 -->
+        <col style="width: 150px;">    <!-- 名前カード列 -->
+        <col>                          <!-- 試合参加列（可変） -->
+        {% for flag in flags %}
+            <col>                      <!-- フラグ列（可変） -->
+        {% endfor %}
+ 
+    </colgroup>
+    <thead>
+        <tr>
+            <th></th>  {# 連番 #}
+            <th>名前</th>
+            <th>試合参加</th>
+            {% for flag in flags %}
+            <th class="flag-header"
+                data-flag-id="{{ flag.id }}">
+                <span class="flag-name">{{ flag.name }}</span>
+            </th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+    {% for p in participants %}
+    <tr>
+        <td class="participant-index">{{ forloop.counter }}</td>
+        <td>
+            <div class="tb-player-card-sm">
+                {{ p.name }}
+            </div>
+        </td>
+        <td class="checkbox-cell">
+            <input type="checkbox" class="match-flag-checkbox"
+                   data-participant-id="{{ p.id }}"
+                   {% if p.participates_match %}checked{% endif %}>
+        </td>
+
+        {% for flag in flags %}
+        <td class="checkbox-cell">
+            <input type="checkbox"
+                    class="flag-checkbox"
+                    data-participant-id="{{ p.id }}"
+                    data-flag-id="{{ flag.id }}"
+                    {% if flag.id in p.assigned_flag_ids %}checked{% endif %}>
+        </td>
+        {% endfor %}
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+{% else %}
+{# ★ 参加者ゼロのときも、レイアウトがわかる空テーブルを表示 #}
+<table id="participants-table"
+       class="participants-table">
+    <colgroup>
+        <col style="width: 40px;">     <!-- 連番列 -->
+        <col style="width: 150px;">    <!-- 名前カード列 -->
+        <col>                          <!-- 試合参加列（可変） -->
+        {% for flag in flags %}
+            <col>                      <!-- フラグ列（可変） -->
+        {% endfor %}
+    </colgroup>
+    <thead>
+        <tr>
+            <th></th>  {# 連番 #}
+            <th>名前</th>
+            <th>試合参加</th>
+            {% for flag in flags %}
+            <th class="flag-header">
+                <span class="flag-name">{{ flag.name }}</span>
+            </th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+    {# 1〜4 行のダミー行を表示 #}
+    {% for i in "1234" %}
+    <tr>
+        <td class="participant-index">{{ forloop.counter }}</td>
+        <td><div class="tb-player-card-sm">&nbsp;</div></td>
+        <td class="checkbox-cell"><input type="checkbox" disabled></td>
+
+        {% for flag in flags %}
+            <td class="checkbox-cell"><input type="checkbox" disabled></td>
+        {% endfor %}
+
+    </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<p style="margin-top:4px; font-size:0.85rem; color:#666;">
+    まだ参加者が登録されていません。メンバーページにて参加者を募集してください。
+</p>
+{% endif %}
+
+{# ===== 対戦表（ヘッダー＋条件表示） ===== #}
+<h3>対戦表（ランダム生成）</h3>
+
+<div class="match-settings-bar">
+    <div class="match-pill-group">
+        <button type="button"
+                id="pill-game-type"
+                class="settings-pill game-type-pill settings-trigger
+                       {% if game_type == 'singles' %}pill-singles{% else %}pill-doubles{% endif %}">
+            {% if game_type == "singles" %}シングルス{% else %}ダブルス{% endif %}
+        </button>
+
+        <button type="button"
+                id="pill-num-courts"
+                class="settings-pill settings-trigger">
+            {{ num_courts }} 面
+        </button>
+
+        <button type="button"
+                id="pill-match-count"
+                class="settings-pill settings-trigger">
+            {{ match_count }} 人
+        </button>
+
+        <button type="button"
+                id="pill-num-rounds"
+                class="settings-pill settings-trigger">
+            {{ num_rounds }} ラウンド
+        </button>
+    </div>
+
+    {# 公開ボタン（右寄せ） #}
+    <button type="button"
+            id="publish-pill"
+            class="settings-pill publish-pill
+                   {% if publish_state in 'no_schedule published' %}pill-disabled{% endif %}"
+            data-publish-state="{{ publish_state }}"
+            onclick="publishSchedule()"
+            {% if publish_state in 'no_schedule published' %}disabled{% endif %}>
+        {% if publish_state == 'published' %}
+            公開済み
+        {% elif publish_state == 'changed' %}
+            再公開
+        {% else %}
+            📢 対戦表を公開
+        {% endif %}
+    </button>
+</div>
+
+{# 公開後に内容が変わっている場合の注意メッセージ #}
+{% if publish_state == 'changed' %}
+<div id="publish-notice" class="publish-notice">
+    対戦表が更新されました。この変更を参加者ページへ適用する場合は「再公開」ボタンを押してください。
+</div>
+{% endif %}
+
+{# ===== 条件変更モーダル ===== #}
+<div id="match-settings-modal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-content">
+        <button type="button" class="modal-close" id="close-settings-modal">×</button>
+        <h3>条件を変更する</h3>
+
+        <form method="post"
+            id="match-settings-form"
+            class="modal-form"
+            data-generate-url="{% url 'tennis:ajax_generate_schedule' event.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="generate_schedule" value="1">
+
+            <div class="field-group">
+                <div class="toggle-row">
+                    <button type="button"
+                            class="toggle-btn {% if game_type == 'singles' %}active{% endif %}"
+                            data-game-type="singles">
+                        シングルス
+                    </button>
+                    <button type="button"
+                            class="toggle-btn {% if game_type != 'singles' %}active{% endif %}"
+                            data-game-type="doubles">
+                        ダブルス
+                    </button>
+                </div>
+                <input type="hidden" name="game_type" id="id_game_type"
+                       value="{{ game_type|default:'doubles' }}">
+            </div>
+            <div class="field-group field-group-count">
+                <label>人数</label>
+                <p class="count-pill modal-number">
+                    {{ match_count }}
+                </p>
+            </div>
+            <div class="field-group">
+                <label>面数</label>
+                <div class="stepper-row">
+                    <button type="button" class="stepper-btn" data-target="num_courts" data-step="-1">－</button>
+                    <input type="number"
+                        id="id_num_courts"
+                        name="num_courts"
+                        class="modal-number"
+                        min="1" max="8"
+                        value="{{ num_courts }}">
+                    <button type="button" class="stepper-btn" data-target="num_courts" data-step="1">＋</button>
+                </div>
+            </div>
+
+
+
+            <div class="field-group">
+                <label>ラウンド数</label>
+                <div class="stepper-row">
+                    <button type="button" class="stepper-btn" data-target="num_rounds" data-step="-1">－</button>
+                    <input type="number"
+                        id="id_num_rounds"
+                        name="num_rounds"
+                        class="modal-number"
+                        min="1" max="20"
+                        value="{{ num_rounds }}">
+                    <button type="button" class="stepper-btn" data-target="num_rounds" data-step="1">＋</button>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">
+                    条件を変更する
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{# ===== 対戦表表示 ===== #}
+<div id="schedule-area">
+    {% include "tennis/_schedule_block.html" %}
+</div>
+
+<div id="stats-area">
+    {% include "tennis/_stats_block.html" %}
+</div>
+
+{% endblock %}

@@ -1,0 +1,26 @@
+{# tennis/templates/tennis/index.html #}
+{% extends "tennis/base.html" %}
+
+{% block title %}トップ - テニスサークル{% endblock %}
+
+{% block content %}
+<p><a class="btn btn-primary" href="{% url 'tennis:create_event' %}">＋ 新しいテニス会を作る</a></p>
+
+<h2>直近のイベント</h2>
+{% if events %}
+    <table>
+        <tr>
+            <th>日付</th><th>タイトル</th><th>場所</th>
+        </tr>
+        {% for e in events %}
+        <tr>
+            <td>{{ e.date }}</td>
+            <td>{{ e.title }}</td>
+            <td>{{ e.place }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+{% else %}
+    <p>まだイベントはありません。</p>
+{% endif %}
+{% endblock %}

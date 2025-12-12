@@ -1,0 +1,28 @@
+{# tennis/templates/tennis/create_done.html #}
+{% extends "tennis/base.html" %}
+
+{% block title %}イベント作成完了{% endblock %}
+
+{% block content %}
+<h2>イベントを作成しました</h2>
+
+<p>この回の情報：</p>
+<ul>
+    <li>日付：{{ event.date }}</li>
+    <li>タイトル：{{ event.title }}</li>
+    <li>場所：{{ event.place }}</li>
+</ul>
+
+<h3>URL</h3>
+<p>
+    出欠登録・閲覧用URL（メンバーに共有）<br>
+    <code>{{ public_url }}</code>
+</p>
+<p>
+    幹事用URL（対戦表生成など。幹事だけが保管）<br>
+    <code>{{ admin_url }}</code>
+</p>
+
+<p><a href="{{ public_url }}">参加用ページを開く</a></p>
+<p><a href="{{ admin_url }}">幹事用ページを開く</a></p>
+{% endblock %}

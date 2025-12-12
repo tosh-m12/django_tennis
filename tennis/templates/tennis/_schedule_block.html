@@ -1,0 +1,71 @@
+{# tennis/templates/tennis/_schedule_block.html #}
+{% if schedule %}
+    <script id="current-schedule-json"
+            type="application/json"
+            data-event-id="{{ event.id }}"
+            data-publish-url="{% url 'tennis:publish_schedule' %}">
+    {{ schedule_json|safe }}
+    </script>
+
+    <div class="tb-schedule">
+        {% for round in schedule %}
+        <div class="tb-round">
+            <div class="tb-round-header">
+                {# 左の濃紺ピル：ラウンド番号だけ #}
+                <span class="tb-round-pill">ラウンド {{ round.round }}</span>
+            </div>
+
+            {% if round.matches %}
+                <div class="tb-round-body">
+                    {% for m in round.matches %}
+                        <div class="tb-court-row">
+                            <div class="tb-court-name">
+                                {{ m.court }}コート
+                            </div>
+
+                            <div class="tb-match-flex">
+
+                                {# 左チーム #}
+                                <div class="tb-team">
+                                    {% for p in m.team1 %}
+                                        <div class="tb-player-card">{{ p }}</div>
+                                    {% endfor %}
+                                </div>
+
+                                {# スコア欄（とりあえずダミーの "-"） #}
+                                <div class="tb-score-area">
+                                    <span class="tb-score tb-score-left">-</span>
+                                    <span class="tb-vs">vs</span>
+                                    <span class="tb-score tb-score-right">-</span>
+                                </div>
+
+                                {# 右チーム #}
+                                <div class="tb-team">
+                                    {% for p in m.team2 %}
+                                        <div class="tb-player-card">{{ p }}</div>
+                                    {% endfor %}
+                                </div>
+
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="tb-no-match">
+                    人数不足のため、このラウンドは試合が組めません。
+                </p>
+            {% endif %}
+
+            <div class="tb-rest-row">
+                {% if round.rests %}
+                    <span class="tb-rest-label">休憩：</span>
+                    <span class="tb-rest-names">{{ round.rests|join:", " }}</span>
+                {% else %}
+                    <span class="tb-rest-label">休憩：</span>
+                    <span class="tb-rest-names">なし（全員出場）</span>
+                {% endif %}
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+{% endif %}

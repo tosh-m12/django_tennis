@@ -1,0 +1,118 @@
+{# tennis/templates/tennis/settings.html #}
+{% extends "tennis/base.html" %}
+{% load static %}
+
+{% block title %}クラブ設定 - 幹事用{% endblock %}
+
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'tennis/calendar.css' %}">
+<script src="{% static 'tennis/calendar.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+<h2>クラブ設定（幹事用）</h2>
+<p class="settings-desc">
+    新しくクラブを作成したら、まずこのページで
+    <strong>練習日の設定</strong> と <strong>出席表のフォーマット</strong> を決めてください。
+</p>
+
+<hr>
+
+<h3>① 練習日の設定（カレンダー）</h3>
+
+<div class="calendar-nav">
+    <a href="{% url 'tennis:settings' %}?year={{ prev_year }}&month={{ prev_month }}">« 前の月</a>
+    <span class="calendar-title">{{ year }}年 {{ month }}月</span>
+    <a href="{% url 'tennis:settings' %}?year={{ next_year }}&month={{ next_month }}">次の月 »</a>
+</div>
+
+<table class="practice-calendar">
+    <thead>
+        <tr>
+            <th>月</th>
+            <th>火</th>
+            <th>水</th>
+            <th>木</th>
+            <th>金</th>
+            <th class="weekend">土</th>
+            <th class="weekend">日</th>
+        </tr>
+    </thead>
+    <tbody>
+    {% for week in month_weeks %}
+        <tr>
+        {% for cell in week %}
+            {% if cell.is_current_month %}
+                <td class="day-cell{% if cell.date == today %} today{% endif %}">
+                    <div class="day-number">{{ cell.date.day }}</div>
+
+                    {# この日の練習イベント #}
+                    {% for ev in cell.events %}
+                    <div class="event-card">
+                        <div class="event-title">
+                            {# 幹事用ページへのリンク #}
+                            <a href="{% url 'tennis:event_admin' ev.public_token ev.admin_token %}">
+                                {{ ev.title }}
+                            </a>
+                        </div>
+
+                        <div class="event-flags"
+                             data-event-id="{{ ev.id }}"
+                             data-add-flag-url="{% url 'tennis:add_flag' %}"
+                             data-delete-flag-url="{% url 'tennis:delete_flag' %}">
+                            {% with ev_flags=flags_by_event.ev.id %}
+                            {% endwith %}
+                            {% if flags_by_event.ev.id %}
+                                {% for flag in flags_by_event.ev.id %}
+                                    <span class="flag-chip">{{ flag.name }}</span>
+                                {% endfor %}
+                            {% else %}
+                                <span class="flag-chip flag-chip-empty">フラグなし</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="event-flag-actions">
+                            <button type="button"
+                                    class="flag-add-btn-sm"
+                                    data-event-id="{{ ev.id }}">
+                                ＋フラグ
+                            </button>
+                            <button type="button"
+                                    class="flag-delete-btn-sm"
+                                    data-event-id="{{ ev.id }}">
+                                －フラグ
+                            </button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </td>
+            {% else %}
+                <td class="day-cell other-month"></td>
+            {% endif %}
+        {% endfor %}
+        </tr>
+    {% endfor %}
+    </tbody>
+</table>
+
+<hr style="margin: 24px 0;">
+
+<h3>② 出席表フォーマット設定（ひな型）</h3>
+<p class="settings-desc">
+    ここでは、出席表の基本フォーマット（デフォルトのフラグや表示順など）を決めます。<br>
+    ※ 現時点では枠のみ。後日、実際に保存・反映する項目を追加していきます。
+</p>
+
+<div class="attendance-format-box">
+    <p>例）デフォルトで用意するフラグ：</p>
+    <ul>
+        <li>🎾 ボール係</li>
+        <li>🧺 かご係</li>
+        <li>🧴 コート整備</li>
+    </ul>
+
+    {# ここに将来フォームを追加する想定 #}
+    {# <form method="post"> ... </form> #}
+</div>
+
+{% endblock %}
