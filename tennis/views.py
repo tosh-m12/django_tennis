@@ -1,17 +1,18 @@
 # tennis/views.py
-import calendar
-from datetime import date
-from django.utils import timezone
-from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
 from django.http import HttpResponseBadRequest, JsonResponse
 from django.template.loader import render_to_string
-from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
-from .models import Event, Participant, FlagDefinition, ParticipantFlag
-from .utils import generate_doubles_schedule, generate_singles_schedule
 import json
+from django.contrib.auth.decorators import login_required
+from django.views.decorators.csrf import csrf_exempt
+
+
+
+from .models import Event, Participant
+from .utils import generate_doubles_schedule, generate_singles_schedule
+
 
 
 
