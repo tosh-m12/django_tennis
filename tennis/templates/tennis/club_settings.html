@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>クラブ設定 - {{ club.name }}</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: sans-serif; margin: 16px; }
+    .row { display: flex; gap: 24px; align-items: flex-start; flex-wrap: wrap; }
+    .card { border: 1px solid #ddd; border-radius: 10px; padding: 14px; min-width: 320px; }
+    h1 { margin: 0 0 10px; font-size: 20px; }
+    h2 { margin: 0 0 10px; font-size: 16px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #ddd; padding: 8px; text-align: center; }
+    .muted { color: #666; font-size: 12px; }
+    .btn { padding: 6px 10px; border: 1px solid #ccc; border-radius: 8px; background: #f7f7f7; cursor: pointer; }
+    .btn:active { transform: translateY(1px); }
+    .event { background: #e9f6ff; }
+    .link { text-decoration: none; }
+    input[type="text"] { padding: 6px 8px; width: 240px; }
+    .list { display: grid; gap: 6px; }
+    .item { display: flex; gap: 8px; align-items: center; justify-content: space-between; border: 1px solid #eee; border-radius: 8px; padding: 8px; }
+  </style>
+</head>
+<body>
+
+<h1>⚙ クラブ設定（幹事） - {{ club.name }}</h1>
+<div class="muted">
+  public: {{ club.public_token }} / admin: {{ club.admin_token }}
+</div>
+
+<div class="row">
+
+  <div class="card">
+    <h2>📅 当月カレンダー（クリックで Event 作成 / 移動）</h2>
+    <div class="muted">{{ year }}-{{ month|stringformat:"02d" }}</div>
+    <table>
+      <thead>
+        <tr>
+          <th>日付</th>
+          <th>Event</th>
+        </tr>
+      </thead>
+      <tbody id="calendar-body">
+        {% for row in calendar_rows %}
+          <tr data-date="{{ row.date }}" class="{% if row.event_id %}event{% endif %}">
+            <td>{{ row.day }}</td>
+            <td>
+              {% if row.event_id %}
+                <a class="link" href="/c/{{ club.public_token }}/e/{{ row.event_id }}/">開く (id={{ row.event_id }})</a>
+              {% else %}
+                <button class="btn create-event-btn" type="button">作成</button>
+              {% endif %}
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+
+    </table>
+    <div class="muted">※ 1日1回固定（club+dateでユニーク）</div>
+  </div>
+
+  <div class="card">
+    <h2>👥 メンバー追加</h2>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <input id="member-name" type="text" placeholder="表示名（重複OK）" />
+      <button id="member-add-btn" class="btn" type="button">追加</button>
+    </div>
+    <div class="muted">メンバーは内部IDで管理</div>
+
+    <h2 style="margin-top:14px;">メンバー一覧</h2>
+    <div id="members" class="list">
+      {% for m in members %}
+        <div class="item"><span>#{{ m.id }} {{ m.display_name }}</span></div>
+      {% empty %}
+        <div class="muted">まだメンバーがいません</div>
+      {% endfor %}
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>🏷 フラグ管理（共通）</h2>
+
+    <div style="display:flex; gap:8px; align-items:center;">
+      <input id="flag-name" type="text" placeholder="新しいフラグ名" />
+      <button id="flag-add-btn" class="btn" type="button">追加</button>
+    </div>
+
+    <h2 style="margin-top:14px;">フラグ一覧</h2>
+    <div id="flags" class="list">
+      {% for f in flags %}
+        <div class="item" data-flag-id="{{ f.id }}">
+          <div>
+            <div><b>({{ f.order }})</b> <span class="flag-name">{{ f.name }}</span></div>
+            <div class="muted">active={{ f.is_active }}</div>
+          </div>
+          <div style="display:flex; gap:6px;">
+            <button class="btn flag-rename-btn" type="button">名称変更</button>
+            <button class="btn flag-toggle-btn" type="button">{% if f.is_active %}非表示{% else %}復活{% endif %}</button>
+          </div>
+        </div>
+      {% empty %}
+        <div class="muted">まだフラグがありません</div>
+      {% endfor %}
+    </div>
+
+    <div class="muted">※ 非表示でも過去データは保持</div>
+  </div>
+
+</div>
+
+<script>
+  const CLUB_PUBLIC = "{{ club.public_token }}";
+
+  async function postForm(url, data) {
+    const fd = new URLSearchParams();
+    for (const [k, v] of Object.entries(data)) fd.append(k, v);
+    const res = await fetch(url, { method: "POST", body: fd });
+    const ct = res.headers.get("content-type") || "";
+    if (ct.includes("application/json")) return await res.json();
+    const txt = await res.text();
+    throw new Error(`HTTP ${res.status}: ${txt}`);
+  }
+
+  // Event 作成
+  document.querySelectorAll(".create-event-btn").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      const tr = e.target.closest("tr");
+      const d = tr.dataset.date;
+      try {
+        const r = await postForm(`/api/club/${CLUB_PUBLIC}/events/create/`, { date: d });
+        if (!r.ok) throw new Error(r.error || "failed");
+        location.reload(); // 最短：再読み込み
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  });
+
+  // メンバー追加
+  document.getElementById("member-add-btn").addEventListener("click", async () => {
+    const name = document.getElementById("member-name").value.trim();
+    if (!name) return alert("表示名を入力してください");
+    try {
+      const r = await postForm(`/api/club/${CLUB_PUBLIC}/members/add/`, { display_name: name });
+      if (!r.ok) throw new Error(r.error || "failed");
+      location.reload();
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+
+  // フラグ追加
+  document.getElementById("flag-add-btn").addEventListener("click", async () => {
+    const name = document.getElementById("flag-name").value.trim();
+    if (!name) return alert("フラグ名を入力してください");
+    try {
+      const r = await postForm(`/api/club/${CLUB_PUBLIC}/flags/add/`, { name });
+      if (!r.ok) throw new Error(r.error || "failed");
+      location.reload();
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+
+  // フラグ名称変更 / active切替
+  document.querySelectorAll("#flags .item").forEach(item => {
+    const flagId = item.dataset.flagId;
+
+    item.querySelector(".flag-rename-btn")?.addEventListener("click", async () => {
+      const current = item.querySelector(".flag-name")?.textContent || "";
+      const name = prompt("新しい名称", current);
+      if (!name) return;
+      try {
+        const r = await postForm(`/api/club/${CLUB_PUBLIC}/flags/${flagId}/rename/`, { name });
+        if (!r.ok) throw new Error(r.error || "failed");
+        location.reload();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+
+    item.querySelector(".flag-toggle-btn")?.addEventListener("click", async () => {
+      try {
+        const r = await postForm(`/api/club/${CLUB_PUBLIC}/flags/${flagId}/toggle_active/`, {});
+        if (!r.ok) throw new Error(r.error || "failed");
+        location.reload();
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  });
+</script>
+
+</body>
+</html>

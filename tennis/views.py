@@ -1,800 +1,537 @@
 # tennis/views.py
-from django.shortcuts import render, get_object_or_404, redirect
-from django.urls import reverse
-from django.http import HttpResponseBadRequest, JsonResponse
-from django.template.loader import render_to_string
-from django.views.decorators.http import require_POST
-import json
-from django.contrib.auth.decorators import login_required
+from __future__ import annotations
+
+import calendar, json, random
+from datetime import date as dt_date
+from datetime import datetime
+from django.db import transaction
+from django.db.models import Count, Q
+from django.http import JsonResponse, HttpResponseBadRequest
+from django.http import Http404, HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.views.decorators.http import require_http_methods
 from django.views.decorators.csrf import csrf_exempt
 
 
+from .models import (
+    Club, Event, Participant,
+    Attendance, ClubFlagDefinition, AttendanceFlag,
+    MatchScore,
+)
 
-from .models import Event, Participant
-from .utils import generate_doubles_schedule, generate_singles_schedule
 
+# -------------------------
+# helpers
+# -------------------------
 
+def _get_club_by_public(public_token: str) -> Club:
+    return get_object_or_404(Club, public_token=public_token)
 
+def _require_admin(club: Club, admin_token: str) -> None:
+    if club.admin_token != admin_token:
+        raise Http404("admin token mismatch")
 
-def index(request):
+def _month_range(year: int, month: int) -> tuple[dt_date, dt_date]:
+    first = dt_date(year, month, 1)
+    last_day = calendar.monthrange(year, month)[1]
+    last = dt_date(year, month, last_day)
+    return first, last
+
+@transaction.atomic
+def _ensure_attendance_rows(event: Event) -> None:
     """
-    とりあえず最近のイベント一覧と「新規作成」リンクだけ出す簡易トップ
+    BETA最短：イベントに入った時点でクラブメンバー全員分 Attendance を用意する
     """
-    events = Event.objects.order_by("-date")[:10]
-    return render(request, "tennis/index.html", {"events": events})
+    participants = Participant.objects.filter(club=event.club).all()
+    for p in participants:
+        Attendance.objects.get_or_create(event=event, participant=p)
 
-@login_required
-def club_settings(request):
+
+# -------------------------
+# pages (BETA: minimal)
+# -------------------------
+
+@csrf_exempt
+@require_http_methods(["GET", "POST"])
+def portal_index(request):
     """
-    クラブ設定ページ：
-      - ① 練習日の設定（カレンダー）
-      - ② 出席表フォーマット（フラグなど）の設定
-    新規クラブ登録後、まずここに来て設定してもらう想定。
+    / : クラブ作成（クラブ名のみ）
+    POST: club_name を受けて作成し、URLを返す（BETA：コピー前提）
     """
-    today = timezone.localdate()
+    if request.method == "POST":
+        club_name = (request.POST.get("club_name") or "").strip()
+        if not club_name:
+            return HttpResponse("club_name is required", status=400)
 
-    # ?year= / ?month= 指定があればその月、なければ今月
-    try:
-        year = int(request.GET.get("year", today.year))
-        month = int(request.GET.get("month", today.month))
-    except ValueError:
-        year = today.year
-        month = today.month
+        club = Club.objects.create(name=club_name)
+        member_url = f"/c/{club.public_token}/"
+        admin_url = f"/c/{club.public_token}/admin/{club.admin_token}/settings/"
+        return HttpResponse(
+            "CLUB CREATED\n"
+            f"member_url: {member_url}\n"
+            f"admin_url:  {admin_url}\n"
+        )
 
-    # 当月の範囲
-    first_day = date(year, month, 1)
-    _, last_day_num = calendar.monthrange(year, month)
-    last_day = date(year, month, last_day_num)
-
-    # この月のイベント（練習日）を取得
-    events_qs = (
-        Event.objects
-        .filter(date__gte=first_day, date__lte=last_day)
-        .order_by("date", "title")
+    # GET: 最小表示（後でテンプレ化）
+    return HttpResponse(
+        "Tennis Portal\n"
+        "POST club_name to create a club.\n"
     )
 
-    # 日付文字列 "YYYY-MM-DD" → [Event,...]
-    events_by_day = {}
-    for ev in events_qs:
-        key = ev.date.strftime("%Y-%m-%d")
-        events_by_day.setdefault(key, []).append(ev)
 
-    # イベントごとのフラグ
-    flags_qs = Flag.objects.filter(event__in=events_qs).order_by("id")
-    flags_by_event = {}
-    for f in flags_qs:
-        flags_by_event.setdefault(f.event_id, []).append(f)
+@require_http_methods(["GET"])
+def club_main(request, club_public_token: str):
+    """
+    /c/<public>/ : 当月カレンダー＆イベント一覧（最小表示）
+    """
+    club = _get_club_by_public(club_public_token)
 
-    # カレンダー用 2次元配列
-    cal = calendar.Calendar(firstweekday=0)  # 月曜始まりなら 0
-    month_weeks = []
-    for week in cal.monthdatescalendar(year, month):
-        week_data = []
-        for d in week:
-            key = d.strftime("%Y-%m-%d")
-            week_data.append({
-                "date": d,
-                "key": key,
-                "is_current_month": (d.month == month),
-                "events": events_by_day.get(key, []),
-            })
-        month_weeks.append(week_data)
+    now = timezone.localdate()
+    first, last = _month_range(now.year, now.month)
 
-    context = {
-        "year": year,
-        "month": month,
-        "month_weeks": month_weeks,
-        "flags_by_event": flags_by_event,
-        "today": today,
-        "prev_year": (month == 1 and year - 1) or year,
-        "prev_month": (month == 1 and 12) or (month - 1),
-        "next_year": (month == 12 and year + 1) or year,
-        "next_month": (month == 12 and 1) or (month + 1),
+    events = (
+        Event.objects.filter(club=club, date__range=(first, last))
+        .order_by("date")
+        .all()
+    )
+
+    # 当月サマリー（yes/no/maybe 集計）
+    # Attendanceはイベント詳細アクセス時に生成されるが、未生成でも落ちないように left join 的に集計するなら別途要作り込み。
+    # ここはBETA最短として「存在するAttendanceのみ集計」。
+    summary = (
+        Attendance.objects.filter(event__in=events)
+        .values("event_id")
+        .annotate(
+            yes=Count("id", filter=Q(attendance="yes")),
+            no=Count("id", filter=Q(attendance="no")),
+            maybe=Count("id", filter=Q(attendance="maybe")),
+        )
+    )
+    summary_map = {x["event_id"]: x for x in summary}
+
+    lines = [f"Club: {club.name}", f"Month: {now.year}-{now.month:02d}", ""]
+    for e in events:
+        s = summary_map.get(e.id, {"yes": 0, "no": 0, "maybe": 0})
+        lines.append(f"- {e.date}  (yes={s['yes']}, no={s['no']}, maybe={s['maybe']})  -> /c/{club.public_token}/e/{e.id}/")
+
+    if not events:
+        lines.append("(no events this month)")
+
+    return HttpResponse("\n".join(lines))
+
+
+@require_http_methods(["GET"])
+def club_settings(request, club_public_token: str, club_admin_token: str):
+    club = _get_club_by_public(club_public_token)
+    _require_admin(club, club_admin_token)
+
+    now = timezone.localdate()
+    first, last = _month_range(now.year, now.month)
+
+    events = Event.objects.filter(club=club, date__range=(first, last)).order_by("date")
+    event_map = {e.date.isoformat(): e.id for e in events}
+
+    # 当月カレンダー行（テンプレで辞書アクセスしないための形）
+    calendar_rows = []
+    for day in range(1, last.day + 1):
+        d = dt_date(now.year, now.month, day).isoformat()
+        calendar_rows.append({
+            "date": d,
+            "day": day,
+            "event_id": event_map.get(d),
+        })
+
+    flags = ClubFlagDefinition.objects.filter(club=club).order_by("order", "id")
+    members = Participant.objects.filter(club=club).order_by("id")
+
+    ctx = {
+        "club": club,
+        "admin_token": club_admin_token,
+        "year": now.year,
+        "month": now.month,
+        "calendar_rows": calendar_rows,
+        "flags": flags,
+        "members": members,
     }
-    return render(request, "tennis/settings.html", context)
-
-def create_event(request):
-    """
-    幹事用：1回分のテニス会を作成
-    """
-    if request.method == "POST":
-        title = request.POST.get("title", "").strip()
-        date = request.POST.get("date", "")
-        start_time = request.POST.get("start_time", "")
-        place = request.POST.get("place", "").strip()
-        note = request.POST.get("note", "").strip()
-
-        if not title or not date:
-            return HttpResponseBadRequest("タイトルと日付は必須です。")
-
-        event = Event(
-            title=title,
-            date=date,
-            start_time=start_time or None,
-            place=place,
-            note=note,
-        )
-        event.save()
-
-        public_url = request.build_absolute_uri(
-            reverse("tennis:event_public", args=[event.public_token])
-        )
-        admin_url = request.build_absolute_uri(
-            reverse("tennis:event_admin", args=[event.public_token, event.admin_token])
-        )
-
-        return render(
-            request,
-            "tennis/create_done.html",
-            {
-                "event": event,
-                "public_url": public_url,
-                "admin_url": admin_url,
-            },
-        )
-
-    return render(request, "tennis/create_event.html")
-
-
-def update_participation_flag(request):
-    """
-    AJAX 用：試合参加フラグを即時更新する
-    POST: participant_id, value(true/false)
-
-    ★ ここでは DB を書き換えず、イベントごとの「作業用フラグ」を
-       セッションにだけ保存する。
-       → リロードすれば破棄される。
-    """
-    if request.method != "POST":
-        return JsonResponse({"error": "POST only"}, status=400)
-
-    try:
-        pid = int(request.POST.get("participant_id"))
-        val = request.POST.get("value") == "true"
-    except Exception:
-        return JsonResponse({"error": "bad request"}, status=400)
-
-    p = Participant.objects.select_related("event").filter(id=pid).first()
-    if not p:
-        return JsonResponse({"error": "participant not found"}, status=404)
-
-    event_id = p.event_id
-    session_key = f"event_{event_id}_working_participates"
-
-    # 作業用フラグをセッションに保持
-    flags = request.session.get(session_key, {})
-    flags[str(pid)] = val
-    request.session[session_key] = flags
-    request.session.modified = True
-
-    return JsonResponse({"status": "ok", "participant": p.id, "value": val})
-
-
-def event_public(request, public_token):
-    """
-    参加者用ページ
-    - 出欠フォーム
-    - 出欠一覧
-    """
-    event = get_object_or_404(Event, public_token=public_token)
-
-    if request.method == "POST":
-        name = request.POST.get("name", "").strip()
-        attendance = request.POST.get("attendance", "yes")
-        level = request.POST.get("level", "").strip()
-        comment = request.POST.get("comment", "").strip()
-
-        if name:
-            participant, created = Participant.objects.get_or_create(
-                event=event,
-                name=name,
-                defaults={
-                    "attendance": attendance,
-                    "level": level,
-                    "comment": comment,
-                },
-            )
-            if not created:
-                participant.attendance = attendance
-                participant.level = level
-                participant.comment = comment
-                participant.save()
-
-        return redirect("tennis:event_public", public_token=event.public_token)
-
-    participants = event.participants.order_by("created_at")
-    return render(
-        request,
-        "tennis/event_public.html",
-        {
-            "event": event,
-            "participants": participants,
-        },
-    )
-
-
-def event_admin(request, public_token, admin_token):
-    """
-    幹事用ページ：
-      - POST(generate_schedule) のときだけ乱数表を生成して draft 保存 → PRG
-      - 直後の GET 1回だけ draft を表示
-      - それ以外の GET では「最後に公開された対戦表」を表示
-      - 試合参加フラグの変更はセッションにだけ保持し、リロードしたら破棄
-    """
-    event = get_object_or_404(Event, public_token=public_token, admin_token=admin_token)
-
-    # 出席者（attendance="yes" のみ）
-    participants = event.participants.filter(attendance="yes").order_by("created_at")
-
-    DEFAULT_ROUNDS = 10
-    DEFAULT_COURTS = 1
-
-    # 作業用フラグのセッションキー
-    session_flags_key = f"event_{event.id}_working_participates"
-
-    # ============ 共通：stats 作成関数 ============（ここはそのまま）
-    def build_stats_from_schedule(names_list, schedule_list):
-        if not schedule_list:
-            return None, None
-
-        all_names = names_list[:]
-        round_seq = {n: [] for n in all_names}
-
-        for round_info in schedule_list:
-            playing = set()
-            for m in round_info.get("matches", []):
-                playing.update(m.get("team1", []))
-                playing.update(m.get("team2", []))
-
-            rests = [n for n in all_names if n not in playing]
-            round_info["rests"] = rests
-
-            for n in all_names:
-                round_seq[n].append("P" if n in playing else "R")
-
-        def max_streak(seq, target):
-            cur = max_s = 0
-            for x in seq:
-                if x == target:
-                    cur += 1
-                    max_s = max(max_s, cur)
-                else:
-                    cur = 0
-            return max_s
-
-        # ★ サマリーは match_participants のみを対象にする
-        stats_list = []
-        for p in match_participants:
-            seq = round_seq.get(p.name, [])
-            stats_list.append({
-                "name": p.name,
-                "matches": seq.count("P"),
-                "rests": seq.count("R"),
-                "max_play_streak": max_streak(seq, "P"),
-                "max_rest_streak": max_streak(seq, "R"),
-            })
-
-        return schedule_list, stats_list
-
-
-    # ★ schedule からゲーム種別・ラウンド数・面数を推論するヘルパー
-    def infer_meta_from_schedule(schedule_list):
-        """
-        schedule_list: [{"round": n, "matches": [...]}] のリスト から
-        - game_type: "singles" or "doubles"
-        - num_rounds: ラウンド数
-        - num_courts: 最大コート番号（≒ 面数）
-        を推論して返す。
-        """
-        if not schedule_list:
-            return None, None, None
-
-        num_rounds = len(schedule_list)
-        game_type = "doubles"  # デフォルト
-        num_courts = 1
-
-        # 最初に「試合があるラウンド」を1つ見て、その中の最初の試合から判定
-        for round_info in schedule_list:
-            matches = round_info.get("matches") or []
-            if not matches:
-                continue
-
-            first_match = matches[0]
-            team1 = first_match.get("team1") or []
-
-            # チーム人数でシングルス/ダブルスを判定
-            if len(team1) == 1:
-                game_type = "singles"
-            else:
-                game_type = "doubles"
-
-            # 面数は「court の最大値」か、なければ試合数
-            courts = [
-                m.get("court")
-                for m in matches
-                if isinstance(m.get("court"), int)
-            ]
-            if courts:
-                num_courts = max(courts)
-            else:
-                num_courts = len(matches)
-
-            break  # 1ラウンド分見られれば十分
-
-        return game_type, num_rounds, num_courts
-
-
-    # ★ 有効な「試合参加メンバー」を求めるヘルパー
-    def get_match_participants(use_working_flags: bool):
-        """
-        use_working_flags=True のとき：
-            セッション上の作業用フラグを優先（なければ DB の participates_match）
-        use_working_flags=False のとき：
-            DB の participates_match のみを信じる（公式状態）
-        """
-        if use_working_flags:
-            flags = request.session.get(session_flags_key, {})
-        else:
-            flags = {}
-
-        result = []
-        for p in participants:
-            if use_working_flags:
-                f = flags.get(str(p.id))
-                if f is None:
-                    f = p.participates_match
-            else:
-                f = p.participates_match
-
-            if f:
-                result.append(p)
-        return result
-
-    # ============================================================
-    # ① POST: 乱数表生成 → draft に保存して PRG（このリクエストでは render しない）
-    # ============================================================
-    if request.method == "POST" and "generate_schedule" in request.POST:
-        # 今の「試合参加チェック状態」（作業用＋DB）を反映したメンバー
-        match_participants = get_match_participants(use_working_flags=True)
-        match_count = len(match_participants)
-        names = [p.name for p in match_participants]
-
-        # ゲーム種別
-        game_type = request.POST.get("game_type", "doubles")
-        per_court = 4 if game_type == "doubles" else 2
-        max_courts = max(1, match_count // per_court) if match_count >= per_court else 1
-
-        # ラウンド数
-        try:
-            num_rounds = int(request.POST.get("num_rounds", DEFAULT_ROUNDS))
-        except (TypeError, ValueError):
-            num_rounds = DEFAULT_ROUNDS
-        num_rounds = max(1, min(num_rounds, 20))
-
-        # 面数
-        try:
-            num_courts = int(request.POST.get("num_courts", DEFAULT_COURTS))
-        except (TypeError, ValueError):
-            num_courts = DEFAULT_COURTS
-        num_courts = max(1, min(num_courts, max_courts))
-
-        # 乱数表生成
-        if match_count == 0:
-            schedule = []
-        else:
-            if game_type == "singles":
-                schedule = generate_singles_schedule(names, num_rounds, num_courts)
-            else:
-                schedule = generate_doubles_schedule(names, num_rounds, num_courts)
-
-        # draft に保存（未公開の案）
-        event.draft_schedule = schedule
-        event.save()
-
-        # pill 表示用の条件をセッションに保存
-        request.session[f"event_{event.id}_game_type"] = game_type
-        request.session[f"event_{event.id}_num_rounds"] = num_rounds
-        request.session[f"event_{event.id}_num_courts"] = num_courts
-
-        # ★ 直後の GET 1 回だけ draft を表示するためのフラグ
-        request.session[f"event_{event.id}_show_draft_once"] = True
-
-        # PRG
-        return redirect("tennis:event_admin", public_token=public_token, admin_token=admin_token)
-
-    # ============================================================
-    # ② GET: 表示用ロジック
-    #     - show_draft_once が True なら draft を 1 回だけ表示
-    #     - それ以外は「公開版」を最優先（ドラフトは無視 / 作業フラグも破棄）
-    # ============================================================
-    draft = event.draft_schedule
-    published = event.published_schedule
-
-    show_draft_once_key = f"event_{event.id}_show_draft_once"
-    show_draft_once = request.session.pop(show_draft_once_key, False)
-
-    if show_draft_once and draft:
-        # 乱数生成直後の 1 回だけは draft を表示
-        schedule_source = "draft_once"
-        schedule_raw = draft
-
-        # この 1 回だけは作業用フラグを生かして人数を数える
-        match_participants = get_match_participants(use_working_flags=True)
-        # テンプレート用に表示だけ上書き（DB は書き換えない）
-        working_flags = request.session.get(session_flags_key, {})
-        for p in participants:
-            f = working_flags.get(str(p.id))
-            if f is None:
-                f = p.participates_match
-            p.participates_match = f
-
-    else:
-        # ★ リロード or 通常アクセス：
-        #    公開済みの対戦表だけを表示し、ドラフト＆作業フラグは破棄
-        if published:
-            schedule_source = "published"
-            schedule_raw = published
-        else:
-            schedule_source = None
-            schedule_raw = None
-
-        # 未公開ドラフト＆作業フラグは破棄
-        request.session.pop(session_flags_key, None)
-        # 必要なら DB 上の draft も物理的に消してしまうことも可能
-        # event.draft_schedule = None
-        # event.save(update_fields=["draft_schedule"])
-
-        # 人数は「公式状態」（DB）の participates_match から
-        match_participants = get_match_participants(use_working_flags=False)
-
-    match_count = len(match_participants)
-    names = [p.name for p in match_participants]
-
-    # 対戦表 & サマリー
-    if schedule_raw:
-        schedule, stats = build_stats_from_schedule(names, schedule_raw)
-    else:
-        schedule = None
-        stats = None
-
-    # ===== pill 表示用の値を決める =====
-    # 基本方針：
-    #   - 今表示している schedule_raw があれば、そこから逆算した値を優先
-    #   - schedule が無ければ、これまでどおりセッション or デフォルト
-    derived_game_type = None
-    derived_num_rounds = None
-    derived_num_courts = None
-
-    if schedule_raw:
-        derived_game_type, derived_num_rounds, derived_num_courts = infer_meta_from_schedule(schedule_raw)
-
-    if derived_game_type is not None:
-        game_type = derived_game_type
-        num_rounds = derived_num_rounds or DEFAULT_ROUNDS
-        num_courts = derived_num_courts or DEFAULT_COURTS
-
-        # セッションにも反映しておくと、次回以降も一貫した挙動になる
-        request.session[f"event_{event.id}_game_type"] = game_type
-        request.session[f"event_{event.id}_num_rounds"] = num_rounds
-        request.session[f"event_{event.id}_num_courts"] = num_courts
-    else:
-        # まだ対戦表が一度も作られていないケースなどは従来動作
-        game_type = request.session.get(f"event_{event.id}_game_type", "doubles")
-        num_rounds = request.session.get(f"event_{event.id}_num_rounds", DEFAULT_ROUNDS)
-        num_courts = request.session.get(f"event_{event.id}_num_courts", DEFAULT_COURTS)
-
-
-    # 公開状態の判定
-    if not schedule_raw:
-        publish_state = "no_schedule"
-    else:
-        if schedule_source == "published":
-            publish_state = "published"
-        else:
-            # draft_once を表示している（公開前 or 公開済みと別物）
-            if published and schedule_raw != published:
-                publish_state = "changed"  # 公開済みと異なる → 再公開可能
-            elif published and schedule_raw == published:
-                publish_state = "published"
-            else:
-                publish_state = "ready"    # まだ一度も公開していない
-
-    schedule_json = json.dumps(schedule, ensure_ascii=False) if schedule else None
-
-    # ============================================================
-    # フラグ情報（ここはそのまま）
-    # ============================================================
-    flags = list(event.flag_definitions.all())
-    MAX_FLAGS = 5
-
-    pf_qs = ParticipantFlag.objects.filter(
-        participant__event=event,
-        flag__event=event,
-    )
-    flag_states = {(pf.participant_id, pf.flag_id): pf.checked for pf in pf_qs}
-
-    # ============================================================
-    # レンダリング
-    # ============================================================
-    return render(
-        request,
-        "tennis/event_admin.html",
-        {
-            "event": event,
-            "participants": participants,
-            "schedule": schedule,
-            "num_rounds": num_rounds,
-            "num_courts": num_courts,
-            "stats": stats,
-            "match_count": match_count,
-            "game_type": game_type,
-            "publish_state": publish_state,
-            "schedule_json": schedule_json,
-            "flags": flags,
-            "flag_states": flag_states,
-            "max_flags": MAX_FLAGS,
-        },
-    )
+    return render(request, "tennis/club_settings.html", ctx)
+
+
+@require_http_methods(["GET"])
+def event_detail(request, club_public_token: str, event_id: int):
+    club = get_object_or_404(Club, public_token=club_public_token)
+    event = get_object_or_404(Event, id=event_id, club=club)
+
+    members = Participant.objects.filter(club=club).order_by("id")
+
+    # Attendance を足りない分だけ自動作成（最短）
+    existing = {a.participant_id: a for a in Attendance.objects.filter(event=event)}
+    to_create = []
+    for m in members:
+        if m.id not in existing:
+            to_create.append(Attendance(event=event, participant=m, attendance="maybe"))
+    if to_create:
+        Attendance.objects.bulk_create(to_create)
+        existing = {a.participant_id: a for a in Attendance.objects.filter(event=event)}
+
+    attendances = Attendance.objects.filter(event=event).select_related("participant").order_by("participant__id")
+
+    # フラグ（activeのみ表示。過去保持は DB 側で維持）
+    flags = ClubFlagDefinition.objects.filter(club=club, is_active=True).order_by("order", "id")
+
+    # AttendanceFlag 既存チェック
+    af_qs = AttendanceFlag.objects.filter(attendance__event=event, flag__in=flags)
+    checked = {(af.attendance_id, af.flag_id): af.checked for af in af_qs}
+
+    # 対戦表（ロック優先）
+    schedule = event.locked_schedule if event.locked_at else event.draft_schedule
+    if not schedule:
+        schedule = []
+
+    ctx = {
+        "club": club,
+        "event": event,
+        "members": members,
+        "attendances": attendances,
+        "flags": flags,
+        "checked_map_json": json.dumps({f"{k[0]}_{k[1]}": v for k, v in checked.items()}),
+        "schedule_json": json.dumps(schedule),
+    }
+    return render(request, "tennis/event_detail.html", ctx)
+
+
+    # スコア
+    scores = MatchScore.objects.filter(event=event).order_by("match_key")
+    if scores.exists():
+        lines.append("")
+        lines.append("Scores:")
+        for s in scores:
+            lines.append(f"  - {s.match_key}: {s.score_text}")
+
+    return HttpResponse("\n".join(lines))
+
+
+# -------------------------
+# APIs
+# -------------------------
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_member_add(request, club_public_token: str):
+    club = _get_club_by_public(club_public_token)
+    name = (request.POST.get("display_name") or "").strip()
+    if not name:
+        return JsonResponse({"ok": False, "error": "display_name is required"}, status=400)
+
+    m = Participant.objects.create(club=club, display_name=name)
+    return JsonResponse({"ok": True, "member": {"id": m.id, "display_name": m.display_name}})
 
 
 @csrf_exempt
-def publish_schedule(request):
-    if request.method != "POST":
-        return JsonResponse({"error": "POST only"}, status=400)
-
-    event_id = request.POST.get("event_id")
-    event = Event.objects.filter(id=event_id).first()
-    if not event:
-        return JsonResponse({"error": "Event not found"}, status=404)
-
-    schedule_json = request.POST.get("schedule_json")
-    if not schedule_json:
-        return JsonResponse({"error": "No schedule provided"}, status=400)
-
-    try:
-        schedule = json.loads(schedule_json)
-
-        # 公開＆ドラフトをこの schedule に揃える
-        event.published_schedule = schedule
-        event.draft_schedule = schedule
-
-        # ★ 公開時点の「公式試合参加フラグ」を schedule に合わせて更新
-        player_names = set()
-        for round_info in schedule:
-            for m in round_info.get("matches", []):
-                player_names.update(m.get("team1", []))
-                player_names.update(m.get("team2", []))
-
-        for p in event.participants.filter(attendance="yes"):
-            p.participates_match = (p.name in player_names)
-            p.save(update_fields=["participates_match"])
-
-        event.save()
-
-    except Exception as e:
-        return JsonResponse({"error": str(e)}, status=400)
-
-    return JsonResponse({"status": "ok"})
-
-
-@require_POST
-def add_flag(request):
-    """フラグを 1 つ追加（上限 5）。名前はデフォルト 'フラグN'。"""
-    event_id = request.POST.get("event_id")
-    event = get_object_or_404(Event, id=event_id)
-
-    MAX_FLAGS = 5
-    current = event.flag_definitions.count()
-    if current >= MAX_FLAGS:
-        return JsonResponse({"error": "max_reached", "max": MAX_FLAGS}, status=400)
-
-    order = current + 1
-    flag = FlagDefinition.objects.create(
-        event=event,
-        name=f"フラグ{order}",
-        order=order,
-    )
-    return JsonResponse(
-        {"id": flag.id, "name": flag.name, "order": flag.order}
-    )
-
-
-@require_POST
-def delete_flag(request):
-    """最後に作られたフラグを削除する"""
-    event_id = request.POST.get("event_id")
-    event = get_object_or_404(Event, id=event_id)
-
-    # 最新（order の最大）を削除
-    last_flag = event.flag_definitions.order_by("-order").first()
-    if not last_flag:
-        return JsonResponse({"error": "no_flag"}, status=400)
-
-    last_flag.delete()
-    return JsonResponse({"status": "ok"})
-
-
-
-@require_POST
-def rename_flag(request):
-    """フラグ名の変更（ヘッダクリックで使う想定）"""
-    flag_id = request.POST.get("flag_id")
+@require_http_methods(["POST"])
+def api_flag_add(request, club_public_token: str):
+    club = _get_club_by_public(club_public_token)
     name = (request.POST.get("name") or "").strip()
     if not name:
-        return JsonResponse({"error": "empty_name"}, status=400)
+        return JsonResponse({"ok": False, "error": "name is required"}, status=400)
 
-    flag = get_object_or_404(FlagDefinition, id=flag_id)
-    flag.name = name
-    flag.save()
-    return JsonResponse({"id": flag.id, "name": flag.name})
+    # order: 最後尾に追加（BETA最短）
+    last = ClubFlagDefinition.objects.filter(club=club).order_by("-order").first()
+    next_order = (last.order + 1) if last else 1
 
-
-@require_POST
-def toggle_flag(request):
-    """参加者×フラグの ON/OFF 切り替え"""
-    participant_id = request.POST.get("participant_id")
-    flag_id = request.POST.get("flag_id")
-    checked = request.POST.get("checked") == "true"
-
-    participant = get_object_or_404(Participant, id=participant_id)
-    flag = get_object_or_404(FlagDefinition, id=flag_id)
-
-    pf, _ = ParticipantFlag.objects.get_or_create(
-        participant=participant,
-        flag=flag,
-    )
-    pf.checked = checked
-    pf.save()
-
-    return JsonResponse({"status": "ok"})
+    f = ClubFlagDefinition.objects.create(club=club, name=name, order=next_order, is_active=True)
+    return JsonResponse({"ok": True, "flag": {"id": f.id, "name": f.name, "order": f.order, "is_active": f.is_active}})
 
 
-# 参加者リストと条件を受け取って対戦表＋サマリーだけ返すAPI
-@require_POST
-def ajax_generate_schedule(request, event_id):
-    """
-    対戦条件＆試合参加メンバーを受け取り、
-    対戦表＋サマリーを HTML にして返す（ページはリロードしない）
-    """
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_flag_rename(request, club_public_token: str, flag_id: int):
+    club = _get_club_by_public(club_public_token)
+    f = get_object_or_404(ClubFlagDefinition, id=flag_id, club=club)
+    name = (request.POST.get("name") or "").strip()
+    if not name:
+        return JsonResponse({"ok": False, "error": "name is required"}, status=400)
+    f.name = name
+    f.save(update_fields=["name", "updated_at"])
+    return JsonResponse({"ok": True})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_flag_toggle_active(request, club_public_token: str, flag_id: int):
+    club = _get_club_by_public(club_public_token)
+    f = get_object_or_404(ClubFlagDefinition, id=flag_id, club=club)
+    f.is_active = not f.is_active
+    f.save(update_fields=["is_active", "updated_at"])
+    return JsonResponse({"ok": True, "is_active": f.is_active})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_attendance_update(request, event_id: int):
+    # POST: participant_id, attendance(yes/no/maybe), participates_match(0/1), comment, flags (comma-separated flag ids)
+    event = get_object_or_404(Event, id=event_id)
+    pid = request.POST.get("participant_id")
+    if not pid:
+        return JsonResponse({"ok": False, "error": "participant_id required"}, status=400)
+
+    att = Attendance.objects.select_related("participant").get(event=event, participant_id=int(pid))
+
+    attendance = request.POST.get("attendance")
+    if attendance in ("yes", "no", "maybe"):
+        att.attendance = attendance
+
+    pm = request.POST.get("participates_match")
+    if pm is not None:
+        att.participates_match = (pm == "1")
+
+    comment = request.POST.get("comment")
+    if comment is not None:
+        att.comment = comment
+
+    att.save()
+
+    # flags 更新（activeフラグのみ想定）
+    flags_str = request.POST.get("flags", "")
+    flag_ids = []
+    if flags_str.strip():
+        try:
+            flag_ids = [int(x) for x in flags_str.split(",") if x.strip()]
+        except ValueError:
+            return JsonResponse({"ok": False, "error": "invalid flags"}, status=400)
+
+    # 指定フラグだけ checked=True に、指定外は False に（最短）
+    club_flags = ClubFlagDefinition.objects.filter(id__in=flag_ids)
+    # まず club の active フラグ集合を取得（この attendance の club に限定）
+    active_flags = ClubFlagDefinition.objects.filter(club=event.club, is_active=True)
+    active_ids = list(active_flags.values_list("id", flat=True))
+
+    # 既存を一括で False
+    AttendanceFlag.objects.filter(attendance=att, flag_id__in=active_ids).update(checked=False)
+
+    # 指定分を upsert
+    for fid in flag_ids:
+        AttendanceFlag.objects.update_or_create(
+            attendance=att,
+            flag_id=fid,
+            defaults={"checked": True},
+        )
+
+    return JsonResponse({"ok": True})
+
+
+def _build_schedule(names: list[str], rounds: int = 1) -> list[dict]:
+    rounds = max(1, min(int(rounds), 10))  # 1〜10で制限（BETA安全）
+
+    out = []
+    for r in range(1, rounds + 1):
+        pool = names[:]
+        random.shuffle(pool)
+
+        m = 1
+        i = 0
+        while i + 4 <= len(pool):
+            chunk = pool[i:i+4]
+            out.append({
+                "match_key": f"R{r}-M{m}",
+                "round": r,
+                "players": chunk,
+                "score": {"a": "", "b": ""},
+            })
+            m += 1
+            i += 4
+
+    return out
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_schedule_generate(request, event_id: int):
     event = get_object_or_404(Event, id=event_id)
 
-    # 出席者（出欠 yes のみ）
-    participants = list(
-        event.participants.filter(attendance="yes").order_by("created_at")
-    )
+    
 
-    # ===== チェックボックスで選ばれた「試合参加メンバー」 =====
-    ids_str = request.POST.get("participant_ids", "").strip()
-    if ids_str:
-        try:
-            selected_ids = {int(x) for x in ids_str.split(",") if x}
-        except ValueError:
-            return JsonResponse({"error": "bad participant_ids"}, status=400)
-        match_participants = [p for p in participants if p.id in selected_ids]
-    else:
-        # 何も来なかった場合は DB 上の participates_match=True を採用
-        match_participants = [
-            p for p in participants if p.participates_match
-        ]
+    force = request.POST.get("force") == "1"
+    if event.locked_at and not force:
+        return JsonResponse({"ok": False, "error": "locked (score exists). use force=1 to regenerate."}, status=409)
 
-    match_count = len(match_participants)
-    names = [p.name for p in match_participants]
+    # 参加者：attendance=yes かつ participates_match=True
+    qs = Attendance.objects.filter(event=event, attendance="yes", participates_match=True).select_related("participant")
+    names = [a.participant.display_name for a in qs]
 
-    # ===== 条件の取得 =====
-    DEFAULT_ROUNDS = 10
-    DEFAULT_COURTS = 1
-
-    game_type = request.POST.get("game_type", "doubles")
+    rounds = request.POST.get("rounds") or "1"
     try:
-        num_rounds = int(request.POST.get("num_rounds", DEFAULT_ROUNDS))
-    except (TypeError, ValueError):
-        num_rounds = DEFAULT_ROUNDS
-    num_rounds = max(1, min(num_rounds, 20))
+        rounds_i = int(rounds)
+    except ValueError:
+        return JsonResponse({"ok": False, "error": "invalid rounds"}, status=400)
+
+    schedule = _build_schedule(names, rounds=rounds_i)
+    event.draft_schedule = schedule
+    # force で再生成する場合はロック解除もセットでやる（最短）
+    if force:
+        event.locked_at = None
+        event.has_score = False
+        event.locked_schedule = []
+
+    if event.locked_schedule is None:
+        event.locked_schedule = []
+
+    event.save(update_fields=["draft_schedule", "locked_at", "has_score", "locked_schedule", "updated_at"])
+
+
+    return JsonResponse({"ok": True, "schedule": schedule})
+
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_score_set(request, event_id: int):
+    event = get_object_or_404(Event, id=event_id)
+    match_key = (request.POST.get("match_key") or "").strip()
+    score_a = (request.POST.get("score_a") or "").strip()
+    score_b = (request.POST.get("score_b") or "").strip()
+
+    if not match_key:
+        return JsonResponse({"ok": False, "error": "match_key required"}, status=400)
+
+    # ロック前なら draft を locked にコピーしてロック開始
+    if not event.locked_at:
+        base = event.draft_schedule or []
+        event.locked_schedule = json.loads(json.dumps(base))  # deep copy
+        event.locked_at = timezone.now()
+
+    sched = event.locked_schedule or []
+    found = False
+    for m in sched:
+        if m.get("match_key") == match_key:
+            m.setdefault("score", {})
+            m["score"]["a"] = score_a
+            m["score"]["b"] = score_b
+            found = True
+            break
+
+    if not found:
+        return JsonResponse({"ok": False, "error": "match_key not found"}, status=404)
+
+    # スコアが1つでも入ったら has_score=True
+    if score_a or score_b:
+        event.has_score = True
+
+    event.locked_schedule = sched
+    event.save(update_fields=["locked_schedule", "locked_at", "has_score", "updated_at"])
+    return JsonResponse({"ok": True, "locked_at": event.locked_at.isoformat(), "has_score": event.has_score})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_schedule_reset(request, event_id: int):
+    event = get_object_or_404(Event, id=event_id)
+    event.locked_at = None
+    event.has_score = False
+
+    # NOT NULL 対策（None にしない）
+    event.locked_schedule = []
+    event.draft_schedule = []
+
+    event.save(update_fields=["locked_at", "has_score", "locked_schedule", "draft_schedule", "updated_at"])
+    return JsonResponse({"ok": True})
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_event_create(request, club_public_token: str):
+    """
+    POST:
+      date=YYYY-MM-DD  （必須）
+      start_time=HH:MM （任意）
+      place, note      （任意）
+    """
+    club = _get_club_by_public(club_public_token)
+
+    date_str = (request.POST.get("date") or "").strip()
+    if not date_str:
+        return JsonResponse({"ok": False, "error": "date is required (YYYY-MM-DD)"}, status=400)
 
     try:
-        num_courts = int(request.POST.get("num_courts", DEFAULT_COURTS))
-    except (TypeError, ValueError):
-        num_courts = DEFAULT_COURTS
+        d = datetime.strptime(date_str, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({"ok": False, "error": "invalid date format. use YYYY-MM-DD"}, status=400)
 
-    per_court = 4 if game_type == "doubles" else 2
-    max_courts = (
-        max(1, match_count // per_court) if match_count >= per_court else 1
-    )
-    num_courts = max(1, min(num_courts, max_courts))
+    start_time = (request.POST.get("start_time") or "").strip() or None
+    place = (request.POST.get("place") or "").strip()
+    note = (request.POST.get("note") or "").strip()
 
-    # ===== 対戦表生成 =====
-    if match_count == 0:
-        schedule = []
-    else:
-        if game_type == "singles":
-            schedule = generate_singles_schedule(names, num_rounds, num_courts)
-        else:
-            schedule = generate_doubles_schedule(names, num_rounds, num_courts)
-
-    # ===== stats 用の共通処理 =====
-    def build_stats_from_schedule(names_list, schedule_list):
-        if not schedule_list:
-            return None, None
-
-        all_names = names_list[:]
-        round_seq = {n: [] for n in all_names}
-
-        for round_info in schedule_list:
-            playing = set()
-            for m in round_info.get("matches", []):
-                playing.update(m.get("team1", []))
-                playing.update(m.get("team2", []))
-
-            rests = [n for n in all_names if n not in playing]
-            round_info["rests"] = rests
-
-            for n in all_names:
-                round_seq[n].append("P" if n in playing else "R")
-
-        def max_streak(seq, target):
-            cur = max_s = 0
-            for x in seq:
-                if x == target:
-                    cur += 1
-                    max_s = max(max_s, cur)
-                else:
-                    cur = 0
-            return max_s
-
-        stats_list = []
-        # ★ 試合参加しない人はここに含めない
-        for p in match_participants:
-            seq = round_seq.get(p.name, [])
-            stats_list.append(
-                {
-                    "name": p.name,
-                    "matches": seq.count("P"),
-                    "rests": seq.count("R"),
-                    "max_play_streak": max_streak(seq, "P"),
-                    "max_rest_streak": max_streak(seq, "R"),
-                }
-            )
-
-        return schedule_list, stats_list
-
-
-    if schedule:
-        schedule, stats = build_stats_from_schedule(names, schedule)
-    else:
-        stats = None
-
-    # ===== 公開状態の判定（publish_state） =====
-    published = event.published_schedule
-    if not schedule:
-        publish_state = "no_schedule"
-    else:
-        if published and schedule == published:
-            publish_state = "published"
-        elif published and schedule != published:
-            publish_state = "changed"
-        else:
-            publish_state = "ready"
-
-    schedule_json = json.dumps(schedule, ensure_ascii=False) if schedule else None
-
-    ctx = {
-        "event": event,
-        "schedule": schedule,
-        "schedule_json": schedule_json,
-        "stats": stats,
-    }
-
-    schedule_html = render_to_string("tennis/_schedule_block.html", ctx, request=request)
-    stats_html = render_to_string("tennis/_stats_block.html", ctx, request=request)
-
-    return JsonResponse(
-        {
-            "schedule_html": schedule_html,
-            "stats_html": stats_html,
-            "publish_state": publish_state,
-            "game_type": game_type,
-            "num_courts": num_courts,
-            "num_rounds": num_rounds,
-            "match_count": match_count,
+    # 1日1回固定：unique (club, date)
+    event, created = Event.objects.get_or_create(
+        club=club,
+        date=d,
+        defaults={
+            "place": place,
+            "note": note,
         }
     )
+
+    # 任意項目は created 時のみ入れる（上書きしたいなら別APIで）
+    if created and start_time:
+        # start_time は TimeField の想定
+        try:
+            event.start_time = datetime.strptime(start_time, "%H:%M").time()
+            event.save(update_fields=["start_time", "updated_at"])
+        except ValueError:
+            return JsonResponse({"ok": False, "error": "invalid start_time format. use HH:MM"}, status=400)
+
+    return JsonResponse({
+        "ok": True,
+        "created": created,
+        "event": {
+            "id": event.id,
+            "date": event.date.isoformat(),
+            "detail_url": f"/c/{club.public_token}/e/{event.id}/",
+        }
+    })
+
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def api_schedule_swap_player(request, event_id: int):
+    event = get_object_or_404(Event, id=event_id)
+
+    old_name = (request.POST.get("old_name") or "").strip()
+    new_name = (request.POST.get("new_name") or "").strip()
+
+    if not old_name or not new_name:
+        return JsonResponse({"ok": False, "error": "old_name and new_name required"}, status=400)
+
+    # 置換先は「クラブ所属メンバー」の表示名に限定（最短の安全策）
+    if not Participant.objects.filter(club=event.club, display_name=new_name).exists():
+        return JsonResponse({"ok": False, "error": "new_name not in club members"}, status=400)
+
+    # ロック中は locked_schedule を編集、未ロックは draft_schedule を編集
+    target_field = "locked_schedule" if event.locked_at else "draft_schedule"
+    sched = getattr(event, target_field) or []
+
+    replaced = 0
+    for m in sched:
+        players = m.get("players") or []
+        new_players = []
+        for p in players:
+            if p == old_name:
+                new_players.append(new_name)
+                replaced += 1
+            else:
+                new_players.append(p)
+        m["players"] = new_players
+
+    if replaced == 0:
+        return JsonResponse({"ok": False, "error": "old_name not found in schedule"}, status=404)
+
+    setattr(event, target_field, sched)
+
+    # has_score は維持（ロック中の代打でスコアは消さない）
+    if event.locked_schedule is None:
+        event.locked_schedule = []
+    if event.draft_schedule is None:
+        event.draft_schedule = []
+
+    event.save(update_fields=[target_field, "updated_at"])
+    return JsonResponse({"ok": True, "replaced": replaced, "schedule": sched})

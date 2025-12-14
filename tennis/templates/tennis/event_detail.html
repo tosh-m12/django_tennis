@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <title>{{ club.name }} - {{ event.date }} 練習会</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    body { font-family: sans-serif; margin: 16px; }
+    .row { display:flex; gap:16px; flex-wrap:wrap; align-items:flex-start; }
+    .card { border:1px solid #ddd; border-radius:12px; padding:14px; min-width:360px; }
+    h1 { margin:0 0 10px; font-size:20px; }
+    h2 { margin:0 0 10px; font-size:16px; }
+    table { border-collapse:collapse; width:100%; }
+    th, td { border:1px solid #ddd; padding:8px; text-align:center; }
+    .btn { padding:6px 10px; border:1px solid #ccc; border-radius:8px; background:#f7f7f7; cursor:pointer; }
+    .muted { color:#666; font-size:12px; }
+    input[type="text"] { padding:6px 8px; }
+    .locked { background:#fff3cd; border-color:#ffeeba; }
+  </style>
+</head>
+<body>
+
+<h1>🎾 {{ club.name }} / {{ event.date }} 練習会</h1>
+<div class="muted">
+  {% if event.locked_at %}
+    🔒 ロック中（{{ event.locked_at }}）
+  {% else %}
+    未ロック（スコア入力でロック）
+  {% endif %}
+</div>
+
+<div class="row">
+  <div class="card">
+    <h2>出欠表</h2>
+    <table>
+      <thead>
+        <tr>
+          <th>名前</th>
+          <th>出欠</th>
+          <th>試合参加</th>
+          <th>フラグ</th>
+          <th>コメント</th>
+          <th>保存</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for a in attendances %}
+          <tr data-pid="{{ a.participant.id }}">
+            <td>{{ a.participant.display_name }}</td>
+            <td>
+              <select class="att-select">
+                <option value="yes" {% if a.attendance == "yes" %}selected{% endif %}>〇</option>
+                <option value="no" {% if a.attendance == "no" %}selected{% endif %}>×</option>
+                <option value="maybe" {% if a.attendance == "maybe" %}selected{% endif %}>？</option>
+              </select>
+            </td>
+            <td><input type="checkbox" class="pm-check" {% if a.participates_match %}checked{% endif %}></td>
+            <td style="text-align:left">
+              {% for f in flags %}
+                <label style="display:inline-block;margin-right:8px;">
+                  <input type="checkbox" class="flag-check" data-flag-id="{{ f.id }}"> {{ f.name }}
+                </label>
+              {% endfor %}
+            </td>
+            <td><input type="text" class="comment" value="{{ a.comment|default_if_none:'' }}" style="width:140px"></td>
+            <td><button class="btn save-att">保存</button></td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <div class="muted">※ 最短：行単位で保存（あとでモーダル化できます）</div>
+  </div>
+
+  <div class="card {% if event.locked_at %}locked{% endif %}">
+    <h2>対戦表</h2>
+    <div style="display:flex; gap:8px; margin-bottom:10px;">
+      <button id="gen-btn" class="btn">ランダム生成</button>
+            <label class="muted">rounds:
+                <input id="rounds" type="text" value="2" style="width:40px;">
+            </label>
+      <button id="reset-btn" class="btn">リセット（スコア破棄）</button>
+    </div>
+
+    <div id="schedule"></div>
+
+    <div class="muted">
+      生成条件：出欠=〇 かつ 試合参加=ON の人だけ<br>
+      スコア入力が1つでも入るとロック（再生成は force）
+    </div>
+  </div>
+</div>
+
+<script>
+  const EVENT_ID = {{ event.id }};
+  const CHECKED_MAP = {{ checked_map_json|safe }};
+  const INITIAL_SCHEDULE = {{ schedule_json|safe }};
+  const IS_LOCKED = {{ event.locked_at|yesno:"true,false" }};
+
+  // 既存フラグチェック反映
+  document.querySelectorAll("tr[data-pid]").forEach(tr => {
+    const pid = tr.dataset.pid;
+    tr.querySelectorAll(".flag-check").forEach(chk => {
+      const fid = chk.dataset.flagId;
+      const key = tr.dataset.pid + "_" + fid;
+      if (CHECKED_MAP[key]) chk.checked = true;
+    });
+  });
+
+  async function postForm(url, data) {
+    const fd = new URLSearchParams();
+    for (const [k, v] of Object.entries(data)) fd.append(k, v);
+    const res = await fetch(url, { method:"POST", body: fd });
+    const ct = res.headers.get("content-type") || "";
+    if (ct.includes("application/json")) return await res.json();
+    const txt = await res.text();
+    throw new Error(`HTTP ${res.status}: ${txt}`);
+  }
+
+  // 出欠行 保存
+  document.querySelectorAll(".save-att").forEach(btn => {
+    btn.addEventListener("click", async (e) => {
+      const tr = e.target.closest("tr");
+      const pid = tr.dataset.pid;
+      const attendance = tr.querySelector(".att-select").value;
+      const pm = tr.querySelector(".pm-check").checked ? "1" : "0";
+      const comment = tr.querySelector(".comment").value;
+
+      const flags = [];
+      tr.querySelectorAll(".flag-check").forEach(chk => {
+        if (chk.checked) flags.push(chk.dataset.flagId);
+      });
+
+      try {
+        const r = await postForm(`/api/event/${EVENT_ID}/attendance/update/`, {
+          participant_id: pid,
+          attendance,
+          participates_match: pm,
+          comment,
+          flags: flags.join(","),
+        });
+        if (!r.ok) throw new Error(r.error || "failed");
+        alert("保存しました");
+      } catch (err) {
+        alert(err.message);
+      }
+    });
+  });
+
+    function esc(s){
+      return (s||"")
+        .replaceAll("&","&amp;")
+        .replaceAll("<","&lt;")
+        .replaceAll(">","&gt;");
+    }
+
+    function renderSchedule(s) {
+      const root = document.getElementById("schedule");
+      if (!s || s.length === 0) {
+        root.innerHTML = "<div class='muted'>まだ対戦表がありません</div>";
+        return;
+      }
+
+      // round ごとにグルーピング
+      const byRound = {};
+      for (const m of s) {
+        const r = m.round || 1;
+        if (!byRound[r]) byRound[r] = [];
+        byRound[r].push(m);
+      }
+
+      let html = "";
+      const rounds = Object.keys(byRound).map(Number).sort((a,b)=>a-b);
+
+      for (const r of rounds) {
+        html += `<h3 style="margin-top:16px;">🏁 Round ${r}</h3>`;
+        html += `
+          <table style="margin-bottom:12px;">
+            <thead>
+              <tr>
+                <th>試合</th>
+                <th>プレイヤー（クリックで代打）</th>
+                <th>スコア(A-B)</th>
+                <th>保存</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        for (const m of byRound[r]) {
+          const a = (m.score && m.score.a) ? m.score.a : "";
+          const b = (m.score && m.score.b) ? m.score.b : "";
+
+          const playersHtml = (m.players||[])
+            .map(p =>
+              `<span class="player"
+                data-name="${esc(p)}"
+                style="cursor:pointer;text-decoration:underline;">${esc(p)}</span>`
+            )
+            .join(" / ");
+
+          html += `
+            <tr data-mk="${m.match_key}">
+              <td>${esc(m.match_key)}</td>
+              <td style="text-align:left">${playersHtml}</td>
+              <td>
+                <input type="text" class="sa" value="${esc(a)}" style="width:50px"> -
+                <input type="text" class="sb" value="${esc(b)}" style="width:50px">
+              </td>
+              <td><button class="btn save-score">保存</button></td>
+            </tr>
+          `;
+        }
+
+        html += "</tbody></table>";
+      }
+
+      root.innerHTML = html;
+
+      // ===== 代打（名前差し替え）=====
+      root.querySelectorAll(".player").forEach(sp => {
+        sp.addEventListener("click", async () => {
+          const oldName = sp.dataset.name;
+          const newName = prompt(
+            `代打に変更\n現在：${oldName}\n新しい名前（クラブメンバーの表示名）`,
+            oldName
+          );
+          if (!newName || !newName.trim() || newName.trim() === oldName) return;
+
+          try {
+            const r = await postForm(`/api/event/${EVENT_ID}/schedule/swap_player/`, {
+              old_name: oldName,
+              new_name: newName.trim(),
+            });
+            if (!r.ok) throw new Error(r.error || "failed");
+            renderSchedule(r.schedule);
+          } catch (err) {
+            alert(err.message);
+          }
+        });
+      });
+
+      // ===== スコア保存 =====
+      root.querySelectorAll(".save-score").forEach(btn => {
+        btn.addEventListener("click", async (e) => {
+          const tr = e.target.closest("tr");
+          const mk = tr.dataset.mk;
+          const sa = tr.querySelector(".sa").value;
+          const sb = tr.querySelector(".sb").value;
+          try {
+            const r = await postForm(`/api/event/${EVENT_ID}/score/set/`, {
+              match_key: mk, score_a: sa, score_b: sb
+            });
+            if (!r.ok) throw new Error(r.error || "failed");
+            alert("スコア保存しました（ロック中ならそのまま保持されます）");
+            location.reload();
+          } catch (err) {
+            alert(err.message);
+          }
+        });
+      });
+    }
+
+
+
+
+
+  // リセット
+  document.getElementById("reset-btn").addEventListener("click", async () => {
+    const ok = confirm("ロックとスコアと対戦表をリセットします。よろしいですか？");
+    if (!ok) return;
+    try {
+      const r = await postForm(`/api/event/${EVENT_ID}/schedule/reset/`, {});
+      if (!r.ok) throw new Error(r.error || "failed");
+      location.reload();
+    } catch (err) {
+      alert(err.message);
+    }
+  });
+</script>
+
+</body>
+</html>

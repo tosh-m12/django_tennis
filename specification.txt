@@ -30,3 +30,190 @@
 ・試合参加のチェックボックスはこのページに設置。これはモーダルではなく直接出欠表に表示して、自由にオンオフできるようにする。
 ・対戦表（ランダム生成）はこのページにて実施。
 ・対戦表はスコアが記入できる
+
+
+1) 画面とURL設計（BETA）
+トップページ（ポータル）
+
+クラブ新規作成フォーム（クラブ名だけ）
+
+作成後に 2つのURLを表示
+
+クラブメイン（メンバー用）
+/c/<club_public_token>/
+
+クラブ設定（幹事用）
+/c/<club_public_token>/admin/<club_admin_token>/settings/
+
+※BETAはメールなし。このURLを知っている人がアクセスできる方式。
+
+クラブ設定（幹事URLのみ）
+
+クラブ名変更
+
+フラグ管理（クラブ共通）
+
+追加
+
+名称変更
+
+非表示 / 復活（削除は無し）
+
+当月カレンダー表示
+
+日付クリックで「練習日（Event）」を作成（1日1回固定）
+
+既存の練習日クリックで、その回（練習会画面）へジャンプ
+
+クラブメイン（メンバー用）
+
+当月カレンダー（練習日一覧・クリックで練習会へ）
+
+当月の出欠サマリー（〇×？）＝ 当月分まとめ編集の入口にもする
+
+当月分の編集
+
+「メンバー追加」モーダル（表示名は重複OK、内部ID管理）
+
+“回ごと”の出欠・フラグを クラブメインでも編集可能
+
+実体は「参加者×イベント」のレコードを編集する
+
+練習会画面（メンバー用・イベント単位）
+
+その回の出欠表（名前クリックでモーダル編集）
+
+試合参加チェックは表に直接（モーダルではなく即時ON/OFF）
+
+対戦表生成（ランダム）
+
+スコア入力（スコアが1つでも入ったら“確定扱い”）
+
+再生成時の警告：
+
+「スコアが記入されています。再生成すると記入済みスコアは破棄されますが…」
+
+ただし確定後でも 名前の差し替えは可能（代打想定）
+
+2) モデル再設計（Club中心にする）
+新規：Club
+
+name
+
+public_token / admin_token
+
+created_at
+
+Event（Club配下へ）
+
+club = FK(Club)
+
+date（ユニーク制約：unique_together = ("club","date") → 1日1回固定）
+
+start_time, place, note（あれば）
+
+対戦表
+
+draft_schedule（JSON）
+
+locked_schedule（= 確定版。スコアが入ったらロック）
+
+has_score（bool）or locked_at（datetime）
+
+※BETAでは「公開/非公開」は廃止。ロック概念に置換
+
+Participant（クラブ所属の人）
+
+club = FK(Club)
+
+display_name（重複OK）
+
+created_at
+
+Attendance（イベントごとの出欠・試合参加）
+
+event = FK(Event)
+
+participant = FK(Participant)
+
+attendance（yes/no/maybe）
+
+participates_match（bool）
+
+comment（任意）
+
+unique_together = ("event","participant")
+
+ClubFlagDefinition（クラブ共通フラグ）
+
+club = FK(Club)
+
+name
+
+order
+
+is_active（非表示/復活）
+
+unique_together = ("club","order")（並び順）
+
+AttendanceFlag（出欠×フラグ）
+
+attendance = FK(Attendance)
+
+flag = FK(ClubFlagDefinition)
+
+checked
+
+unique_together = ("attendance","flag")
+
+これで「クラブ共通フラグ」を、各回の出欠（Attendance）に紐づけて保持できます。非表示にしても過去データは残ります。
+
+3) URL（tennis/urls.py）たたき台
+
+/ … ポータルトップ（クラブ作成）
+
+/c/<club_public>/ … クラブメイン
+
+/c/<club_public>/e/<int:event_id>/ … 練習会（イベント）ページ
+
+/c/<club_public>/admin/<club_admin>/settings/ … クラブ設定
+
+API（クラブ or イベント配下）
+
+/api/club/<club_public>/flags/add/
+
+/api/club/<club_public>/flags/<int:flag_id>/rename/
+
+/api/club/<club_public>/flags/<int:flag_id>/toggle_active/
+
+/api/event/<int:event_id>/attendance/update/
+
+/api/event/<int:event_id>/schedule/generate/
+
+/api/event/<int:event_id>/schedule/swap_player/（代打入れ替え：後で）
+
+4) 既存コードからの移植方針（最短で動く順）
+
+Club追加 + トークン発行
+
+EventをClub配下に変更（1日1回制約）
+
+FlagDefinitionをClubへ移動（is_active追加）
+
+ParticipantをEvent所属 → Club所属へ変更
+
+Participant(attendance等) をやめて Attendance を新設（イベントごと状態管理）
+
+既存の対戦表生成ロジック（utils.py）はほぼ流用
+
+入力：match_participants の display_nameリスト
+
+“公開”まわり削除 → **ロック（has_score/locked_at）**に置換
+
+画面
+
+settings.html（カレンダー＋フラグ管理）を Clubベースに
+
+event_admin.html を **event_detail.html（練習会画面）**に改名して「全員用」に
+
+club_main.html（新規追加）：当月カレンダー＋当月まとめ編集

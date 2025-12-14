@@ -13,54 +13,21 @@
 <p>{{ event.date }} @ {{ event.place }}</p>
 
 <h3>出席者リスト</h3>
-<div class="flag-add-area">
-    <button type="button"
-            id="add-flag-btn"
-            class="flag-add-btn"
-            data-event-id="{{ event.id }}"
-            data-add-flag-url="{% url 'tennis:add_flag' %}"
-            {% if flags|length >= max_flags %}disabled{% endif %}>
-        フラグ追加
-    </button>
-    <button type="button"
-            id="delete-flag-btn"
-            class="flag-delete-btn"
-            data-event-id="{{ event.id }}"
-            data-delete-flag-url="{% url 'tennis:delete_flag' %}"
-            {% if flags|length == 0 %}disabled{% endif %}>
-        フラグ削除
-    </button>
-    <br>
-    <small class="flag-note">
-        任意のフラグを５つまで追加できます。ボール・かご持ち帰りなどの当番管理にご活用ください。<br>（クリックするとフラグ名を変更できます）
-    </small>
-</div>
+
 {% if participants %}
 <table id="participants-table"
        class="participants-table"
-       data-update-url="{% url 'tennis:update_participation_flag' %}"
-       data-toggle-flag-url="{% url 'tennis:toggle_flag' %}"
-       data-rename-flag-url="{% url 'tennis:rename_flag' %}">
+       data-update-participation-url="{% url 'tennis:update_participation_flag' %}">
     <colgroup>
-        <col style="width: 40px;">     <!-- 連番列 -->
-        <col style="width: 150px;">    <!-- 名前カード列 -->
-        <col>                          <!-- 試合参加列（可変） -->
-        {% for flag in flags %}
-            <col>                      <!-- フラグ列（可変） -->
-        {% endfor %}
- 
+        <col style="width: 40px;">
+        <col style="width: 150px;">
+        <col>
     </colgroup>
     <thead>
         <tr>
-            <th></th>  {# 連番 #}
+            <th></th>
             <th>名前</th>
             <th>試合参加</th>
-            {% for flag in flags %}
-            <th class="flag-header"
-                data-flag-id="{{ flag.id }}">
-                <span class="flag-name">{{ flag.name }}</span>
-            </th>
-            {% endfor %}
         </tr>
     </thead>
     <tbody>
@@ -77,57 +44,32 @@
                    data-participant-id="{{ p.id }}"
                    {% if p.participates_match %}checked{% endif %}>
         </td>
-
-        {% for flag in flags %}
-        <td class="checkbox-cell">
-            <input type="checkbox"
-                    class="flag-checkbox"
-                    data-participant-id="{{ p.id }}"
-                    data-flag-id="{{ flag.id }}"
-                    {% if flag.id in p.assigned_flag_ids %}checked{% endif %}>
-        </td>
-        {% endfor %}
     </tr>
     {% endfor %}
     </tbody>
 </table>
 
 {% else %}
-{# ★ 参加者ゼロのときも、レイアウトがわかる空テーブルを表示 #}
 <table id="participants-table"
        class="participants-table">
     <colgroup>
-        <col style="width: 40px;">     <!-- 連番列 -->
-        <col style="width: 150px;">    <!-- 名前カード列 -->
-        <col>                          <!-- 試合参加列（可変） -->
-        {% for flag in flags %}
-            <col>                      <!-- フラグ列（可変） -->
-        {% endfor %}
+        <col style="width: 40px;">
+        <col style="width: 150px;">
+        <col>
     </colgroup>
     <thead>
         <tr>
-            <th></th>  {# 連番 #}
+            <th></th>
             <th>名前</th>
             <th>試合参加</th>
-            {% for flag in flags %}
-            <th class="flag-header">
-                <span class="flag-name">{{ flag.name }}</span>
-            </th>
-            {% endfor %}
         </tr>
     </thead>
     <tbody>
-    {# 1〜4 行のダミー行を表示 #}
     {% for i in "1234" %}
     <tr>
         <td class="participant-index">{{ forloop.counter }}</td>
         <td><div class="tb-player-card-sm">&nbsp;</div></td>
         <td class="checkbox-cell"><input type="checkbox" disabled></td>
-
-        {% for flag in flags %}
-            <td class="checkbox-cell"><input type="checkbox" disabled></td>
-        {% endfor %}
-
     </tr>
     {% endfor %}
     </tbody>
@@ -138,7 +80,6 @@
 </p>
 {% endif %}
 
-{# ===== 対戦表（ヘッダー＋条件表示） ===== #}
 <h3>対戦表（ランダム生成）</h3>
 
 <div class="match-settings-bar">
@@ -169,7 +110,6 @@
         </button>
     </div>
 
-    {# 公開ボタン（右寄せ） #}
     <button type="button"
             id="publish-pill"
             class="settings-pill publish-pill
@@ -187,14 +127,21 @@
     </button>
 </div>
 
-{# 公開後に内容が変わっている場合の注意メッセージ #}
+<script
+  id="current-schedule-json"
+  type="application/json"
+  data-event-id="{{ event.id }}"
+  data-publish-url="{% url 'tennis:publish_schedule' %}"
+>
+  {{ schedule_json|default:"null" }}
+</script>
+
 {% if publish_state == 'changed' %}
 <div id="publish-notice" class="publish-notice">
     対戦表が更新されました。この変更を参加者ページへ適用する場合は「再公開」ボタンを押してください。
 </div>
 {% endif %}
 
-{# ===== 条件変更モーダル ===== #}
 <div id="match-settings-modal" class="modal-backdrop" aria-hidden="true">
     <div class="modal-content">
         <button type="button" class="modal-close" id="close-settings-modal">×</button>
@@ -223,12 +170,14 @@
                 <input type="hidden" name="game_type" id="id_game_type"
                        value="{{ game_type|default:'doubles' }}">
             </div>
+
             <div class="field-group field-group-count">
                 <label>人数</label>
                 <p class="count-pill modal-number">
                     {{ match_count }}
                 </p>
             </div>
+
             <div class="field-group">
                 <label>面数</label>
                 <div class="stepper-row">
@@ -242,8 +191,6 @@
                     <button type="button" class="stepper-btn" data-target="num_courts" data-step="1">＋</button>
                 </div>
             </div>
-
-
 
             <div class="field-group">
                 <label>ラウンド数</label>
@@ -268,7 +215,6 @@
     </div>
 </div>
 
-{# ===== 対戦表表示 ===== #}
 <div id="schedule-area">
     {% include "tennis/_schedule_block.html" %}
 </div>
