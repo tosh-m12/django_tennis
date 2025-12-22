@@ -1,0 +1,256 @@
+{# tennis/templates/tennis/club_home.html #}
+{% extends "tennis/base.html" %}
+{% load static %}
+
+{% block title %}{{ club.name }}{% if is_admin %} - 幹事用{% else %} - メンバー用{% endif %}{% endblock %}
+
+{% block extra_head %}
+{# club_home 固有の head 追記があればここに #}
+{% endblock %}
+
+{% block content %}
+
+{% if is_admin %}
+  <hr>
+  <div id="club-calendar-hooks"
+       data-create-url="{% url 'tennis:club_create_event' %}"
+       data-club-id="{{ club.id }}">
+  </div>
+
+  <div class="theme-box url-box">
+    <div class="url-item">
+      <div class="url-label">メンバー用URL</div>
+
+      <button type="button"
+              class="url-copy-btn red-rect"
+              data-copy="{{ member_url }}">
+        コピー
+      </button>
+
+      <div class="url-textbox">
+        {{ member_url }}
+      </div>
+    </div>
+
+    <div class="url-item">
+      <div class="url-label">幹事用URL</div>
+
+      <button type="button"
+              class="url-copy-btn red-rect"
+              data-copy="{{ admin_url }}">
+        コピー
+      </button>
+
+      <div class="url-textbox">
+        {{ admin_url }}
+      </div>
+    </div>
+
+    <div class="url-note">※幹事用、メンバー用URLは忘れないよう保存してください。</div>
+  </div>
+
+  <hr>
+{% endif %}
+
+<h3>イベントスケジュール</h3>
+
+<div class="calendar-nav cal-header">
+  {% if is_admin %}
+    <a class="cal-nav-btn cal-prev"
+       href="{% url 'tennis:club_home_admin' club.public_token admin_token %}?year={{ prev_year }}&month={{ prev_month }}">‹</a>
+  {% else %}
+    <a class="cal-nav-btn cal-prev"
+       href="{% url 'tennis:club_home' club.public_token %}?year={{ prev_year }}&month={{ prev_month }}">‹</a>
+  {% endif %}
+
+  <div class="cal-title-area">
+    <div class="cal-title">{{ year }}年{{ month }}月</div>
+
+    {% if is_admin %}
+      <a class="cal-today-btn"
+         href="{% url 'tennis:club_home_admin' club.public_token admin_token %}?year={{ today.year }}&month={{ today.month }}">本日</a>
+    {% else %}
+      <a class="cal-today-btn"
+         href="{% url 'tennis:club_home' club.public_token %}?year={{ today.year }}&month={{ today.month }}">本日</a>
+    {% endif %}
+  </div>
+
+  {% if is_admin %}
+    <a class="cal-nav-btn cal-next"
+       href="{% url 'tennis:club_home_admin' club.public_token admin_token %}?year={{ next_year }}&month={{ next_month }}">›</a>
+  {% else %}
+    <a class="cal-nav-btn cal-next"
+       href="{% url 'tennis:club_home' club.public_token %}?year={{ next_year }}&month={{ next_month }}">›</a>
+  {% endif %}
+</div>
+
+<table class="practice-calendar">
+  <thead>
+    <tr>
+      <th>MON</th><th>TUE</th><th>WED</th><th>THU</th><th>FRI</th>
+      <th class="weekend">SAT</th><th class="weekend">SUN</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for week in month_weeks %}
+    <tr>
+    {% for cell in week %}
+      {% if cell.is_current_month %}
+        {# ★ calendar.js が拾うため data-date を付与 #}
+        <td class="day-cell{% if cell.date == today %} today{% endif %}"
+            data-date="{{ cell.date|date:'Y-m-d' }}">
+          <div class="day-number">{{ cell.date.day }}</div>
+
+          {% for ev in cell.events %}
+
+            <div class="event-card cal-event{% if ev.cancelled %} is-cancelled{% endif %}{% if ev.cancelled and not is_admin %} is-public-lock{% endif %}">
+              <div class="event-title">
+                {% if ev.cancelled and not is_admin %}
+                  {# 一般：中止イベントはリンク無し #}
+                  <span class="cal-event-link">{{ ev.title }}</span>
+                {% else %}
+                  {# 幹事：常にリンクあり（中止でも編集可） / 一般：通常イベントはリンクあり #}
+                  {% if is_admin %}
+                    <a class="cal-event-link"
+                       href="{% url 'tennis:event_admin' club.public_token admin_token ev.id %}">{{ ev.title }}</a>
+                  {% else %}
+                    <a class="cal-event-link"
+                       href="{% url 'tennis:event_public' club.public_token ev.id %}">{{ ev.title }}</a>
+                  {% endif %}
+                {% endif %}
+              </div>
+            </div>
+          {% endfor %}
+
+        </td>
+      {% else %}
+        <td class="day-cell other-month"></td>
+      {% endif %}
+    {% endfor %}
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<hr style="margin:24px 0;">
+
+<h3>当月戦績</h3>
+<small style="color:#666;">※当月3試合以上が対象）</small>
+
+{# ===== 表示可否判定 ===== #}
+{% with has_doubles=ranking_doubles.ranked|length has_singles=ranking_singles.ranked|length %}
+
+  {% if has_doubles or has_singles %}
+
+    {# ===== doubles ===== #}
+    {% if has_doubles %}
+      <h4>ダブルス</h4>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:60px;">順位</th>
+            <th style="text-align:left;">名前</th>
+            <th style="width:70px;">試合</th>
+            <th style="width:60px;">勝</th>
+            <th style="width:60px;">負</th>
+            <th style="width:60px;">分</th>
+            <th style="width:90px;">勝率</th>
+            <th style="width:90px;">GF</th>
+            <th style="width:90px;">GA</th>
+            <th style="width:110px;">ゲーム率</th>
+            <th style="width:90px;">得失点</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in ranking_doubles.ranked %}
+            <tr>
+              <td>{{ row.rank }}</td>
+              <td style="text-align:left;">{{ row.name }}</td>
+              <td>{{ row.matches }}</td>
+              <td>{{ row.wins }}</td>
+              <td>{{ row.losses }}</td>
+              <td>{{ row.draws }}</td>
+              <td>{{ row.win_pct }}%</td>
+              <td>{{ row.gf }}</td>
+              <td>{{ row.ga }}</td>
+              <td>{{ row.gp_pct }}%</td>
+              <td>{{ row.diff }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+
+    {# ===== singles ===== #}
+    {% if has_singles %}
+      <h4 {% if has_doubles %}style="margin-top:18px;"{% endif %}>シングルス</h4>
+      <table>
+        <thead>
+          <tr>
+            <th style="width:60px;">順位</th>
+            <th style="text-align:left;">名前</th>
+            <th style="width:70px;">試合</th>
+            <th style="width:60px;">勝</th>
+            <th style="width:60px;">負</th>
+            <th style="width:60px;">分</th>
+            <th style="width:90px;">勝率</th>
+            <th style="width:90px;">GF</th>
+            <th style="width:90px;">GA</th>
+            <th style="width:110px;">ゲーム率</th>
+            <th style="width:90px;">得失点</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in ranking_singles.ranked %}
+            <tr>
+              <td>{{ row.rank }}</td>
+              <td style="text-align:left;">{{ row.name }}</td>
+              <td>{{ row.matches }}</td>
+              <td>{{ row.wins }}</td>
+              <td>{{ row.losses }}</td>
+              <td>{{ row.draws }}</td>
+              <td>{{ row.win_pct }}%</td>
+              <td>{{ row.gf }}</td>
+              <td>{{ row.ga }}</td>
+              <td>{{ row.gp_pct }}%</td>
+              <td>{{ row.diff }}</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    {% endif %}
+
+  {% else %}
+    <div style="color:#666; padding:8px 0;">
+      まだ戦績がありません（スコア未入力の試合は集計対象外）
+    </div>
+  {% endif %}
+
+{% endwith %}
+
+{% endblock %}
+
+{% block extra_scripts %}
+  {# 重要：calendar.js は幹事/一般どちらも必要（一般側でも“中止クリック無反応”制御を入れるため） #}
+  <script src="{% static 'tennis/calendar.js' %}" defer></script>
+
+  {% if is_admin %}
+    <script>
+    document.addEventListener("click", (e) => {
+      const btn = e.target.closest(".url-copy-btn");
+      if (!btn) return;
+
+      const text = btn.dataset.copy;
+      if (!text) return;
+
+      navigator.clipboard.writeText(text).then(() => {
+        if (window.UI?.showMessage) {
+          UI.showMessage("URLをコピーしました", 1600);
+        } else {
+          alert("URLをコピーしました");
+        }
+      });
+    });
+    </script>
+  {% endif %}
+{% endblock %}

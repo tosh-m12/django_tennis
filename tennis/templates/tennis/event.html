@@ -1,0 +1,425 @@
+{# tennis/templates/tennis/event.html #}
+{% extends "tennis/base.html" %}
+{% load static %}
+{% load tennis_extras %}
+
+{% block title %}{{ event.title }}{% if is_admin %} - 幹事用{% endif %}{% endblock %}
+
+{% block extra_head %}
+  {# base.html が共通CSS/共通JSを読む。event固有はこれだけ #}
+  <script src="{% static 'tennis/event.js' %}" defer></script>
+{% endblock %}
+
+{% block content %}
+
+{# ★キャンセル済み：画面全体トーンダウン（CSS: .event-page.is-cancelled） #}
+<div class="event-page {% if event.cancelled %}is-cancelled{% endif %}">
+
+  <div class="event-head">
+    <h2 class="event-title">{{ event.title }}</h2>
+
+    <div id="event-meta-bar"
+        class="event-meta-bar{% if is_admin %} is-admin is-clickable{% else %} is-public{% endif %}{% if event.cancelled %} is-cancelled{% endif %}"
+        data-date="{{ event.date|date:'Y-m-d' }}"
+        data-title="{{ event.title|default:'' }}"
+        data-place="{{ event.place|default:'' }}"
+        data-start="{{ event.start_time|time:'H:i'|default_if_none:'' }}"
+        data-end="{{ event.end_time|time:'H:i'|default_if_none:'' }}"
+        data-cancelled="{% if event.cancelled %}1{% else %}0{% endif %}"
+        {% if is_admin %}title="クリックして編集"{% endif %}>
+
+      <span class="event-meta-text" id="event-meta-text">
+        {{ event.date|date:"Y-m-d" }}
+        {% if event.start_time and event.end_time %}
+          {{ event.start_time|time:"H:i" }}〜{{ event.end_time|time:"H:i" }}
+        {% elif event.start_time %}
+          {{ event.start_time|time:"H:i" }}〜
+        {% elif event.end_time %}
+          〜{{ event.end_time|time:"H:i" }}
+        {% endif %}
+        {% if event.place %} @ {{ event.place }}{% endif %}
+      </span>
+    </div>
+
+    {% if event.cancelled %}
+      <div class="event-cancel-badge">このイベントは中止です</div>
+    {% endif %}
+  </div>
+
+  {# admin-only: event meta edit に必要な hook（event.js が参照） #}
+  {% if is_admin %}
+    <div id="event-edit-hooks"
+        data-event-id="{{ event.id }}"
+        data-club-id="{{ club.id }}"
+        data-public-token="{{ club.public_token }}"
+        data-admin-token="{{ club.admin_token }}"
+        data-update-url="{% url 'tennis:ajax_update_event' %}">
+    </div>
+  {% endif %}
+
+  <hr>
+
+  <div class="section-head">
+    <h3 class="section-title">出席者リスト</h3>
+    <button type="button" class="btn btn-pill" id="add-guest-btn">
+      参加登録
+    </button>
+  </div>
+
+  <table
+    id="participants-table"
+    data-is-admin="{% if is_admin %}1{% else %}0{% endif %}"
+    data-event-id="{{ event.id }}"
+    data-publish-state="{{ publish_state }}"
+    data-update-attendance-url="{% url 'tennis:update_attendance' %}"
+    data-update-comment-url="{% url 'tennis:update_comment' %}"
+    data-toggle-flag-url="{% url 'tennis:toggle_participant_flag' %}"
+    data-set-participates-match-url="{% url 'tennis:set_participates_match' %}"
+    data-add-guest-url="{% url 'tennis:add_guest_participant' %}"
+    data-publish-url="{% url 'tennis:publish_schedule' %}"
+    data-save-score-url="{% url 'tennis:save_match_score' %}"
+  >
+    <colgroup>
+      <col style="width: 40px;">
+      <col style="width: 180px;">
+
+      {# ★両方表示 #}
+      <col style="width: 70px;">   {# 出欠 #}
+      <col style="width: 70px;">   {# 試合参加 #}
+
+      {% for flag in flags %}<col>{% endfor %}
+      <col style="width: 200px;">
+    </colgroup>
+
+    <thead>
+      <tr>
+        <th></th>
+        <th>名前</th>
+        <th>出欠</th>
+        <th>試合参加</th>
+        {% for flag in flags %}
+          <th class="flag-header" data-flag-id="{{ flag.id }}">
+            <span class="flag-name">{{ flag.name }}</span>
+          </th>
+        {% endfor %}
+        <th>コメント</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      {# ============= 固定メンバー（未登録行=ep_id空の可能性あり） ============= #}
+      {% for row in fixed_rows %}
+      <tr class="participant-row"
+          data-row-kind="fixed"
+          data-member-id="{{ row.member_id }}"
+          data-ep-id="{{ row.ep_id|default_if_none:'' }}">
+        <td class="participant-index">{{ forloop.counter }}</td>
+
+        <td><div class="tb-player-card-sm">{{ row.display_name }}</div></td>
+
+        {# ★出欠（幹事/一般どちらも操作可：attendance-btn は常に出す） #}
+        <td class="attendance-cell">
+          <button type="button"
+                  class="attendance-btn"
+                  data-member-id="{{ row.member_id }}"
+                  data-ep-id="{{ row.ep_id|default_if_none:'' }}"
+                  data-attendance="{{ row.attendance|default_if_none:'' }}">
+            {% if row.attendance == "yes" %}
+              <span class="attendance-icon attendance-yes">✓</span>
+            {% elif row.attendance == "no" %}
+              <span class="attendance-icon attendance-no">×</span>
+            {% elif row.attendance == "maybe" %}
+              <span class="attendance-icon attendance-maybe">?</span>
+            {% else %}
+              <span class="attendance-icon attendance-maybe">?</span>
+            {% endif %}
+          </button>
+        </td>
+
+        {# ★試合参加（両方操作可）＋連動のため識別class付与（attendance!=yes は初期非表示） #}
+        <td class="check-cell match-cell">
+          <button type="button"
+                  class="check-btn toggle-check match-toggle
+                        {% if row.participates_match %}is-on{% endif %}
+                        {% if row.attendance != 'yes' %}is-hidden{% endif %}"
+                  data-kind="match"
+                  data-member-id="{{ row.member_id }}"
+                  data-ep-id="{{ row.ep_id|default_if_none:'' }}">
+            <span class="check-icon {% if row.participates_match %}check-on{% else %}check-off{% endif %}">✓</span>
+          </button>
+        </td>
+
+        {# ===== flags ===== #}
+        {% for flag in flags %}
+        <td class="check-cell">
+          {% if row.ep_id %}
+            {% with key=row.ep_id|stringformat:"s"|add:":"|add:flag.id|stringformat:"s" %}
+              {% with on=flag_states|dict_get:key %}
+                <button type="button"
+                        class="check-btn toggle-check {% if on %}is-on{% endif %}"
+                        data-member-id="{{ row.member_id }}"
+                        data-ep-id="{{ row.ep_id }}"
+                        data-flag-id="{{ flag.id }}">
+                  <span class="check-icon {% if on %}check-on{% else %}check-off{% endif %}">✓</span>
+                </button>
+              {% endwith %}
+            {% endwith %}
+          {% else %}
+            {# ep無し（未登録行）は常にOFF表示（クリックされてもJS側でep作る想定） #}
+            <button type="button"
+                    class="check-btn toggle-check"
+                    data-member-id="{{ row.member_id }}"
+                    data-ep-id=""
+                    data-flag-id="{{ flag.id }}">
+              <span class="check-icon check-off">✓</span>
+            </button>
+          {% endif %}
+        </td>
+        {% endfor %}
+
+        <td class="comment-cell">
+          <div class="comment-editable"
+              contenteditable="true"
+              data-member-id="{{ row.member_id }}"
+              data-ep-id="{{ row.ep_id|default_if_none:'' }}"
+              data-placeholder="コメントを入力…">{{ row.comment|default:'' }}</div>
+        </td>
+      </tr>
+      {% endfor %}
+
+      {# ============= ゲスト（必ずep_idあり） ============= #}
+      {% for row in guest_rows %}
+      <tr class="participant-row"
+          data-row-kind="guest"
+          data-ep-id="{{ row.ep_id }}">
+        <td class="participant-index">{{ fixed_rows|length|add:forloop.counter }}</td>
+
+        <td><div class="tb-player-card-sm">{{ row.display_name }}</div></td>
+
+        {# ★出欠（常に操作可） #}
+        <td class="attendance-cell">
+          <button type="button"
+                  class="attendance-btn"
+                  data-ep-id="{{ row.ep_id }}"
+                  data-attendance="{{ row.attendance|default_if_none:'' }}">
+            {% if row.attendance == "yes" %}
+              <span class="attendance-icon attendance-yes">✓</span>
+            {% elif row.attendance == "no" %}
+              <span class="attendance-icon attendance-no">×</span>
+            {% elif row.attendance == "maybe" %}
+              <span class="attendance-icon attendance-maybe">?</span>
+            {% else %}
+              <span class="attendance-icon attendance-maybe">?</span>
+            {% endif %}
+          </button>
+        </td>
+
+        {# ★試合参加（常に操作可）＋連動のため識別class付与（attendance!=yes は初期非表示） #}
+        <td class="check-cell match-cell">
+          <button type="button"
+                  class="check-btn toggle-check match-toggle
+                        {% if row.participates_match %}is-on{% endif %}
+                        {% if row.attendance != 'yes' %}is-hidden{% endif %}"
+                  data-kind="match"
+                  data-ep-id="{{ row.ep_id }}">
+            <span class="check-icon {% if row.participates_match %}check-on{% else %}check-off{% endif %}">✓</span>
+          </button>
+        </td>
+
+        {# ===== flags ===== #}
+        {% for flag in flags %}
+        <td class="check-cell">
+          {% with key=row.ep_id|stringformat:"s"|add:":"|add:flag.id|stringformat:"s" %}
+            {% with on=flag_states|dict_get:key %}
+              <button type="button"
+                      class="check-btn toggle-check {% if on %}is-on{% endif %}"
+                      data-ep-id="{{ row.ep_id }}"
+                      data-flag-id="{{ flag.id }}">
+                <span class="check-icon {% if on %}check-on{% else %}check-off{% endif %}">✓</span>
+              </button>
+            {% endwith %}
+          {% endwith %}
+        </td>
+        {% endfor %}
+
+        <td class="comment-cell">
+          <div class="comment-editable"
+              contenteditable="true"
+              data-ep-id="{{ row.ep_id }}"
+              data-placeholder="コメントを入力…">{{ row.comment|default:'' }}</div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <hr>
+
+  {% if is_admin %}
+  <h3>対戦表（ランダム生成）</h3>
+
+  <div class="match-settings-bar">
+    <div class="match-pill-group">
+      <button type="button"
+              id="pill-game-type"
+              class="settings-pill game-type-pill settings-trigger {% if game_type == 'singles' %}pill-singles{% else %}pill-doubles{% endif %}">
+        {% if game_type == "singles" %}シングルス{% else %}ダブルス{% endif %}
+      </button>
+
+      <button type="button" id="pill-num-courts" class="settings-pill settings-trigger">
+        {{ num_courts }} 面
+      </button>
+
+      <button type="button" id="pill-match-count" class="settings-pill settings-trigger">
+        {{ match_count }} 人
+      </button>
+
+      <button type="button" id="pill-num-rounds" class="settings-pill settings-trigger">
+        {{ num_rounds }} ラウンド
+      </button>
+    </div>
+
+    <button type="button"
+            id="publish-pill"
+            class="settings-pill publish-pill {% if publish_state == 'no_schedule' or publish_state == 'published' %}pill-disabled{% endif %}"
+            data-publish-state="{{ publish_state }}"
+            onclick="publishSchedule()"
+            {% if publish_state == 'no_schedule' or publish_state == 'published' %}disabled{% endif %}>
+      {% if publish_state == 'published' %}
+        公開済み
+      {% elif publish_state == 'changed' %}
+        再公開
+      {% else %}
+        📢 対戦表を公開
+      {% endif %}
+    </button>
+  </div>
+
+  <div id="match-settings-modal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-content event-modal modal-has-topbar"
+        role="dialog" aria-modal="true" aria-labelledby="match-settings-modal-title">
+
+      <div class="modal-topbar">
+        <div class="modal-topbar-title" id="match-settings-modal-title">条件を変更する</div>
+        <button type="button"
+                id="close-settings-modal"
+                class="modal-topbar-btn"
+                aria-label="閉じる">×</button>
+      </div>
+
+      <form method="post"
+            id="match-settings-form"
+            class="modal-form"
+            data-generate-url="{% url 'tennis:ajax_generate_schedule' event.id %}">
+        {% csrf_token %}
+        <input type="hidden" name="generate_schedule" value="1">
+
+        <div class="field-group">
+          <div class="toggle-row">
+            <button type="button"
+                    class="toggle-btn {% if game_type == 'singles' %}active{% endif %}"
+                    data-game-type="singles">シングルス</button>
+            <button type="button"
+                    class="toggle-btn {% if game_type != 'singles' %}active{% endif %}"
+                    data-game-type="doubles">ダブルス</button>
+          </div>
+          <input type="hidden" name="game_type" id="id_game_type" value="{{ game_type|default:'doubles' }}">
+        </div>
+
+        <div class="field-group field-group-count">
+          <label>人数</label>
+          <p class="count-pill modal-number">{{ match_count }}</p>
+        </div>
+
+        <div class="field-group">
+          <label>面数</label>
+          <div class="stepper-row">
+            <button type="button" class="stepper-btn" data-target="num_courts" data-step="-1">－</button>
+            <input type="number" id="id_num_courts" name="num_courts" class="modal-number" min="1" max="8" value="{{ num_courts }}">
+            <button type="button" class="stepper-btn" data-target="num_courts" data-step="1">＋</button>
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label>ラウンド数</label>
+          <div class="stepper-row">
+            <button type="button" class="stepper-btn" data-target="num_rounds" data-step="-1">－</button>
+            <input type="number" id="id_num_rounds" name="num_rounds" class="modal-number" min="1" max="20" value="{{ num_rounds }}">
+            <button type="button" class="stepper-btn" data-target="num_rounds" data-step="1">＋</button>
+          </div>
+        </div>
+
+        <div class="modal-actions">
+          <button type="submit" class="btn btn-pill btn-primary">条件を変更する</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  {% endif %}
+
+  <h3>対戦表</h3>
+  <div id="schedule-area"
+      data-can-edit-score="{% if publish_state == 'published' %}1{% else %}0{% endif %}">
+    {% include "tennis/_schedule_block.html" %}
+  </div>
+
+  {% if is_admin %}
+    <div id="stats-area">
+      {% include "tennis/_stats_block.html" %}
+    </div>
+  {% endif %}
+
+  {# ===== 参加登録モーダル：幹事/一般 共通 ===== #}
+  <div id="add-guest-modal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-content event-modal modal-has-topbar"
+        role="dialog" aria-modal="true" aria-labelledby="add-guest-modal-title">
+
+      <div class="modal-topbar">
+        <div class="modal-topbar-title" id="add-guest-modal-title">参加登録</div>
+        <button type="button"
+                id="close-add-guest-modal"
+                class="modal-topbar-btn"
+                aria-label="閉じる">×</button>
+      </div>
+
+      <form class="modal-form" id="add-guest-form">
+        <div class="field-group">
+          <label for="guest-name-input">名前</label>
+          <input
+            type="text"
+            id="guest-name-input"
+            class="event-title-input"
+            placeholder="例：山田（ゲスト）"
+            autocomplete="name"
+          >
+        </div>
+
+        <div class="modal-actions">
+          <button type="submit" class="btn btn-pill btn-primary">追加する</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  {# ===== 出欠モーダル：幹事/一般 共通 ===== #}
+  <div id="attendance-modal" class="modal-backdrop" aria-hidden="true">
+    <div class="modal-content">
+      <button type="button" class="modal-close" id="close-attendance-modal">×</button>
+      <h3>出欠を選択</h3>
+
+      <div class="attendance-choice-row">
+        <button type="button" class="attendance-choice" data-attendance="yes">
+          <span class="attendance-icon attendance-yes">✓</span>
+        </button>
+        <button type="button" class="attendance-choice" data-attendance="no">
+          <span class="attendance-icon attendance-no">×</span>
+        </button>
+        <button type="button" class="attendance-choice" data-attendance="maybe">
+          <span class="attendance-icon attendance-maybe">?</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+</div>
+{% endblock %}

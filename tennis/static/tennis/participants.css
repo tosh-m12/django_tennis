@@ -1,0 +1,244 @@
+/* =========================================
+   参加者一覧（カードレイアウト）
+   ========================================= */
+
+#participants-table {
+    width: 100%;
+    table-layout: fixed;       /* colgroup の幅を優先 */
+    border-collapse: separate;
+    border-spacing: 0 6px;     /* 行間に余白 */
+}
+
+/* ヘッダー */
+#participants-table th {
+    border: none;
+    padding: 4px 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+/* 通常セル */
+#participants-table td {
+    border: none;
+    padding: 4px 8px;
+    vertical-align: middle;
+}
+
+/* 左端の番号 */
+#participants-table .participant-index {
+    width: 32px;
+    text-align: right;
+    color: #777;
+    font-size: 0.8rem;
+}
+
+/* チェックボックス列 */
+#participants-table .checkbox-cell {
+    text-align: center;
+}
+
+/* 対戦表の名前カードのミニ版 */
+.tb-player-card-sm {
+    display: inline-block;
+    width: 130px;      /* 対戦表より少し小さめ */
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #555;
+    background: #fff;
+    text-align: center;
+    font-size: 0.9rem;
+    font-weight: 600;
+    box-sizing: border-box;
+    white-space: nowrap;
+}
+
+/* 行ホバー時の薄いハイライト */
+#participants-table tbody tr:hover td {
+    background: #fafafa;
+}
+
+/* ===== settings: 出欠（チェック表示の見た目） ===== */
+.attendance-cell { text-align: center; }
+
+.attendance-btn{
+  border: none !important;          /* ←枠を消す */
+  background: transparent !important;
+  padding: 2px 6px;
+  cursor: pointer;
+  appearance: none;
+  -webkit-appearance: none;
+  outline: none;
+}
+
+.attendance-btn:focus{ outline: none; }
+.attendance-btn:active{ transform: translateY(1px); }
+
+.attendance-icon{
+  display: inline-block;
+  font-size: 22px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+/* 色イメージ（調整さん風） */
+.attendance-yes  { color: #16a34a; }  /* 濃い緑 */
+.attendance-no   { color: #cbd5e1; }  /* 薄いグレー */
+.attendance-maybe{ color: #86efac; }  /* 薄い緑 */
+
+
+
+/* ===== settings: コメント（枠なしインライン編集） ===== */
+.comment-editable {
+  min-height: 28px;
+  padding: 6px 8px;
+  outline: none;
+  border: none;
+  background: transparent;
+  text-align: left;
+}
+
+.comment-editable:empty:before {
+  content: attr(data-placeholder);
+  color: #9ca3af;
+}
+
+/* ===== 共通：チェックマークUI（出欠/試合参加/フラグ） ===== */
+
+.check-cell{
+  text-align: center;
+}
+
+.check-btn{
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.check-btn:focus{ outline: none; }
+.check-btn:active{ transform: translateY(1px); }
+
+.check-icon{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 26px;
+  height: 26px;
+
+  border: 1.5px solid #d1d5db;   /* ★ 薄グレー枠 */
+  border-radius: 4px;
+
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1;
+
+  transition: background-color 0.15s ease,
+              border-color 0.15s ease,
+              color 0.15s ease;
+}
+
+/* ★ 試合参加・フラグ用（赤） */
+/* 未チェック */
+.check-off{
+  color: transparent;
+  background: transparent;
+}
+
+/* ★ チェックON（赤） */
+.check-on{
+  color: #dc2626;
+  /* border-color: #dc2626; */
+  /* background: #fff5f5; */
+}
+
+/* hover で操作感 */
+.check-btn:hover .check-icon{
+  background: #f8fafc;
+}
+
+/* =========================================
+   フラグ追加／削除ボタン
+   ========================================= */
+
+.flag-add-btn,
+.flag-delete-btn {
+    display: inline-block;
+    padding: 4px 16px;
+    border-radius: 30px;
+    border: none;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: 1.05rem;
+    color: #fff;
+    box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+    transition: all 0.2s ease;
+}
+
+.flag-add-btn {
+    background: linear-gradient(135deg, #3da9ff, #267dff);
+}
+
+.flag-add-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #5abbff, #3d8dff);
+    box-shadow: 0 4px 10px rgba(0, 123, 255, 0.4);
+}
+
+.flag-add-btn:active:not(:disabled) {
+    background: linear-gradient(135deg, #2c8be6, #1b6fe0);
+    transform: translateY(1px);
+}
+
+.flag-add-btn:disabled {
+    background: #aacbee;
+    color: #eef5ff;
+    cursor: not-allowed;
+    box-shadow: none;
+}
+
+.flag-delete-btn {
+    margin-left: 6px;
+    background: linear-gradient(135deg, #ff6262, #d64444);
+}
+
+.flag-delete-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, #ff7a7a, #e55656);
+}
+
+.flag-delete-btn:active:not(:disabled) {
+    transform: translateY(1px);
+}
+
+.flag-delete-btn:disabled {
+    background: #ccc;
+    color: #888;
+    box-shadow: none;
+    cursor: not-allowed;
+    transform: none;
+}
+
+/* 出欠がyes以外の時は「試合参加」ボタンを完全に消す */
+.match-toggle.is-hidden {
+  display: none !important;
+}
+
+/* =========================================================
+   Match checkbox hide (keep table alignment)
+   - Do NOT use display:none on <td> or button.
+   - Keep column width so the comment column never shifts.
+   ========================================================= */
+
+/* 行が「試合参加を隠すべき」状態のとき（出欠が yes 以外） */
+.participant-row.match-hidden td.match-cell,
+.participant-row.match-hidden td.match-cell * {
+  visibility: hidden;   /* 見えないが、スペースは維持 */
+  pointer-events: none; /* クリック不可 */
+}
+
+/* ボタンだけに付ける場合（保険） */
+.toggle-check.match-hidden,
+.toggle-check.match-hidden * {
+  visibility: hidden;
+  pointer-events: none;
+}

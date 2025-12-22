@@ -1,0 +1,317 @@
+/* =========================================
+   ヘッダー側のピルボタン（対戦条件）
+   ========================================= */
+
+.match-settings-bar {
+    margin: 10px 0 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;  /* 左に条件ピル、右に公開ボタン */
+    gap: 12px;
+}
+
+.match-pill-group {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* 共通ピル（テニスベア風） */
+.settings-pill {
+    border-radius: 999px;
+    border: 1px solid #2ecc71;
+    padding: 4px 14px;
+    background: linear-gradient(180deg, #33d47b, #29b864);
+    color: #ffffff;
+    cursor: pointer;
+    font-size: 1.05rem;
+    line-height: 1.4;
+    white-space: nowrap;
+    box-shadow: 0 3px 0 #1f8e4a;
+    transition:
+        background 0.15s ease,
+        box-shadow 0.15s ease,
+        transform 0.15s ease,
+        opacity 0.15s ease;
+}
+
+.settings-pill:hover {
+    background: linear-gradient(180deg, #2fc972, #25a95a);
+    box-shadow: 0 4px 0 #1a783f;
+    transform: translateY(-1px);
+}
+
+.settings-pill:active {
+    box-shadow: 0 1px 0 #1a783f;
+    transform: translateY(1px);
+}
+
+/* 将来シングルス／ダブルスで差を出したいとき用 */
+.game-type-pill.pill-singles,
+.game-type-pill.pill-doubles {
+    /* ここにスタイルを追加可能 */
+}
+
+/* ▼マーク */
+.settings-pill .caret {
+    margin-left: 4px;
+    font-size: 0.8em;
+}
+
+/* 公開ボタン */
+.publish-pill {
+    margin-left: auto;
+}
+
+/* 無効状態（グレーアウト） */
+.pill-disabled {
+    background: #cccccc !important;
+    border-color: #cccccc !important;
+    color: #666666 !important;
+    cursor: default !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+/* 公開状態の注意ボックス */
+.publish-notice {
+    margin-top: 8px;
+    padding: 8px 10px;
+    background: #e8f4ff;
+    border-radius: 4px;
+    font-size: 0.9rem;
+    border: 1px solid #c2ddff;
+}
+
+
+
+/* =========================================
+   対戦表（テニスベア風）
+   ========================================= */
+
+.tb-schedule {
+    margin-top: 8px;
+}
+
+/* ラウンド単位 */
+.tb-round {
+    margin-bottom: 24px;
+}
+
+.tb-round-header {
+    display: flex;
+    align-items: center;
+    margin-bottom: 8px;
+    font-size: 0.9rem;
+}
+
+.tb-round-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 90px;
+    height: 24px;
+    border-radius: 6px;
+    background: #181f4b;
+    color: #fff;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-right: 8px;
+}
+
+.tb-round-title {
+    font-weight: 600;
+    color: #333;
+}
+
+/* ラウンド内のコート群 */
+.tb-round-body {
+    padding: 4px 16px;
+    border-top: 1px solid #eee;     /* 上の線 */
+    border-bottom: 1px solid #eee;
+}
+
+.tb-court-row {
+    display: flex;
+    align-items: center;
+    padding: 8px 0;
+    border-top: 1px solid #eee;     /* コート間の線 */
+}
+
+.tb-court-row:first-child {
+    border-top: none;
+}
+
+.tb-court-row:last-child {
+    border-bottom: none;
+}
+
+/* 「Aコート」「Bコート」 */
+.tb-court-name {
+    width: 72px;
+    font-size: 0.9rem;
+    color: #555;
+}
+
+/* 4枚の名前カード＋中央vs */
+.tb-match-flex {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    flex-wrap: wrap;
+    width: 100%;
+}
+
+.tb-team {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+/* 名前カード（固定幅） */
+.tb-player-card {
+    width: 120px;
+    padding: 8px 4px;
+    border-radius: 6px;
+    border: 1px solid #555;
+    background: #fff;
+    text-align: center;
+    font-size: 0.95rem;
+    font-weight: 600;
+    box-sizing: border-box;
+    white-space: nowrap;
+}
+
+/* vs ＆ 将来のスコア欄 */
+.tb-score-area {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    min-width: 80px;
+}
+
+.tb-score {
+    width: 32px;
+    text-align: center;
+    font-weight: 700;
+    color: #444;
+    font-size: 1rem;
+    cursor: pointer;     /* クリックできる感じに */
+}
+
+/* クリック時に出す入力欄 */
+.tb-score-input {
+    width: 32px;
+    text-align: center;
+    font-size: 1rem;
+    font-weight: 700;
+    padding: 2px 4px;
+    border-radius: 4px;
+    border: 1px solid #ccc;
+    box-sizing: border-box;
+}
+
+/* スピンボタン消す */
+.tb-score-input::-webkit-inner-spin-button,
+.tb-score-input::-webkit-outer-spin-button {
+    -webkit-appearance: none;
+    margin: 0;
+}
+
+.tb-score-input {
+    -moz-appearance: textfield;
+}
+
+.tb-vs {
+    font-weight: 700;
+    font-size: 0.9rem;
+    color: #777;
+}
+
+/* 試合が組めないラウンド */
+.tb-no-match {
+    margin: 0 0 4px 0;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+/* 休憩表示 */
+.tb-rest-row {
+    margin-top: 6px;
+    font-size: 0.95rem;   /* 名前カードと同じ */
+    color: #333;          /* 薄くしない */
+    display: flex;
+    align-items: center;
+}
+
+.tb-rest-label {
+    font-weight: 600;     /* 強調 */
+}
+
+.tb-rest-names {
+    margin-left: 6px;
+    font-weight: 600;     /* 名前もカードと同じく太め */
+}
+
+
+/* =========================================
+   参加者一覧（カードレイアウト）
+   ========================================= */
+
+#participants-table {
+    width: 100%;
+    table-layout: fixed;       /* colgroup の幅を優先 */
+    border-collapse: separate;
+    border-spacing: 0 6px;     /* 行間に余白 */
+}
+
+/* ヘッダー */
+#participants-table th {
+    border: none;
+    padding: 4px 8px;
+    font-size: 0.9rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+/* 通常セル */
+#participants-table td {
+    border: none;
+    padding: 4px 8px;
+    vertical-align: middle;
+}
+
+/* 左端の番号 */
+#participants-table .participant-index {
+    width: 32px;
+    text-align: right;
+    color: #777;
+    font-size: 0.8rem;
+}
+
+/* チェックボックス列 */
+#participants-table .checkbox-cell {
+    text-align: center;
+}
+
+/* 対戦表の名前カードのミニ版 */
+.tb-player-card-sm {
+    display: inline-block;
+    width: 130px;      /* 対戦表より少し小さめ */
+    padding: 6px 10px;
+    border-radius: 6px;
+    border: 1px solid #555;
+    background: #fff;
+    text-align: center;
+    font-size: 0.9rem;
+    font-weight: 600;
+    box-sizing: border-box;
+    white-space: nowrap;
+}
+
+/* 行ホバー時の薄いハイライト */
+#participants-table tbody tr:hover td {
+    background: #fafafa;
+}

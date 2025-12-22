@@ -1,24 +1,23 @@
 {# tennis/templates/tennis/_schedule_block.html #}
-{% load tennis_extras %}
-
-{% if schedule_json %}
-  {{ schedule_json|json_script:"current-schedule-json" }}
-  <script>
-    (function(){
-      const el = document.getElementById("current-schedule-json");
-      if (!el) return;
-      el.dataset.eventId = "{{ event.id }}";
-      el.dataset.publishUrl = "{% url 'tennis:publish_schedule' %}";
-    })();
-  </script>
-{% endif %}
-
 {% if schedule %}
+
+  {# publish 用：幹事ページでだけ必要。schedule_json が来ている時だけ埋める #}
+  {% if schedule_json %}
+    {{ schedule_json|json_script:"current-schedule-json" }}
+    <script>
+      (function(){
+        const el = document.getElementById("current-schedule-json");
+        if (!el) return;
+        el.dataset.eventId = "{{ event.id }}";
+        el.dataset.publishUrl = "{% url 'tennis:publish_schedule' %}";
+      })();
+    </script>
+  {% endif %}
+
   <div class="tb-schedule">
     {% for round in schedule %}
       {% with r_no=round.round %}
       <div class="tb-round">
-
         <div class="tb-round-header">
           <span class="tb-round-pill">ラウンド {{ r_no }}</span>
         </div>
@@ -28,33 +27,27 @@
             {% for m in round.matches %}
               {% with c_no=forloop.counter %}
               <div class="tb-court-row">
-
                 <div class="tb-court-name">
-                  {{ m.court|default:c_no }}コート
+                  {% if m.court %}{{ m.court }}{% else %}{{ c_no }}{% endif %}コート
                 </div>
 
+                {# ★一般側が正：tb-match-flex 構造に統一 #}
                 <div class="tb-match-flex">
-
                   <div class="tb-team">
-                    {% for ep_id in m.team1 %}
-                      <div class="tb-player-card">
-                        {% with nm=ep_name_map|get_item:ep_id %}
-                          {% if nm %}{{ nm }}{% else %}{{ ep_id }}{% endif %}
-                        {% endwith %}
-                      </div>
+                    {% for p in m.team1 %}
+                      <div class="tb-player-card">{{ p }}</div>
                     {% endfor %}
                   </div>
 
                   <div class="tb-score-area">
+                    {# ★誰でも編集できる：data属性は常に付ける #}
                     <span class="tb-score tb-score-left"
                           data-round-no="{{ r_no }}"
                           data-court-no="{{ c_no }}"
                           data-side="a">
                       {% if m.score1 is not None %}{{ m.score1 }}{% else %}-{% endif %}
                     </span>
-
                     <span class="tb-vs">vs</span>
-
                     <span class="tb-score tb-score-right"
                           data-round-no="{{ r_no }}"
                           data-court-no="{{ c_no }}"
@@ -64,15 +57,10 @@
                   </div>
 
                   <div class="tb-team">
-                    {% for ep_id in m.team2 %}
-                      <div class="tb-player-card">
-                        {% with nm=ep_name_map|get_item:ep_id %}
-                          {% if nm %}{{ nm }}{% else %}{{ ep_id }}{% endif %}
-                        {% endwith %}
-                      </div>
+                    {% for p in m.team2 %}
+                      <div class="tb-player-card">{{ p }}</div>
                     {% endfor %}
                   </div>
-
                 </div>
               </div>
               {% endwith %}
@@ -83,24 +71,19 @@
         {% endif %}
 
         <div class="tb-rest-row">
-          <span class="tb-rest-label">休憩：</span>
           {% if round.rests %}
-            <span class="tb-rest-names">
-              {% for ep_id in round.rests %}
-                {% with nm=ep_name_map|get_item:ep_id %}
-                  {% if nm %}{{ nm }}{% else %}{{ ep_id }}{% endif %}
-                {% endwith %}{% if not forloop.last %}, {% endif %}
-              {% endfor %}
-            </span>
+            <span class="tb-rest-label">休憩：</span>
+            <span class="tb-rest-names">{{ round.rests|join:", " }}</span>
           {% else %}
+            <span class="tb-rest-label">休憩：</span>
             <span class="tb-rest-names">なし（全員出場）</span>
           {% endif %}
         </div>
-
       </div>
       {% endwith %}
     {% endfor %}
   </div>
+
 {% else %}
-  <div class="tb-empty">対戦表はまだ公開されていません。</div>
+  <div class="tb-empty">対戦表がまだ生成されていません。</div>
 {% endif %}

@@ -1,32 +1,1425 @@
 
+# V1 仕様書（完全版・統合｜未登録行はDBに作らない版）
 
-トップページ
-・クラブ名称と幹事のメールアドレスを登録できる。
-・クラブ登録すると幹事用ページ（＝クラブ設定画面）とメンバー用ページ（クラブメイン画面）のURLが生成される。
+## 0. 設計思想（最上位コンセプト）
 
-クラブ設定画面にて
-・クラブ幹事のみ閲覧可能の前提
-・クラブ名称の変更
-・空の出欠表を表示、出欠表のフラグ追加、削除設定ができる
-・フラグは名称の変更が可能。
-・当月のカレンダーが表示されていて、練習日を設定したい日をクリックすると練習日が登録される。
-・
+* 調整さんのような手軽さ（全員がその場で出欠・コメントを更新できる）
+* 連絡アプリ的なカレンダー表示で予定を管理（クラブの練習日＝イベントを月カレンダーで見える化）
+* テニスベア的なランダム対戦表生成（幹事が条件指定→生成→公開→スコア入力→ロック）
+* V1 はログイン無し。URLトークン方式でアクセス制御（幹事URL / メンバーURL）
+* クラブ単位で管理。イベント単位トークンは使用しない。
+* UIドリブン。各テンプレートは1枚で、幹事用/一般用にテンプレートを分けず、権限によって表示・操作できる機能のみ切り替える方式。
+* UI上は固定/ゲストの区別を極力見せず、運用で吸収する（ただし内部データは整理できるように持つ）
 
-クラブメイン画面
-・全員閲覧可能
-・当月の練習会スケジュールが見れる（カレンダー表示）
-・カレンダーのスケジュールをクリックするとその回のページへジャンプする
-・当月の出欠状況サマリー（出席予定も含む）が見れる（〇×？表示）
-・当月戦績とランキングがデフォルトで表示
-・年間戦績とランキングもスイッチ切り替えで表示ができる
-・メンバーはこのページで名前（表示名）と出欠を〇×？、フラグをチェックボックスにて登録可能。「メンバー追加」ボタンでモーダル出現、編集する。
-・メンバーはこのページの出欠状況サマリーで名前部分をクリックするとモーダル出現し、出欠およびフラグ登録を変更できる。
+---
 
-クラブ練習会画面
-・全員閲覧可能
-・いまの幹事用ページがクラブ練習会画面になり、上記の機能が追加されるイメージ
-・メンバーはこのページでも名前（表示名）と出欠を登録可能。名前クリック→モーダル出現
-・フラグチェックボックスも同様にモーダルにて操作可能。
-・試合参加のチェックボックスはこのページに設置。これはモーダルではなく直接出欠表に表示して、自由にオンオフできるようにする。
-・対戦表（ランダム生成）はこのページにて実施。
-・対戦表はスコアが記入できる
+## 1. 権限・URL設計（クラブ単位）
+### 1-1. トークンの考え方
+クラブに対してのみトークンを発行
+club.public_token：一般（メンバー）
+club.admin_token：幹事
+イベント単位のトークンは廃止
+
+### 1-2. 画面一覧
+サイトトップ画面（幹事用クラブ名登録）
+クラブトップ画面（全員）
+クラブ設定画面（幹事）
+クラブメンバー管理画面（幹事）
+イベント画面（全員）
+
+## 2. ページ別機能・仕様一覧
+
+### 2-1. 幹事用トップページ `index.html`
+* クラブ幹事がアクセス
+* クラブ名称を登録できる
+* 将来的にメールアドレス登録→ログイン管理を実装可能な設計余地を残す
+* クラブ登録するとpublic_token / admin_token 発行
+* 作成後にURLを表示
+
+### 2-2. 幹事用クラブ設定画面 `settings.html`
+* クラブ幹事のみ閲覧可能
+* クラブ名称の変更
+* ダミーの出欠表を見ながらフラグ追加・削除設定ができる。フラグは最大３個まで。
+* フラグ名称の変更が可能
+
+### 2-3. メンバー管理画面 `member_admin.html`
+* クラブ幹事のみ閲覧可能
+* クラブ名簿一覧表示
+* 戦績や出欠履歴を同一人物として統合する必要がある場合はこのページで member_id の紐付けを調整して行う。
+* メンバー用イベント画面で自由登録された名前がクラブ名簿として蓄積され、この画面に一覧表示
+* 幹事が 固定メンバー / 非固定メンバー をフラグで設定できる
+* お試し参加、友人による招待などで参加した臨時メンバーもこのページに表示されるが、幹事が固定メンバーフラグを立てない限りlast_seen_at + 48hで自動整理。ただし、戦績は残す。
+* 48時間経過後に削除/無効化されたら、次回また登録
+* 注意：固定メンバーだったとしても幹事が固定フラグを立て忘れると消える可能性がある（次回イベントで再登録）
+
+
+### 2-4. クラブトップ画面 `club_home.html`
+* 全員閲覧可能
+〔共通機能〕
+* 当月カレンダーを表示
+* 月移動（前月/翌月）、本日ボタンあり
+* カレンダー上のイベント予定をクリックするとそれぞれのイベントページへ飛ぶ
+* （V2以降で実装）当月出欠サマリー表を表示。幹事を含めて全員この画面上でも出欠✓ × ?を編集することができる。
+* （V2以降で実装）名前の編集もこのページで可能。例えば、次の回で違う名前で登録してしまった場合に、表示上の誤入力や表記ゆれを修正できる。
+* 戦績や出欠履歴を同一人物として統合する必要がある場合は、幹事が member_admin で member_id の紐付けを調整して行う。（表示名編集では統合されない）
+* 当月戦績・ランキング表示（固定メンバーのみ）※将来：期間切替（当月 / 全期間など）
+〔幹事用機能〕
+* 練習日を登録したい日をクリックするとイベント登録できる
+
+注：イベントの削除・中止は settings では基本扱わず、イベント管理（幹事イベント画面）に寄せる方針。
+
+### 2-5. イベント画面 event.html
+* 全員閲覧可能
+〔共通機能〕
+* 参加者一覧表示
+* 表示名、出欠（✓ × ?）、コメント、フラグ on/off の編集が可能
+* 固定メンバーはデフォルトで表示される
+* 出欠は未設定（null）状態で表示し、✓ × ? やコメント等の 初回入力が行われた時点で event_participant を作成する（未登録行はDBに作らない）
+* 固定メンバーについては、作成される event_participant には必ず member_id が設定される
+* 出欠登録はチェックボックスクリックでモーダルを表示し編集可能
+* 参加者追加ボタンを押すと参加者追加モーダルが表示され、名前を登録可能
+* 臨時参加（ゲスト）は member_id 未設定（NULL）のままでも良い
+* ゲスト追加時は member(is_fixed=false) を作成して名簿に残す（48h整理対象）。
+* event_participant.member_id は NULLでも可だが、後の統合運用を想定する場合は member_id を付与しておく運用を推奨（幹事が member_admin で統合しやすい）。
+* 表示名の編集が可能。ただし表示上の誤入力や表記ゆれを修正する目的に限定する
+* 表示名の変更によって戦績・ランキングの集計単位が変更・統合されることはない（集計キーは member_id）。
+* 幹事機能により対戦表がランダム生成・公開されると、一般ユーザー向けにも表示される
+* 対戦表が公開された後は各自スコア入力が可能
+* 試合ラウンド進行途中、ケガ・体調不良・休憩対応等のため、対戦表上の名前をクリックすると代打登録モーダルが表示され、代打登録が可能
+〔幹事用機能〕
+* 試合参加フラグの編集
+* デフォルトでは出欠登録が yes の者を試合参加とする。一般メンバーには表示しない
+* 対戦表条件設定（シングルス／ダブルス、コート面数、ラウンド数）
+* 設定された条件および試合参加者をもとに対戦表をランダム生成
+* 対戦表ドラフトを生成し、公開ボタンを押すことで正式公開版となり一般メンバーにも表示される
+* 対戦表にスコアが入力された時点でロックがかかり、ロック状態を表示
+* ロック状態でも再生成は可能だが、「スコアが入力されています。再公開するとスコアがリセットされますが、よろしいですか」という警告を表示する
+* 試作段階では検証用に、メンバーごとの試合数・休憩数・連続試合数・連続休憩数の統計を表示（当面）
+
+補足（仕様としての明示事項）
+* member_id は内部識別子としてのみ使用し、メンバーがアクセス可能な画面上には表示しない
+* 戦績・ランキング等の集計は member_id をキーとして行う
+* 表示名はUI上の表示目的であり、人物識別や戦績統合のキーには使用しない
+
+---
+
+## 3. DBテーブル一覧（V1）
+
+### 3-1. Club（クラブ）
+テーブル名：club
+* id (PK)
+* name (varchar) クラブ名
+* public_token (varchar unique) クラブメンバー用URLトークン
+* admin_token (varchar unique) クラブ幹事用URLトークン
+* created_at (datetime)
+* updated_at (datetime)
+
+### 3-2. ClubFlagDefinition（クラブ共通フラグ定義）
+テーブル名：club_flag_definition
+* id (PK)
+* club_id (FK → club.id)
+* name (varchar) フラグ名（例：ボール当番）
+* display_order (int) 表示順
+* is_active (boolean) 論理削除
+* created_at (datetime)
+* updated_at (datetime)
+
+制約（推奨）
+* unique(club_id, display_order)
+* unique(club_id, name) は 置かない（表記ゆれ許容／運用で吸収でも可）
+※置く場合はUIで重複禁止にすること
+
+備考
+* フラグ最大3個（仕様）
+→ is_active=true の件数を3以内に制限（アプリ側チェック）
+
+### 3-3. Event（練習回／イベント）
+テーブル名：event
+* id (PK)
+* club_id (FK → club.id) 所属クラブ
+* title (varchar) 練習名（任意。未入力なら自動で「練習」等）
+* date (date) 開催日
+* start_time (time, NULL可) 任意
+* end_time (time, NULL可) 任意
+* cancelled (boolean) 中止フラグ
+* created_at (datetime)
+* updated_at (datetime)
+
+備考
+* イベント単位トークンは持たない（仕様）
+
+### 3-4. Member（クラブ名簿：固定/非固定）
+テーブル名：member
+* id (PK)
+* club_id (FK → club.id)
+* display_name (varchar) 表示名（本人入力ベース）
+* is_fixed (boolean) 固定メンバーか（幹事が設定）
+* is_active (boolean) 整理で落とすなら false（または物理削除）
+* last_seen_at (datetime) 最終操作日時（48h整理判定に使用）
+* created_at (datetime)
+* updated_at (datetime)
+
+方針（確定）
+* unique(club_id, display_name) は置かない（推奨しない）
+* 同名別人・表記ゆれを許容
+* 同一人物性は member_id をキーに担保する
+
+### 3-5. EventParticipant（イベント参加者）
+テーブル名：event_participant
+* id (PK)
+* event_id (FK → event.id)
+* member_id (FK → member.id, NULL可)
+* 固定メンバーは原則必ず設定
+* ゲストは NULL 可
+* display_name (varchar) 表示名（当該イベントの表示用）
+* attendance (enum or varchar, NULL可)
+* yes / no / maybe / NULL（未設定）
+※ 未登録行（UIのみ表示）をDBに作らないため、attendance=NULL行の大量生成は発生しない
+* participates_match (boolean) 試合参加（幹事のみ操作）
+* comment (text)
+* created_at (datetime)
+* updated_at (datetime)
+
+制約（推奨）
+* 部分ユニーク（filtered unique）
+* unique(event_id, member_id) WHERE member_id IS NOT NULL
+* ゲスト（member_id IS NULL）は重複を許容（UI/運用で吸収）
+
+備考（仕様との対応）
+* 固定メンバーは event 画面で「未登録行（UIのみ）」として表示し、✓×？・コメント等の入力が発生した瞬間に初めて event_participant を作成する（＝入力が発生したら保存）
+
+### 3-6. ParticipantFlag（イベント単位フラグ ON/OFF）
+テーブル名：participant_flag
+* id (PK)
+* event_participant_id (FK → event_participant.id)
+* flag_definition_id (FK → club_flag_definition.id)
+* is_on (boolean)
+* updated_at (datetime)
+
+制約
+* unique(event_participant_id, flag_definition_id)
+
+備考
+* フラグ操作時に対象参加者が未登録行の場合は、先に event_participant を作成してから保存する
+
+### 3-7. MatchSchedule（対戦表：公開版）
+テーブル名：match_schedule
+* id (PK)
+* event_id (FK → event.id)
+* schedule_json (JSON) 対戦表本体
+* game_type (enum) singles / doubles
+* court_count (int)
+* round_count (int)
+* published (boolean) 公開中か
+* locked (boolean) スコア入力によりロックされたか
+* created_at (datetime)
+* updated_at (datetime)
+
+制約（推奨）
+* unique(event_id)（イベントにつき公開版は1つ）
+
+備考
+* 公開後にスコアが1つでも入力されたら locked=true（仕様）
+
+### 3-8. MatchScheduleDraft（生成中ドラフト）
+テーブル名：match_schedule_draft
+* id (PK)
+* event_id (FK → event.id)
+* draft_json (JSON) 生成中の対戦表
+* params_json (JSON) 条件（game_type/court_count/round_count等）
+* updated_at (datetime)
+
+制約（推奨）
+* unique(event_id)（イベントにつきドラフトは1つ）
+
+備考
+* event.html の幹事機能で「生成」→ draft に保存
+* 「公開」→ match_schedule に反映
+
+### 3-9. MatchScore（スコア）
+テーブル名：match_score
+* id (PK)
+* match_schedule_id (FK → match_schedule.id)
+* round_no (int)
+* court_no (int)
+* side_a_score (int, NULL可)
+* side_b_score (int, NULL可)
+* updated_at (datetime)
+
+制約（推奨）
+* unique(match_schedule_id, round_no, court_no)
+
+備考
+* side_a_score / side_b_score のいずれかが入力された時点で「スコア入力あり」とみなし、locked判定に使用してよい（実装方針）
+
+### 3-10. Substitution（代打）
+テーブル名：substitution
+* id (PK)
+* match_schedule_id (FK → match_schedule.id)
+* round_no (int)
+* original_participant_id (FK → event_participant.id) 交代元
+* substitute_participant_id (FK → event_participant.id) 代打
+* updated_at (datetime)
+
+制約（推奨）
+* unique(match_schedule_id, round_no, original_participant_id)
+
+備考
+* 代打は「現状態のみ」を保持（履歴管理はV2以降）
+
+### 3-11. （任意）AuditLog（操作ログ：V1では任意）
+※V1必須ではないが「全員編集可」のため将来トラブル対応に有効
+テーブル名：audit_log（任意）
+* id (PK)
+* club_id (FK → club.id)
+* event_id (FK → event.id, NULL可)
+* actor_token_kind (enum) public / admin（誰が操作したかの種別のみ。個人特定はしない）
+* action (varchar) 例：attendance_update / comment_update / score_update など
+* payload_json (JSON) 変更内容の差分
+* created_at (datetime)
+
+---
+
+## 4. ページ別：保存先・取得元まとめ
+
+### 4-1. 幹事トップ index.html
+処理	取得	保存
+クラブ作成	–	club
+クラブURL表示（public/admin）	club	–
+
+### 4-2. クラブ設定 settings.html（幹事のみ）
+処理	取得	保存
+クラブ名表示	club	–
+クラブ名変更	–	club
+フラグ定義一覧表示	club_flag_definition	–
+フラグ追加	–	club_flag_definition
+フラグ名称変更	–	club_flag_definition
+フラグ削除（論理削除）	–	club_flag_definition.is_active=false
+フラグ表示順変更	–	club_flag_definition.display_order
+（任意）フラグ最大3個チェック	club_flag_definition（is_active=true件数）	–
+※イベント作成は club_home の幹事機能 に寄せる（方針）	–	–
+
+### 4-3. メンバー管理 member_admin.html（幹事のみ）
+処理	取得	保存
+メンバー一覧表示	member	–
+固定/非固定切替	–	member.is_fixed
+有効/無効（整理・退会等）	–	member.is_active
+表示名編集（名簿側）	–	member.display_name
+last_seen_at 参照（整理判定）	member	–
+自動整理（48h）	member	member.is_active=false（または削除）
+
+自動整理基準（確定）
+member.is_fixed=False AND member.is_active=True AND member.last_seen_at + 48h < now()
+
+### 4-4. クラブトップ club_home.html（全員）
+処理	取得	保存
+当月カレンダー表示	event	–
+月移動（前月/翌月）	event	–
+イベントクリック→イベント画面遷移	event	–
+当月戦績・ランキング表示（固定のみ）	match_schedule / match_score / substitution / event_participant / member	–
+（V2以降）当月出欠サマリー表示	event + event_participant（固定はUI未登録行含む）	–
+（V2以降）クラブトップから出欠編集	–	event_participant（必要時に作成）
+
+〔幹事用機能〕
+
+処理	取得	保存
+日付クリックでイベント作成	–	event
+イベント中止/削除は event.html 側へ寄せる（方針）	–	–
+
+### 4-5. イベント画面 event.html（全員＋幹事機能を同画面に内包）
+
+#### 4-5-1. 共通（全員が利用）
+処理	取得	保存
+初期表示（参加者リスト）	member（固定） + event_participant（既存）	–
+固定メンバー「未登録行」表示（UIのみ）	member（is_fixed=true）	–
+出欠登録（✓×？）	–	event_participant（必要時に作成）
+コメント登録	–	event_participant（必要時に作成）
+表示名変更（イベント内）	–	event_participant.display_name（必要時に作成）
+フラグON/OFF	participant_flag	participant_flag（必要時にevent_participant作成）
+参加者追加（ゲスト）	–	event_participant（member_id=NULL可） + member（upsert/last_seen_at更新）
+last_seen_at 更新（操作が発生した時）	–	member.last_seen_at（該当memberがある場合）
+対戦表閲覧（公開後）	match_schedule（published=true）	–
+スコア入力（公開後）	–	match_score
+代打登録（公開後）	–	substitution
+
+備考（重要）
+
+固定メンバーの未登録行は DBに event_participant を作らない
+✓×？・コメント・フラグ・表示名等の 入力が発生した瞬間に初めて作成（＝入力が発生したら保存）
+
+member_id は内部識別子であり、画面には表示しない（集計キーとしてのみ使用）
+
+#### 4-5-2. 幹事のみ（admin_tokenで開いた場合のみ表示・操作可能）
+処理	取得	保存
+試合参加フラグ（participates_match）決定	event_participant（attendance=yes 等）	event_participant.participates_match
+対戦表条件表示・編集	match_schedule_draft.params_json（あれば）	match_schedule_draft.params_json
+対戦表ドラフト生成	event_participant（試合参加者）	match_schedule_draft.draft_json
+公開（ドラフト→公開版へ反映）	match_schedule_draft	match_schedule（schedule_json, published=true）
+ロック状態表示	match_score（入力有無） + match_schedule.locked	match_schedule.locked
+ロック後の再生成（警告付き）	match_score / match_schedule	match_score（リセット） + match_schedule（更新） + match_schedule.locked再設定
+（当面）統計表示（試合数/休憩/連続など）	match_schedule_draft or match_schedule	–
+
+ロック条件（確定）
+
+match_score が1件でも入力されたら match_schedule.locked=true
+
+locked 状態で再生成する場合は警告を出し、再公開時にスコアをリセットする
+
+
+
+## 5. メンバー管理の考え方
+
+### 5-1. 固定メンバー
+
+* クラブに所属する人。名簿の中核。`member` に保存
+* クラブ単位で永続管理：`member.is_fixed=True`
+* 原則消さない（退会は `is_active=false` 等で扱う）
+* 当番フラグ管理の対象（ボール当番等）
+* 戦績・ランキングの主体（将来もここが中心）
+
+### 5-2. ゲスト参加（お試し・友人招待等）
+
+* event.html でその場登録（例：「田中（友人）」「体験A」）
+* `member` 側には `is_fixed=False` のまま蓄積（幹事が固定化しない限り整理対象）
+* 自動整理：`member.last_seen_at + 48h` を基準に整理
+* 過去イベントの表示・戦績整合を壊さないため
+
+  * `member` 側を無効化（非表示/整理）
+  * `event_participant` は履歴として残す
+* 「固定メンバーに昇格」しない限り整理される
+
+補足
+* 同一人物統合（member_idの統一）は幹事のみが member_admin で実施する。表示名編集では統合しない。
+
+---
+
+## 6. 戦績ロジック（V1：確定版）
+
+### 6-0. 前提
+
+* 戦績の入力元は `event.html`
+* スコアは `match_score`
+* 対戦構造は `match_schedule.schedule_json`
+* 代打は `substitution`（現状態のみ）
+* 戦績は `schedule_json + match_score + substitution` を突合して「試合単位」で算出
+
+### 6-1. 集計対象データ
+
+* 対象試合：`match_score` 入力済みのみ
+* 対象者：イベント参加者（event_participant）
+* 固定／ゲストの区別は集計段階では行わない（ただしランキング対象は固定のみ）
+
+### 6-2. 勝敗判定
+
+* side_a_score > side_b_score → sideA 勝ち
+* side_a_score < side_b_score → sideB 勝ち
+* side_a_score == side_b_score → 引き分け
+
+引き分けの扱い（確定）
+
+* 勝ち点・ランキングポイントには一切カウントしない
+* 戦績として draws 件数は保持可
+
+### 6-3. 個人戦績の集計項目（V1）
+
+participant_id（最終的には member_id）単位で集計
+
+* matches：出場試合数
+* wins：勝数
+* losses：負数
+* draws：引き分け数
+* win_rate：勝率
+* points_for：得点合計
+* points_against：失点合計
+* point_pct：得点率（参考表示）
+
+### 6-4. 勝率・得点率
+
+* win_rate = wins / matches（draw は matches に含む、wins には加算しない）
+* point_pct = points_for / (points_for + points_against)
+* matches = 0 は対象外
+
+### 6-5. ダブルスの扱い
+
+* 1試合の勝敗・得点は参加者全員に同じように配賦
+* ペア相性・直接対決補正は V1 では行わない
+
+### 6-6. 代打の扱い（確定）
+
+* 実際にその試合に出た人の戦績として記録
+* 元の予定メンバーには勝敗を付けない
+* substitution 履歴はランキングでは参照しない（現状態のみ）
+
+### 6-7. 集計対象者条件（重要）
+
+* ランキング・戦績表示対象：固定メンバー、かつ対象期間内 試合数3以上
+* 除外：ゲスト参加のみ、試合数3未満
+
+集計キー（確定）
+
+* 固定メンバーの戦績集計キーは **member_id（event_participant.member_id）**
+* member_id が NULL（ゲスト）はランキング対象外（イベント内表示のみ）
+
+---
+
+## 7 ランキングロジック（V1：当時合意完全版）
+
+### 7-0. 集計期間
+
+* ランキングは「全期間」を基本
+* club_home では「当月ランキング」も併記（ロジック同一、期間のみ違う）
+* いずれも **固定メンバーかつ対象期間内3試合以上のみ順位付け対象**
+* 3試合未満は参考表示（順位 “–”）で下部に出す
+* 将来拡張：当月 / 3か月 / 6か月 / 1年 / 全期間 を切替可能にする
+
+### 7-1. ランキング指標（V1）
+
+* 勝率（win_rate）
+* 試合数（matches）
+* 勝数（wins）
+* ※ point%・得失点差はランキングには使わない
+
+### 7-2. 並び順（多段ソート）
+
+1. 勝率（win_rate）降順
+2. 試合数（matches）降順
+3. 勝数（wins）降順
+4. 名前 昇順（完全同率時の安定化）
+
+「1勝0敗の人が1位になる」問題を試合数で自然に押し下げる設計。
+
+### 7-3. 表示仕様（V1）
+
+* 表形式のみ
+* 表示項目：順位 / 名前 / 試合数 / 勝 / 負 / 勝率
+* グラフ・推移・相関はやらない
+
+### 7-4. やらないと決めたこと（再確認）
+
+* Elo / レーティング
+* 相手強度補正
+* ペア相性補正
+* 最近成績の重み付け
+* ゲストを含めたランキング
+
+### 7-5. V1ランキングの思想（結論）
+
+* 厳密さより納得感
+* 誰が見ても「まあ妥当だね」と思える並びを最優先
+
+
+
+
+
+
+
+
+
+
+
+---
+
+# V1 仕様書（完全版・統合｜未登録行はDBに作らない版）
+
+## 0. 設計思想（最上位コンセプト）
+
+* 調整さんのような手軽さ（全員がその場で出欠・コメントを更新できる）
+* 連絡アプリ的なカレンダー表示で予定を管理（クラブの練習日＝イベントを月カレンダーで見える化）
+* テニスベア的なランダム対戦表生成（幹事が条件指定→生成→公開→スコア入力→ロック）
+* V1 はログイン無し。URLトークン方式でアクセス制御（幹事URL / メンバーURL）
+* クラブ単位で管理。イベント単位トークンは使用しない。
+* UIドリブン。各テンプレートは1枚で、幹事用/一般用にテンプレートを分けず、権限によって表示・操作できる機能のみ切り替える方式。
+* UI上は固定/ゲストの区別を極力見せず、運用で吸収する（ただし内部データは整理できるように持つ）
+
+---
+
+## 1. 権限・URL設計（クラブ単位）
+
+### 1-1. トークンの考え方
+
+クラブに対してのみトークンを発行
+
+* `club.public_token`：一般（メンバー）
+* `club.admin_token`：幹事
+  イベント単位のトークンは廃止
+
+### 1-2. 画面一覧
+
+* サイトトップ画面（幹事用クラブ名登録）
+* クラブトップ画面（全員）
+* クラブ設定画面（幹事）
+* クラブメンバー管理画面（幹事）
+* イベント画面（全員）
+
+---
+
+## 2. ページ別機能・仕様一覧
+
+### 2-1. 幹事用トップページ `index.html`
+
+* クラブ幹事がアクセス
+* クラブ名称を登録できる
+* 将来的にメールアドレス登録→ログイン管理を実装可能な設計余地を残す
+* クラブ登録すると `public_token / admin_token` を発行
+* 作成後にURLを表示
+
+---
+
+### 2-2. 幹事用クラブ設定画面 `settings.html`
+
+* クラブ幹事のみ閲覧可能
+* クラブ名称の変更
+* ダミーの出欠表を見ながらフラグ追加・削除設定ができる（フラグは最大3個まで）
+* フラグ名称の変更が可能
+
+---
+
+### 2-3. メンバー管理画面 `member_admin.html`
+
+* クラブ幹事のみ閲覧可能
+* クラブ名簿一覧表示
+* メンバー用イベント画面で自由登録された名前（ゲスト含む）がクラブ名簿として蓄積され、この画面に一覧表示
+* 幹事が **固定メンバー / 非固定メンバー** をフラグで設定できる
+* お試し参加・友人招待などの臨時メンバーもこのページに表示されるが、幹事が固定化しない限り `last_seen_at + 48h` で自動整理（ただし戦績・履歴は残す）
+* 48時間経過後に無効化されたら、次回また登録（= 新しい member が作られても良い）
+
+#### 同一人物統合（V1：確定）
+
+戦績や出欠履歴を同一人物として統合する必要がある場合は、このページで **統合作業**を行う。
+
+* 統合とは「代表 `member_id` を決め、過去の `event_participant.member_id` を代表 `member_id` に付け替える」ことを指す（V1）
+* 統合の結果、表示名が同じ/違うに関わらず **集計キーは代表 `member_id` に一本化**される
+* 表示名編集（member / event_participant）だけでは統合されない
+
+注意：
+
+* 固定メンバーだったとしても幹事が固定フラグを立て忘れると整理される可能性がある（次回イベントで再登録 → 必要に応じて統合）
+
+---
+
+### 2-4. クラブトップ画面 `club_home.html`
+
+* 全員閲覧可能
+
+〔共通機能〕
+
+* 当月カレンダーを表示
+* 月移動（前月/翌月）、本日ボタンあり
+* カレンダー上のイベント予定をクリックするとそれぞれのイベントページへ遷移
+* （V2以降で実装）当月出欠サマリー表を表示。幹事を含めて全員この画面上でも出欠 ✓ × ? を編集可能
+* （V2以降で実装）名前の編集もこのページで可能（表示上の誤入力・表記ゆれ修正のみ）
+* 戦績や出欠履歴を同一人物として統合する必要がある場合は、幹事が `member_admin` で統合作業（member_id付け替え）を行う（表示名編集では統合されない）
+* 当月戦績・ランキング表示（固定メンバーのみ）※将来：期間切替（当月 / 全期間など）
+
+〔幹事用機能〕
+
+* 練習日を登録したい日をクリックするとイベント登録できる
+
+注：
+
+* イベントの削除・中止は settings では基本扱わず、イベント管理（イベント画面）側に寄せる方針
+
+---
+
+### 2-5. イベント画面 `event.html`
+
+* 全員閲覧可能（同一テンプレート内で admin_token の場合のみ幹事機能を表示）
+
+〔共通機能〕
+
+* 参加者一覧表示
+* 表示名、出欠（✓ × ?）、コメント、フラグ on/off の編集が可能
+* 固定メンバーはデフォルトで表示される（ただしDB行は作らない）
+* 出欠は未設定（null）状態で表示し、✓ × ? やコメント等の **初回入力が行われた時点で `event_participant` を作成**する（未登録行はDBに作らない）
+* 固定メンバーについては、作成される `event_participant` には **必ず `member_id` を設定**する
+* 出欠登録はチェックボックスクリックでモーダルを表示し編集可能
+* 参加者追加ボタンを押すと参加者追加モーダルが表示され、名前を登録可能
+* ゲスト追加時は `member(is_fixed=false)` を作成して名簿に残す（48h整理対象）
+* **ゲストの `event_participant.member_id` も原則必ず設定する（推奨ではなく原則）**
+
+  * 後の統合運用・戦績整合・履歴追跡のため
+  * 例外的に `member_id=NULL` の参加者（過去互換・移行データ等）は、ランキング対象外・イベント内表示のみとする
+* 表示名の編集が可能。ただし表示上の誤入力や表記ゆれを修正する目的に限定する
+* 表示名の変更によって戦績・ランキングの集計単位が変更・統合されることはない（集計キーは member_id）
+* 幹事機能により対戦表がランダム生成・公開されると、一般ユーザー向けにも表示される
+* 対戦表が公開された後は各自スコア入力が可能
+* 試合ラウンド進行途中、ケガ・体調不良・休憩対応等のため、対戦表上の名前をクリックすると代打登録モーダルが表示され、代打登録が可能
+
+#### 表示名の扱い（確定）
+
+* `member.display_name` は名簿上の表示名
+* `event_participant.display_name` は **当該イベント内の表示名**
+* `event_participant` 作成時、`display_name` の初期値は原則 `member.display_name` をコピーして設定する
+  （以後、イベント側で独立して編集可。編集しても統合キーは変わらない）
+
+〔幹事用機能〕
+
+* 試合参加フラグ（`participates_match`）の編集
+
+  * デフォルトでは出欠登録が yes の者を試合参加とする
+  * 一般メンバーには表示しない
+* 対戦表条件設定（シングルス／ダブルス、コート面数、ラウンド数）
+* 設定された条件および試合参加者をもとに対戦表をランダム生成
+* 対戦表ドラフトを生成し、公開ボタンを押すことで正式公開版となり一般メンバーにも表示される
+* 対戦表にスコアが入力された時点でロックがかかり、ロック状態を表示
+* ロック状態でも再生成は可能だが、「スコアが入力されています。再公開するとスコアがリセットされますが、よろしいですか」という警告を表示する
+* 試作段階では検証用に、メンバーごとの試合数・休憩数・連続試合数・連続休憩数の統計を表示（当面）
+
+補足（仕様としての明示事項）
+
+* `member_id` は内部識別子としてのみ使用し、メンバーがアクセス可能な画面上には表示しない
+* 戦績・ランキング等の集計は `member_id` をキーとして行う
+* 表示名はUI上の表示目的であり、人物識別や戦績統合のキーには使用しない
+
+---
+
+## 3. DBテーブル一覧（V1）
+
+### 3-1. Club（クラブ）
+
+テーブル名：`club`
+
+* id (PK)
+* name (varchar) クラブ名
+* public_token (varchar unique) クラブメンバー用URLトークン
+* admin_token (varchar unique) クラブ幹事用URLトークン
+* created_at (datetime)
+* updated_at (datetime)
+
+---
+
+### 3-2. ClubFlagDefinition（クラブ共通フラグ定義）
+
+テーブル名：`club_flag_definition`
+
+* id (PK)
+* club_id (FK → club.id)
+* name (varchar) フラグ名（例：ボール当番）
+* display_order (int) 表示順
+* is_active (boolean) 論理削除
+* created_at (datetime)
+* updated_at (datetime)
+
+制約（推奨）
+
+* unique(club_id, display_order)
+* unique(club_id, name) は置かない（表記ゆれ許容／運用で吸収でも可）
+
+  * 置く場合はUIで重複禁止にすること
+
+備考
+
+* フラグ最大3個（仕様）
+
+  * is_active=true の件数を3以内に制限（アプリ側チェック）
+
+---
+
+### 3-3. Event（練習回／イベント）
+
+テーブル名：`event`
+
+* id (PK)
+* club_id (FK → club.id)
+* title (varchar) 練習名（任意。未入力なら自動で「練習」等）
+* date (date) 開催日
+* start_time (time, NULL可)
+* end_time (time, NULL可)
+* cancelled (boolean) 中止フラグ
+* created_at (datetime)
+* updated_at (datetime)
+
+備考
+
+* イベント単位トークンは持たない（仕様）
+
+---
+
+### 3-4. Member（クラブ名簿：固定/非固定）
+
+テーブル名：`member`
+
+* id (PK)
+* club_id (FK → club.id)
+* display_name (varchar) 表示名（本人入力ベース）
+* is_fixed (boolean) 固定メンバーか（幹事が設定）
+* is_active (boolean) 整理で落とすなら false（または物理削除）
+* last_seen_at (datetime) 最終操作日時（48h整理判定に使用）
+* created_at (datetime)
+* updated_at (datetime)
+
+方針（確定）
+
+* unique(club_id, display_name) は置かない（推奨しない）
+* 同名別人・表記ゆれを許容
+* 同一人物性は `member_id` をキーに担保する
+
+---
+
+### 3-5. EventParticipant（イベント参加者）
+
+テーブル名：`event_participant`
+
+* id (PK)
+* event_id (FK → event.id)
+* member_id (FK → member.id, NULL可)
+
+  * 固定メンバーは必ず設定
+  * ゲストも原則設定（NULLは過去互換・例外）
+* display_name (varchar) 当該イベントの表示名
+* attendance (enum or varchar, NULL可)
+
+  * yes / no / maybe / NULL（未設定）
+  * 未登録行（UIのみ表示）をDBに作らないため、attendance=NULL行の大量生成は発生しない
+* participates_match (boolean) 試合参加（幹事のみ操作）
+* comment (text)
+* created_at (datetime)
+* updated_at (datetime)
+
+制約（推奨）
+
+* 部分ユニーク（filtered unique）
+
+  * unique(event_id, member_id) WHERE member_id IS NOT NULL
+* member_id IS NULL の参加者は重複を許容（UI/運用で吸収）
+
+備考（仕様との対応）
+
+* 固定メンバーは event 画面で「未登録行（UIのみ）」として表示し、✓×？・コメント等の入力が発生した瞬間に初めて event_participant を作成（＝入力が発生したら保存）
+
+---
+
+### 3-6. ParticipantFlag（イベント単位フラグ ON/OFF）
+
+テーブル名：`participant_flag`
+
+* id (PK)
+* event_participant_id (FK → event_participant.id)
+* flag_definition_id (FK → club_flag_definition.id)
+* is_on (boolean)
+* updated_at (datetime)
+
+制約
+
+* unique(event_participant_id, flag_definition_id)
+
+備考
+
+* フラグ操作時に対象参加者が未登録行の場合は、先に event_participant を作成してから保存する
+
+---
+
+### 3-7. MatchSchedule（対戦表：公開版）
+
+テーブル名：`match_schedule`
+
+* id (PK)
+* event_id (FK → event.id)
+* schedule_json (JSON) 対戦表本体
+* game_type (enum) singles / doubles
+* court_count (int)
+* round_count (int)
+* published (boolean) 公開中か
+* locked (boolean) スコア入力によりロックされたか
+* created_at (datetime)
+* updated_at (datetime)
+
+制約（推奨）
+
+* unique(event_id)（イベントにつき公開版は1つ）
+
+備考
+
+* 公開後にスコアが1つでも入力されたら locked=true（仕様）
+
+---
+
+### 3-8. MatchScheduleDraft（生成中ドラフト）
+
+テーブル名：`match_schedule_draft`
+
+* id (PK)
+* event_id (FK → event.id)
+* draft_json (JSON) 生成中の対戦表
+* params_json (JSON) 条件（game_type/court_count/round_count等）
+* updated_at (datetime)
+
+制約（推奨）
+
+* unique(event_id)（イベントにつきドラフトは1つ）
+
+備考
+
+* event.html の幹事機能で「生成」→ draft に保存
+* 「公開」→ match_schedule に反映
+
+---
+
+### 3-9. MatchScore（スコア）
+
+テーブル名：`match_score`
+
+* id (PK)
+* match_schedule_id (FK → match_schedule.id)
+* round_no (int)
+* court_no (int)
+* side_a_score (int, NULL可)
+* side_b_score (int, NULL可)
+* updated_at (datetime)
+
+制約（推奨）
+
+* unique(match_schedule_id, round_no, court_no)
+
+備考
+
+* side_a_score / side_b_score のいずれかが入力された時点で「スコア入力あり」とみなし、locked判定に使用してよい（実装方針）
+
+---
+
+### 3-10. Substitution（代打）
+
+テーブル名：`substitution`
+
+* id (PK)
+* match_schedule_id (FK → match_schedule.id)
+* round_no (int)
+* original_participant_id (FK → event_participant.id) 交代元
+* substitute_participant_id (FK → event_participant.id) 代打
+* updated_at (datetime)
+
+制約（推奨）
+
+* unique(match_schedule_id, round_no, original_participant_id)
+
+備考
+
+* 代打は「現状態のみ」を保持（履歴管理はV2以降）
+
+---
+
+### 3-11. （任意）AuditLog（操作ログ：V1では任意）
+
+※V1必須ではないが「全員編集可」のため将来トラブル対応に有効
+テーブル名：`audit_log`（任意）
+
+* id (PK)
+* club_id (FK → club.id)
+* event_id (FK → event.id, NULL可)
+* actor_token_kind (enum) public / admin（誰が操作したかの種別のみ。個人特定はしない）
+* action (varchar) 例：attendance_update / comment_update / score_update など
+* payload_json (JSON) 変更内容の差分
+* created_at (datetime)
+
+---
+
+## 4. ページ別：保存先・取得元まとめ
+
+### 4-1. 幹事トップ `index.html`
+
+| 処理                     | 取得   | 保存   |
+| ---------------------- | ---- | ---- |
+| クラブ作成                  | –    | club |
+| クラブURL表示（public/admin） | club | –    |
+
+---
+
+### 4-2. クラブ設定 `settings.html`（幹事のみ）
+
+| 処理              | 取得                                     | 保存                                   |
+| --------------- | -------------------------------------- | ------------------------------------ |
+| クラブ名表示          | club                                   | –                                    |
+| クラブ名変更          | –                                      | club                                 |
+| フラグ定義一覧表示       | club_flag_definition                   | –                                    |
+| フラグ追加           | –                                      | club_flag_definition                 |
+| フラグ名称変更         | –                                      | club_flag_definition                 |
+| フラグ削除（論理削除）     | –                                      | club_flag_definition.is_active=false |
+| フラグ表示順変更        | –                                      | club_flag_definition.display_order   |
+| （任意）フラグ最大3個チェック | club_flag_definition（is_active=true件数） | –                                    |
+
+---
+
+### 4-3. メンバー管理 `member_admin.html`（幹事のみ）
+
+| 処理                    | 取得                         | 保存                                         |
+| --------------------- | -------------------------- | ------------------------------------------ |
+| メンバー一覧表示              | member                     | –                                          |
+| 固定/非固定切替              | –                          | member.is_fixed                            |
+| 有効/無効（整理・退会等）         | –                          | member.is_active                           |
+| 表示名編集（名簿側）            | –                          | member.display_name                        |
+| last_seen_at 参照（整理判定） | member                     | –                                          |
+| 自動整理（48h）             | member                     | member.is_active=false（または削除）              |
+| 同一人物統合（V1）            | member + event_participant | event_participant.member_id を代表memberへ付け替え |
+
+自動整理基準（確定）
+`member.is_fixed=False AND member.is_active=True AND member.last_seen_at + 48h < now()`
+
+---
+
+### 4-4. クラブトップ `club_home.html`（全員）
+
+| 処理                 | 取得                                                                       | 保存                        |
+| ------------------ | ------------------------------------------------------------------------ | ------------------------- |
+| 当月カレンダー表示          | event                                                                    | –                         |
+| 月移動（前月/翌月）         | event                                                                    | –                         |
+| イベントクリック→イベント画面遷移  | event                                                                    | –                         |
+| 当月戦績・ランキング表示（固定のみ） | match_schedule / match_score / substitution / event_participant / member | –                         |
+| （V2以降）当月出欠サマリー表示   | event + event_participant（固定はUI未登録行含む）                                   | –                         |
+| （V2以降）クラブトップから出欠編集 | –                                                                        | event_participant（必要時に作成） |
+
+〔幹事用機能〕
+
+| 処理            | 取得 | 保存    |
+| ------------- | -- | ----- |
+| 日付クリックでイベント作成 | –  | event |
+
+---
+
+### 4-5. イベント画面 `event.html`（全員＋幹事機能を同画面に内包）
+
+#### 4-5-1. 共通（全員が利用）
+
+| 処理                        | 取得                                 | 保存                                               |
+| ------------------------- | ---------------------------------- | ------------------------------------------------ |
+| 初期表示（参加者リスト）              | member（固定） + event_participant（既存） | –                                                |
+| 固定メンバー「未登録行」表示（UIのみ）      | member（is_fixed=true）              | –                                                |
+| 出欠登録（✓×？）                 | –                                  | event_participant（必要時に作成）                        |
+| コメント登録                    | –                                  | event_participant（必要時に作成）                        |
+| 表示名変更（イベント内）              | –                                  | event_participant.display_name（必要時に作成）           |
+| フラグON/OFF                 | participant_flag                   | participant_flag（必要時にevent_participant作成）        |
+| 参加者追加（ゲスト）                | –                                  | member（作成/更新） + event_participant（原則member_id付与） |
+| last_seen_at 更新（操作が発生した時） | –                                  | member.last_seen_at（該当memberがある場合）               |
+| 対戦表閲覧（公開後）                | match_schedule（published=true）     | –                                                |
+| スコア入力（公開後）                | –                                  | match_score                                      |
+| 代打登録（公開後）                 | –                                  | substitution                                     |
+
+備考（重要）
+
+* 固定メンバーの未登録行は DBに `event_participant` を作らない
+  → ✓×？・コメント・フラグ・表示名等の入力が発生した瞬間に初めて作成（＝入力が発生したら保存）
+* `member_id` は内部識別子であり、画面には表示しない（集計キーとしてのみ使用）
+* ゲストも原則 `member_id` を付与して保存する（統合と戦績整合のため）
+
+#### 4-5-2. 幹事のみ（admin_tokenで開いた場合のみ表示・操作可能）
+
+| 処理                            | 取得                                        | 保存                                                 |
+| ----------------------------- | ----------------------------------------- | -------------------------------------------------- |
+| 試合参加フラグ（participates_match）決定 | event_participant（attendance=yes 等）       | event_participant.participates_match               |
+| 対戦表条件表示・編集                    | match_schedule_draft.params_json（あれば）     | match_schedule_draft.params_json                   |
+| 対戦表ドラフト生成                     | event_participant（試合参加者）                  | match_schedule_draft.draft_json                    |
+| 公開（ドラフト→公開版へ反映）               | match_schedule_draft                      | match_schedule（schedule_json, published=true）      |
+| ロック状態表示                       | match_score（入力有無） + match_schedule.locked | match_schedule.locked                              |
+| ロック後の再生成（警告付き）                | match_score / match_schedule              | match_score（リセット） + match_schedule（更新） + locked再設定 |
+| （当面）統計表示（試合数/休憩/連続など）         | match_schedule_draft or match_schedule    | –                                                  |
+
+ロック条件（確定）
+`match_score` が1件でも入力されたら `match_schedule.locked=true`
+locked 状態で再生成する場合は警告を出し、再公開時にスコアをリセットする
+
+---
+
+## 5. メンバー管理の考え方
+
+### 5-1. 固定メンバー
+
+* クラブに所属する人。名簿の中核。`member` に保存
+* クラブ単位で永続管理：`member.is_fixed=True`
+* 原則消さない（退会は `is_active=false` 等で扱う）
+* 当番フラグ管理の対象（ボール当番等）
+* 戦績・ランキングの主体（将来もここが中心）
+
+### 5-2. ゲスト参加（お試し・友人招待等）
+
+* `event.html` でその場登録（例：「田中（友人）」「体験A」）
+* `member` 側には `is_fixed=False` のまま蓄積（幹事が固定化しない限り整理対象）
+* 自動整理：`member.last_seen_at + 48h` を基準に整理
+* 過去イベントの表示・戦績整合を壊さないため
+
+  * `member` 側を無効化（非表示/整理）
+  * `event_participant` は履歴として残す
+* 同一人物統合（member_idの統一）は幹事のみが `member_admin` で実施する（表示名編集では統合しない）
+
+---
+
+## 6. 戦績ロジック（V1：確定版）
+
+### 6-0. 前提
+
+* 戦績の入力元は `event.html`
+* スコアは `match_score`
+* 対戦構造は `match_schedule.schedule_json`
+* 代打は `substitution`（現状態のみ）
+* 戦績は `schedule_json + match_score + substitution` を突合して「試合単位」で算出
+
+### 6-1. 集計対象データ
+
+* 対象試合：`match_score` 入力済みのみ
+* 対象者：イベント参加者（event_participant）
+* 固定／ゲストの区別は集計段階では行わない（ただしランキング対象は固定のみ）
+
+### 6-2. 勝敗判定
+
+* side_a_score > side_b_score → sideA 勝ち
+* side_a_score < side_b_score → sideB 勝ち
+* side_a_score == side_b_score → 引き分け
+
+引き分けの扱い（確定）
+
+* 勝ち点・ランキングポイントには一切カウントしない
+* 戦績として draws 件数は保持可
+
+### 6-3. 個人戦績の集計項目（V1）
+
+集計キーは **member_id** を原則とする。
+
+* matches：出場試合数
+* wins：勝数
+* losses：負数
+* draws：引き分け数
+* win_rate：勝率
+* points_for：得点合計
+* points_against：失点合計
+* point_pct：得点率（参考表示）
+
+### 6-4. 勝率・得点率
+
+* win_rate = wins / matches（draw は matches に含む、wins には加算しない）
+* point_pct = points_for / (points_for + points_against)
+* matches = 0 は対象外
+
+### 6-5. ダブルスの扱い
+
+* 1試合の勝敗・得点は参加者全員に同じように配賦
+* ペア相性・直接対決補正は V1 では行わない
+
+### 6-6. 代打の扱い（確定）
+
+* 実際にその試合に出た人の戦績として記録
+* 元の予定メンバーには勝敗を付けない
+* substitution 履歴はランキングでは参照しない（現状態のみ）
+
+### 6-7. 集計対象者条件（重要）
+
+* ランキング・戦績表示対象：固定メンバー、かつ対象期間内 試合数3以上
+* 除外：ゲスト参加のみ、試合数3未満
+
+集計キー（確定）
+
+* 固定メンバーの戦績集計キーは **member_id（event_participant.member_id）**
+* member_id が NULL（例外データ）はランキング対象外（イベント内表示のみ）
+
+---
+
+## 7. ランキングロジック（V1：当時合意完全版）
+
+### 7-0. 集計期間
+
+* ランキングは「全期間」を基本
+* club_home では「当月ランキング」も併記（ロジック同一、期間のみ違う）
+* いずれも **固定メンバーかつ対象期間内3試合以上のみ順位付け対象**
+* 3試合未満は参考表示（順位 “–”）で下部に出す
+* 将来拡張：当月 / 3か月 / 6か月 / 1年 / 全期間 を切替可能にする
+
+### 7-1. ランキング指標（V1）
+
+* 勝率（win_rate）
+* 試合数（matches）
+* 勝数（wins）
+* ※ point%・得失点差はランキングには使わない
+
+### 7-2. 並び順（多段ソート）
+
+1. 勝率（win_rate）降順
+2. 試合数（matches）降順
+3. 勝数（wins）降順
+4. 名前 昇順（完全同率時の安定化）
+
+「1勝0敗の人が1位になる」問題を試合数で自然に押し下げる設計。
+
+### 7-3. 表示仕様（V1）
+
+* 表形式のみ
+* 表示項目：順位 / 名前 / 試合数 / 勝 / 負 / 勝率
+* グラフ・推移・相関はやらない
+
+### 7-4. やらないと決めたこと（再確認）
+
+* Elo / レーティング
+* 相手強度補正
+* ペア相性補正
+* 最近成績の重み付け
+* ゲストを含めたランキング
+
+### 7-5. V1ランキングの思想（結論）
+
+* 厳密さより納得感
+* 誰が見ても「まあ妥当だね」と思える並びを最優先
+
+---
+
+
+了解。上で整理した内容を、そのまま **設計書としてコピペ一発で使える形**で出します（仕様＋状態遷移＋保存先＋API契約＋UI要件）。
+
+---
+
+# 🎾 イベント出欠・試合参加・対戦表（Draft/Published）仕様書（整理版）
+
+最終更新：2025-12-21
+対象：`event.html / event.js / views.py（update_attendance / set_participates_match / publish_schedule / save_match_score）`
+目的：イベントごとの出欠と、対戦表生成・公開・スコア管理を混線なく運用する
+
+---
+
+## 0. 用語
+
+* **Attendance（出欠）**：その回に参加するかどうか（参加の大枠）
+* **Participates Match（試合参加）**：練習後半の試合タイムに参加できるか
+* **Draft（未公開対戦表）**：幹事が生成した仮の対戦表（公開ボタン押下前）
+* **Published（公開済対戦表）**：公開ボタン押下で確定した正式対戦表
+* **Score（スコア）**：公開済対戦表に対してのみ入力できる結果情報
+
+---
+
+## 1. データモデル上の責務（分離）
+
+### 1-1. Attendance（出欠）
+
+* イベントごとに保持する
+* 値：`yes / no / maybe / null(未設定)`
+* 「その回に来る/来ない/未確定」の最上位情報
+
+### 1-2. Participates Match（試合参加）
+
+* イベントごとに保持する（同一イベント内でのみ意味を持つ）
+* 値：`True / False`
+* 出欠とは切り離す（早退・練習のみ・見学などに対応するため）
+
+---
+
+## 2. 整合性ルール（仕様として強制）
+
+### 2-1. 強制OFFルール（最重要）
+
+* `attendance != "yes"` の場合、**試合参加は必ず OFF 扱い**
+
+  * UI上も OFF にする（or 非表示/disabled）
+  * サーバ上も OFF とみなす（生成対象に入れない）
+
+理由：その回に参加しない/未確定なのに試合参加はあり得ないため。
+
+### 2-2. デフォルトONルール
+
+* 出欠を `yes` にした瞬間、試合参加は **デフォルトで ON** とする
+* ただし、その後ユーザーが **出欠 yes のまま試合参加 OFF に変更可能**
+
+---
+
+## 3. UI要件（event.html / event.js）
+
+### 3-1. 出欠操作 UI
+
+* 幹事/一般ともに出欠を操作できる
+* 出欠はモーダルで `yes/no/maybe` を選択して保存
+
+### 3-2. 試合参加 UI
+
+* 幹事/一般ともに試合参加を操作できる（ただし整合性ルールに従う）
+* 表示ルール：
+
+  * `attendance == "yes"` → 試合参加チェック表示（操作可）
+  * `attendance != "yes"` → 試合参加チェック非表示（or disabled）＋内部的にOFF
+
+### 3-3. 出欠と試合参加の連動（片方向）
+
+* **出欠 → 試合参加**は連動する（表示/非表示 + 強制OFF + デフォルトON）
+* **試合参加 → 出欠**は連動しない（試合参加OFFにしても出欠はyesのまま）
+
+---
+
+## 4. 対戦表の仕様（Draft / Published）
+
+### 4-1. 生成対象（参加者抽出）
+
+* 対戦表生成のベース集合は以下：
+
+  * `attendance == "yes"` かつ `participates_match == True`
+* 上記に合致する参加者のみが `participant_ids` に入る
+
+### 4-2. Draft（未公開）
+
+* 幹事が生成した段階では **Draft**
+* Draftは仮であり、公開されるまで正式ではない
+* Draftは幹事だけが閲覧できる（一般には見せない / 見せても「仮」と明示しスコア入力不可）
+
+### 4-3. Published（公開済み）
+
+* 幹事が「公開」ボタンを押すと Published として確定
+* 一般メンバーが閲覧可能になる
+* スコア入力も可能になる
+
+---
+
+## 5. スコア管理
+
+### 5-1. スコア入力の許可条件
+
+* スコア入力は **Published に対してのみ可能**
+* Draftにはスコア入力UIを出さない（または無効化）
+* サーバ側でも Published でない場合は `403/409` 等で拒否する
+
+### 5-2. 再生成・再公開時の警告（スコア保護）
+
+* Published にスコアが1つでも存在する状態で再公開する場合：
+
+  * 「スコア記入済み。再公開するとスコアが破棄される」警告を必ず出す
+  * OKした場合のみ force 付きで再公開し、既存スコアを破棄する
+
+---
+
+## 6. 状態遷移（対戦表）
+
+状態は以下の4つで表す：
+
+1. **no_schedule**：生成された対戦表がない（DraftもPublishedもなし）
+2. **ready**：Draftが存在（未公開）
+3. **published**：Publishedが存在（公開済）
+4. **changed**：Publishedが存在し、Draft側が更新されて「未反映」状態
+
+遷移：
+
+* 生成（幹事）
+  `no_schedule → ready`
+* 公開（幹事）
+  `ready → published`
+* 参加者変更/条件変更/再生成（幹事）
+  `published → changed`（一般は published を見続ける）
+* 再公開（幹事）
+  `changed → published`（Published差し替え）
+* 再公開時にスコアあり
+  `changed → (警告) → published(差し替え)`（OKならスコア破棄）
+
+---
+
+## 7. 表示の「正」（何をロード時に採用するか）
+
+### 7-1. 対戦表表示
+
+* **Publishedがあるなら Published が正**
+
+  * リロード時に Draft を混ぜない
+* Published が無い場合だけ Draft を表示して良い
+
+### 7-2. 出欠・試合参加表示
+
+* Attendance と participates_match は **DB（EventParticipant）** を正とする
+  ※ただし「attendance != yes なら参加はOFF扱い」を常に適用
+
+---
+
+## 8. API契約（現行関数を前提にした仕様）
+
+### 8-1. `update_attendance`
+
+入力：
+
+* `event_id`
+* `ep_id` or `member_id`
+* `attendance` in `yes/no/maybe/""`
+
+処理：
+
+* attendance 保存
+* **追加仕様（推奨）：**
+
+  * attendance が `yes` の場合：`participates_match=True` をデフォルトで反映（DB保存）
+  * attendance が `no/maybe/""` の場合：`participates_match=False` を強制反映（DB保存）
+
+返却：
+
+* `{ok: true, attendance: "...", ep_id: ...}`
+
+### 8-2. `set_participates_match`
+
+入力：
+
+* `event_id`
+* `ep_id` or `member_id`
+* `checked=true/false`
+
+処理：
+
+* **UI操作としての「試合参加の意思」**を保存する
+* Draft participant_ids へ反映（対戦表作業用）
+* **整合性ルール：**
+
+  * attendance != yes の対象は必ず OFF 扱い（サーバ側でも拒否 or 強制off）
+
+返却：
+
+* `{ok:true, ep_id:..., participates_match:true/false}`
+
+### 8-3. `publish_schedule`
+
+入力：
+
+* `event_id`
+* `schedule_json`
+* `force=1`（スコア破棄許可）
+
+処理：
+
+* Draft → Published 化
+* score が存在する場合は 409 + `error=score_exists` を返す（force が無い時）
+
+### 8-4. `save_match_score`
+
+入力：
+
+* `event_id`
+* `round_no, court_no, side`
+* `value`
+
+処理：
+
+* **Publishedが無ければ拒否**（Draftへの保存禁止）
+
+---
+
+## 9. UI上の具体挙動（確定）
+
+### 9-1. 出欠を yes にしたとき
+
+* 試合参加欄を表示
+* 試合参加を **ON にする（デフォルト）**
+* 以後、ユーザーがOFFに変更できる
+
+### 9-2. 出欠を no/maybe にしたとき
+
+* 試合参加は **OFFにする（強制）**
+* 試合参加欄は非表示（or disabled）
+
+### 9-3. リロード後に試合参加が消える問題の定義
+
+* **DBに保存されていないなら消えるのが正**
+* よって「デフォルトON」は **サーバ側（update_attendance）でDBへ保存**して初めて安定する
+  （JSでONにしただけではリロードで消える）
+
+---
+
+# 付録：実装時の指針（迷ったらここ）
+
+* 参加の大枠：`attendance` が正
+* 試合参加：`attendance==yes` の範囲でだけ有効
+* 対戦表：`Published` が常に正
+* Draft：幹事の作業領域
+* スコア：Publishedにのみ存在できる
+* 再公開：スコアがあれば警告 → OKなら破棄して差し替え
+
+---
+
+必要なら、この仕様に合わせて次の1手として、
+
+* **A案**：`update_attendance()` で `participates_match` を強制更新（yes→True, no/maybe→False）
+* **B案**：DBの participates_match は「ユーザー意思」として保持しつつ、生成時に `attendance==yes` を必ずフィルタ
+
+どちらで統一するか（コードの最小修正か、意味の純度を取るか）まで、こちらで決め打ちして差分コードも出せます。

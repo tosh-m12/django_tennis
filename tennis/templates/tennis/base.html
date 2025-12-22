@@ -3,30 +3,54 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <title>{% block title %}テニスサークル{% endblock %}</title>
+  <meta charset="UTF-8">
+  <title>{% block title %}テニスサークル{% endblock %}</title>
 
-    {# ここで共通CSSを読み込む #}
-    <link rel="stylesheet" href="{% static 'tennis/style.css' %}">
+  <link rel="stylesheet" href="{% static 'tennis/style.css' %}">
+  <link rel="stylesheet" href="{% static 'tennis/calendar.css' %}">
+  <link rel="stylesheet" href="{% static 'tennis/index.css' %}">
+  <link rel="stylesheet" href="{% static 'tennis/admin.css' %}">
+  <link rel="stylesheet" href="{% static 'tennis/base.css' %}">
+  <link rel="stylesheet" href="{% static 'tennis/event.css' %}">
+  <link rel="stylesheet" href="{% static 'tennis/schedule.css' %}">
+  <link rel="stylesheet" href="{% static 'tennis/modal.css' %}">
+  <link rel="stylesheet" href="{% static 'tennis/participants.css' %}">
 
-    <style>
-        body { font-family: system-ui, sans-serif; margin: 20px; }
-        a { text-decoration: none; color: #0066cc; }
-        table { border-collapse: collapse; width: 100%; margin-top: 10px; }
-        th, td { border: 1px solid #ccc; padding: 4px 8px; font-size: 14px; text-align: center; }
-        .btn { padding: 4px 10px; border: 1px solid #0066cc; border-radius: 4px; background: #eef6ff; cursor: pointer; }
-        .btn-primary { background: #0066cc; color: #fff; }
-        .container { max-width: 800px; margin: 0 auto; }
-        .field { margin-bottom: 8px; }
-        label { display: inline-block; min-width: 80px; }
-    </style>
+  <script src="{% static 'tennis/ui_modal.js' %}" defer></script>
 
-    {% block extra_head %}{% endblock %}
+  {% block extra_head %}{% endblock %}
 </head>
-<body>
-<div class="container">
-    <h1><a href="{% url 'tennis:index' %}">🎾 テニスサークル</a></h1>
+
+<body class="{% if is_admin %}is-admin{% endif %}">
+  {% block header %}
+    {% if show_topbar %}
+      <div class="topbar topbar--fixed">
+        <div class="topbar-inner">
+          <div class="topbar-title">
+            {% if club %}
+              {{ club.name }}
+            {% else %}
+              テニスサークル管理アプリ
+            {% endif %}
+          </div>
+
+          <div class="topbar-actions">
+          {% if is_admin %}
+              <span class="topbar-admin-badge">幹事モード</span>
+          {% endif %}
+          {# 将来：ナビ・設定・ユーザー等 #}
+          </div>
+        </div>
+      </div>
+    {% endif %}
+  {% endblock %}
+
+  {# ★固定トップバー分だけ下げる #}
+  <div class="container{% if show_topbar %} has-fixed-topbar{% endif %}">
     {% block content %}{% endblock %}
-</div>
+  </div>
+
+  {% include "tennis/_ui_modals.html" %}
+  {% block extra_scripts %}{% endblock %}
 </body>
 </html>

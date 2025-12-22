@@ -1,0 +1,143 @@
+{# tennis/templates/tennis/_ui_modals.html #}
+{% load static %}
+
+{% comment %}
+============================================================
+共通UIモーダル（ui_modal.js / calendar.js が操作）
+- ui-message-modal : 一時メッセージ（自動クローズ）
+- ui-confirm-modal : OKのみ確認
+- club-event-modal : 幹事カレンダー用「イベント作成/編集」
+============================================================
+{% endcomment %}
+
+{# ===== メッセージモーダル（数秒で自動クローズ） ===== #}
+<div id="ui-message-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content ui-message-content" role="dialog" aria-modal="true">
+    <div id="ui-message-body" class="ui-message-body"></div>
+  </div>
+</div>
+
+{# ===== 確認モーダル（OKのみ / キャンセル無し） ===== #}
+<div id="ui-confirm-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content ui-confirm-content" role="dialog" aria-modal="true" aria-labelledby="ui-confirm-title">
+    <h3 class="ui-confirm-title" id="ui-confirm-title">確認</h3>
+    <div id="ui-confirm-body" class="ui-confirm-body"></div>
+    <div class="modal-actions ui-confirm-actions">
+      <button type="button" id="ui-confirm-ok" class="btn btn-pill btn-primary">OK</button>
+    </div>
+  </div>
+</div>
+
+{% if is_admin %}
+{% comment %}
+============================================================
+club-event-modal（幹事のみ）
+- calendar.js が id を参照して open/close/submit する
+- 日付は「クリックした日付」：表示のみ（編集不可）
+- 送信用 date は hidden に保持（disabled にしない）
+- event.js が edit のときこのモーダルを流用して更新を行う
+============================================================
+{% endcomment %}
+
+<div id="club-event-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content event-modal modal-has-topbar"
+       role="dialog" aria-modal="true" aria-labelledby="club-event-modal-title">
+
+    <div class="modal-topbar">
+      <div class="modal-topbar-title" id="club-event-modal-title">イベント作成</div>
+      <button type="button"
+              id="club-event-modal-close"
+              class="modal-topbar-btn"
+              aria-label="閉じる">×</button>
+    </div>
+
+    <form id="club-event-form" class="modal-form" method="post">
+      {% csrf_token %}
+      <input type="hidden" id="club-event-mode" name="mode" value="create">
+      <input type="hidden" id="club-event-event-id" name="event_id" value="">
+
+      {# 日付：表示のみ #}
+      <div class="field-group">
+        <label>日付</label>
+        <div class="event-date-display">
+          <span id="club-event-date-text">—</span>
+        </div>
+        <input id="club-event-date" name="date" type="hidden" value="">
+      </div>
+
+      <div class="field-group">
+        <label for="club-event-title">タイトル</label>
+        <input
+          id="club-event-title"
+          name="title"
+          type="text"
+          class="event-title-input"
+          required
+          maxlength="80"
+          placeholder="例：定例練習会・G1/2"
+        >
+      </div>
+
+      <div class="field-group">
+        <label for="club-event-place">場所</label>
+        <input
+          id="club-event-place"
+          name="place"
+          type="text"
+          class="event-title-input"
+          maxlength="100"
+          placeholder="例：〇〇テニスコート"
+        >
+      </div>
+
+      <div class="field-group">
+        <div class="time-range">
+          <div class="time-picker">
+            <div class="time-label">開始</div>
+            <div class="time-selects">
+              <select id="club-start-hour" class="time-select" aria-label="開始 時"></select>
+              <span class="time-colon">:</span>
+              <select id="club-start-min" class="time-select" aria-label="開始 分"></select>
+            </div>
+          </div>
+
+          <span class="time-sep">–</span>
+
+          <div class="time-picker">
+            <div class="time-label">終了</div>
+            <div class="time-selects">
+              <select id="club-end-hour" class="time-select" aria-label="終了 時"></select>
+              <span class="time-colon">:</span>
+              <select id="club-end-min" class="time-select" aria-label="終了 分"></select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <input id="club-event-start-time" name="start_time" type="hidden" value="">
+      <input id="club-event-end-time" name="end_time" type="hidden" value="">
+
+      {# ===== 更新ボタン（従来どおり / JSが edit時に disabled/文言 を制御） ===== #}
+      <div class="club-event-actions">
+        <button type="submit"
+                id="club-event-submit-btn"
+                class="btn btn-pill btn-primary">
+          イベント作成
+        </button>
+      </div>
+
+      {# ===== 中止/復活（更新ボタンのさらに下・中央） ===== #}
+      <div class="club-event-cancel-wrap">
+        <button type="button"
+                id="club-event-cancel-toggle"
+                class="btn btn-pill btn-cancel-special"
+                data-cancelled="0"
+                style="display:none;">
+          イベントを中止
+        </button>
+      </div>
+
+    </form>
+  </div>
+</div>
+{% endif %}

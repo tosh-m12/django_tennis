@@ -1,0 +1,394 @@
+/* ===========================
+   base.css  完全版
+   =========================== */
+
+/* =========================================================
+   Base Theme Variables (Member / Admin)
+   ========================================================= */
+
+/* Default = 一般（青） */
+:root {
+  --accent: #3b82f6;         /* blue-500 */
+  --accent-dark: #1e40af;    /* blue-900 */
+  --accent-soft: #eff6ff;    /* blue-50 */
+  --accent-border: #bfdbfe;  /* blue-200 */
+
+  --text-main: #111827;
+  --text-sub: #6b7280;
+  --border-base: #d1d5db;
+  --bg-soft: #f9fafb;
+
+  /* 共通ピルボタン（緑） */
+  --btn: #22c55e;        /* green-500 */
+  --btn-dark: #15803d;   /* green-700 */
+  --btn-soft: #dcfce7;   /* green-100 */
+  --btn-border: #86efac; /* green-300 */
+}
+
+/* 幹事（薄い赤） */
+body.is-admin {
+  --accent: #f87171;         /* red-400 */
+  --accent-dark: #dc2626;    /* red-600 */
+  --accent-soft: #fef2f2;    /* red-50 */
+  --accent-border: #fecaca;  /* red-200 */
+}
+
+/* =========================================================
+   Reset / Base Elements
+   ========================================================= */
+
+body{
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  margin: 0;                 /* ←最重要：上の余白を消す */
+  padding: 0;
+  color: var(--text-main);
+  background: #fff;
+}
+
+a {
+  text-decoration: none;
+  color: var(--accent);
+}
+a:hover {
+  color: var(--accent-dark);
+}
+
+hr {
+  border: none;
+  border-top: 1px solid var(--border-base);
+  margin: 16px 0;
+}
+
+label {
+  display: inline-block;
+  min-width: 80px;
+}
+
+/* =========================================================
+   Layout
+   ========================================================= */
+
+.container{
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 16px;              /* ←ページ左右の余白はここで持つ */
+}
+
+/* 固定バー分だけ下げる（今のままでOK） */
+.container.has-fixed-topbar{
+  padding-top: calc(56px + 16px);
+}
+
+.field {
+  margin-bottom: 8px;
+}
+
+/* =========================================================
+   Tables (base)
+   ========================================================= */
+
+table {
+  border-collapse: collapse;
+  width: 100%;
+  margin-top: 10px;
+}
+
+th,
+td {
+  border: 1px solid var(--border-base);
+  padding: 4px 8px;
+  font-size: 14px;
+  text-align: center;
+}
+
+th {
+  background: var(--bg-soft);
+  font-weight: 600;
+}
+
+/* =========================================================
+   Buttons
+   ========================================================= */
+
+.btn {
+  border: none;
+  background: none;
+  cursor: pointer;
+}
+
+/* =========================================================
+   Pill Buttons (Reusable)
+   - modal の btn-primary を “正” として共通化
+   ========================================================= */
+
+.btn-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  border-radius: 999px;
+  border: 1px solid var(--btn-border);
+  padding: 6px 18px;
+
+  /* 互換性重視で固定色（元の「正」） */
+  background: linear-gradient(180deg, #33d47b, #29b864);
+  color: #ffffff;
+
+  cursor: pointer;
+  font-size: 1.05rem;
+  /* font-weight: 600; */
+
+  box-shadow: 0 3px 0 #1f8e4a;
+
+  transition:
+    background 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease;
+}
+
+.btn-pill:hover {
+  background: linear-gradient(180deg, #2fc972, #25a95a);
+  box-shadow: 0 4px 0 #1a783f;
+  transform: translateY(-1px);
+}
+
+.btn-pill:active {
+  box-shadow: 0 1px 0 #1a783f;
+  transform: translateY(1px);
+}
+
+/* ピルの視認性を少し上げたい場合（任意） */
+/*
+.btn-pill:focus-visible {
+  outline: 3px solid rgba(34,197,94,0.25);
+  outline-offset: 2px;
+}
+*/
+
+/* =========================================================
+   Utility
+   ========================================================= */
+
+/* 長いURLを折り返して表示 */
+.wrap-url {
+  display: inline-block;
+  max-width: 100%;
+  word-break: break-all;
+  overflow-wrap: anywhere;
+  white-space: normal;
+}
+
+/* テーマ追従ボックス（URL表示など） */
+.theme-box {
+  border: 1px solid var(--accent-border);
+  background: var(--accent-soft);
+  border-radius: 6px;
+}
+
+/* =========================================================
+   Header Topbar (Reusable / Content-width)
+   base.html の .topbar を想定
+   ========================================================= */
+
+.topbar{
+  /* フル幅をやめて、コンテンツ幅にする */
+  width: min(980px, calc(100% - 32px)); /* 画面端に少し余白 */
+  margin: 0 auto;
+
+  background: var(--accent);
+  color: #fff;
+  box-shadow: 0 1px 0 rgba(0,0,0,0.08);
+
+  border-radius: 0; /* 好みで 12px とかでもOK */
+}
+
+/* 固定：ただし中央寄せで固定する */
+.topbar--fixed{
+  position: fixed;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 900;
+}
+
+/* 中身は topbar の中で詰めるだけ */
+.topbar-inner{
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+
+  padding: 0 16px;
+}
+
+.topbar-title{
+  font-weight: 900;
+  font-size: 18px;
+  line-height: 1;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topbar-actions{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* =========================================================
+   Page Topbar (Reusable / Content-width)
+   ========================================================= */
+
+.page-topbar{
+  margin: 0 0 16px; /* 下のコンテンツとの間隔 */
+}
+
+/* 中央寄せ・コンテンツ幅制御 */
+.page-topbar-inner{
+  width: min(980px, calc(100% - 32px)); /* ← 既存コンテンツ幅に合わせる */
+  margin: 0 auto;
+
+  height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  /* テーマカラーでベタ塗り */
+  background: var(--accent);
+  color: #fff;
+
+  padding: 0 16px;
+
+  /* ページ用なので角丸なし */
+  border-radius: 0;
+
+  box-shadow: 0 1px 0 rgba(0,0,0,0.08);
+}
+
+/* タイトル */
+.page-topbar-title{
+  font-weight: 900;
+  font-size: 18px;
+  line-height: 1;
+
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 右側操作エリア */
+.page-topbar-actions{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* 汎用ボタン（必要なページだけ使う） */
+.page-topbar-btn{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  height: 36px;
+  padding: 0 12px;
+
+  color: #fff;
+  text-decoration: none;
+  font-weight: 800;
+
+  background: rgba(255,255,255,0.12);
+  border: 1px solid rgba(255,255,255,0.22);
+  border-radius: 10px;
+}
+
+.page-topbar-btn:hover{
+  background: rgba(255,255,255,0.18);
+  border-color: rgba(255,255,255,0.30);
+}
+
+/* =========================================================
+   Section Head (title + right action)
+   ========================================================= */
+
+.section-head{
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* ← 左にタイトル、右にボタン */
+  gap: 12px;
+  margin: 14px 0 10px;
+}
+
+.section-title{
+  margin: 0; /* h3 のデフォルトmarginを潰す（ズレ防止） */
+}
+
+.section-head > .btn{
+  flex: 0 0 auto; /* ボタンが潰れないように */
+}
+
+/* ===== URL box ===== */
+.url-box { padding: 12px; }
+
+.url-item { margin-bottom: 10px; }
+.url-item:last-of-type { margin-bottom: 0; }
+
+.url-label{
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+
+/* 赤い四角ボタン（ピル禁止） */
+.url-copy-btn.red-rect{
+  float: right;                 /* ←回り込みの要 */
+  margin-left: 10px;
+  margin-top: 0px;
+
+  border: 0;
+  border-radius: 6px;           /* 四角寄り（角丸少し） */
+  padding: 6px 14px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+
+  color: #fff;
+  background: #e74c3c;          /* テーマ赤 */
+  box-shadow: 0 2px 6px rgba(231, 76, 60, 0.25);
+}
+
+.url-copy-btn.red-rect:hover{ filter: brightness(1.05); }
+.url-copy-btn.red-rect:active{ transform: translateY(1px); }
+
+/* URL本文：テキストボックス“風” だが枠線は出さない（今のビジュアル維持） */
+.url-textbox{
+  display: block;
+
+  /* ★ 折り返し禁止 */
+  white-space: nowrap;
+
+  /* ★ はみ出したら横スクロールではなく、そのまま下に回り込ませる */
+  overflow: hidden;
+  text-overflow: clip;
+
+  padding: 6px 8px;
+  background: rgba(255,255,255,0.45);
+  border-radius: 6px;
+
+  font-size: 0.85rem;
+  color: #444;
+}
+
+/* float解除（次のブロックに影響させない） */
+.url-item::after{
+  content: "";
+  display: block;
+  clear: both;
+}
+
+.url-note{
+  margin-top: 8px;
+  color: #666;
+  font-size: 0.8rem;
+}

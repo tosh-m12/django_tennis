@@ -1,0 +1,280 @@
+/* =========================================================
+   calendar.css（club_home カレンダー専用）
+   目的：
+   - れんらくアプリ風ヘッダー
+   - カレンダー本体（コンパクト）
+   - カレンダー内イベントピル（セル幅いっぱい・中央寄せ）
+   色は base.css の theme vars を使用：
+     --accent, --accent-dark, --accent-soft, --accent-border
+   ========================================================= */
+
+
+/* =========================
+   0) 変えやすい調整パラメータ（サイズ/余白だけ）
+   ※ 色は base.css の var(--accent...) を使う
+   ========================= */
+:root{
+  --cal-line: #f0f1f3;
+
+  --cell-h: 80px;
+  --cell-pad-y: 4px;
+  --cell-pad-x: 4px;
+
+  --date-size: 12px;
+  --date-w: 20px;
+  --date-h: 20px;
+
+  --pill-h: 22px;
+  --pill-font: 12px;
+  --pill-radius: 8px;
+  --pill-side-gap: 12px; /* セル左右余白（pill幅の引き算用） */
+
+  /* 日曜だけは注意色として固定（テーマと独立） */
+  --cal-sun: #e55b5b;
+}
+
+
+/* =========================
+   1) ヘッダー（れんらくアプリ風）
+   ========================= */
+.calendar-nav.cal-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:12px;
+
+  /* テーマ色 */
+  background: linear-gradient(180deg, var(--accent), var(--accent-dark));
+  color:#fff;
+
+  padding: 2px 12px;
+  border-radius:10px;
+  margin: 6px 0;
+
+  /* ちょい立体感（好み） */
+  box-shadow: 0 6px 18px rgba(0,0,0,0.10);
+}
+
+.cal-nav-btn{
+  width:36px;
+  height:36px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+
+  color:#fff;
+  text-decoration:none;
+  font-size:26px;
+  line-height:1;
+  border-radius:18px;
+}
+.cal-nav-btn:hover{ background: rgba(255,255,255,0.12); }
+
+.cal-title-area{
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+
+.cal-title{
+  font-size:18px;
+  letter-spacing:0.5px;
+}
+
+.cal-today-btn{
+  color:#fff;
+  text-decoration:none;
+  font-size:14px;
+  padding:1px 12px;
+  border:2px solid rgba(255,255,255,0.55);
+  border-radius:999px;
+}
+.cal-today-btn:hover{
+  border-color: rgba(255,255,255,0.85);
+}
+
+
+/* =========================
+   2) カレンダー本体
+   ========================= */
+.practice-calendar{
+  width:100%;
+  border-collapse:separate;
+  border-spacing:0;
+  table-layout:fixed;
+
+  background:#fff;
+  border-radius:10px;
+  overflow:hidden;
+  font-size: 0.85rem;
+
+  /* 既存の table/th/td 直書きCSSがあっても
+     ここは “見た目の枠” をこちらで決める */
+}
+
+/* 曜日行 */
+.practice-calendar thead th{
+  border:none;
+  padding: 2px 0;
+  font-size:0.8rem;
+  font-weight:700;
+  background:#fff;
+  color:#9aa0a6;
+}
+
+/* 土日（ヘッダー） */
+.practice-calendar thead th.weekend{ color: var(--accent); }  /* SAT */
+.practice-calendar thead th:last-child{ color: var(--cal-sun); } /* SUN */
+
+/* 日セル */
+.practice-calendar tbody td{
+  border:none;
+  height: var(--cell-h);
+  vertical-align:top;
+  padding: var(--cell-pad-y) var(--cell-pad-x);
+  position:relative;
+}
+
+/* 週の区切り（横線） */
+.practice-calendar tbody tr + tr td{
+  border-top: 1px solid var(--cal-line);
+}
+
+/* 列の区切り（縦線） */
+.practice-calendar tbody td + td{
+  border-left: 1px solid var(--cal-line);
+}
+
+/* 他月セル */
+.practice-calendar td.other-month{
+  background:#fafafa;
+  color:#c7c7c7;
+}
+
+/* 日付数字 */
+.day-number{
+  font-size: var(--date-size);
+  font-weight:600;
+  color:#333;
+
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+
+  width: var(--date-w);
+  height: var(--date-h);
+  border-radius: 999px;
+  margin-bottom: 2px;
+}
+
+/* 土曜（6列目） */
+.practice-calendar tbody td:nth-child(6) .day-number{
+  color: var(--accent);
+}
+
+/* 日曜（7列目） */
+.practice-calendar tbody td:nth-child(7) .day-number{
+  color: var(--cal-sun);
+}
+
+/* 今日の丸 */
+.day-cell.today .day-number{
+  background: var(--accent);
+  color:#fff !important;
+}
+
+/* 今日セルをほんのり面で強調（好み） */
+.day-cell.today{
+  background: var(--accent-soft);
+}
+
+
+/* =========================
+   3) カレンダー内イベント表示（ピル）
+   ========================= */
+
+/* 外側の箱は消す */
+.event-card{
+  margin-top: 4px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  box-shadow: none;
+}
+
+/* ピルの配置：セル中央寄せ */
+.day-cell .event-title{
+  display:flex;
+  justify-content:center;
+}
+
+/* ピル本体：セル幅いっぱい（左右に少し余白） */
+.event-card .event-title a{
+  display:block;
+  width: calc(100% - var(--pill-side-gap));
+  margin: 0 auto;
+
+  height: var(--pill-h);
+  line-height: var(--pill-h);
+
+  padding: 0 8px;
+  border-radius: var(--pill-radius);
+
+  /* テーマ色 */
+  background: linear-gradient(180deg, var(--accent), var(--accent-dark));
+  color:#fff;
+
+  font-size: var(--pill-font);
+  text-align:center;
+  text-decoration:none;
+
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+
+  /* ちょい立体感 */
+  box-shadow: 0 2px 0 rgba(0,0,0,0.15);
+}
+
+.event-card .event-title a:hover{
+  filter: brightness(0.98);
+}
+
+/* 中止表示（将来用） */
+.event-card.is-cancelled .event-title a{
+  opacity: 0.45;
+  text-decoration: line-through;
+}
+
+
+/* =========================
+   4) “この画面では見せない”要素（保険）
+   ========================= */
+.practice-calendar .event-flags,
+.practice-calendar .event-flag-actions{
+  display:none;
+}
+
+
+/* =========================================================
+   Calendar: cancelled event = simple greyed out
+   (no border, no strike, keep original background)
+   ========================================================= */
+
+.cal-event.is-cancelled {
+  opacity: 0.35;            /* ← グレーアウトの強さ（0.25〜0.45で調整） */
+  filter: grayscale(0.85);  /* 色味を落とす */
+  box-shadow: none !important;
+}
+
+/* 既存の背景色や枠は維持（白地化・黒枠化しない）
+   念のため「取り消し線」は完全禁止 */
+.cal-event.is-cancelled,
+.cal-event.is-cancelled * {
+  text-decoration: none !important;
+}
+
+/* 一般ユーザー側：クリック不可に“見せる”だけ（実際の無効化は JS で止める） */
+.cal-event.is-cancelled.is-public-lock {
+  cursor: default !important;
+  pointer-events: auto; /* JSで止めるのでautoのまま */

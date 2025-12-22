@@ -1,0 +1,98 @@
+/* =========================================================
+   Event Header (title + meta bar)
+   ========================================================= */
+
+.event-head{
+  display:flex;
+  align-items:center;
+  gap:12px;
+}
+
+/* h2 は他ページでも使うので、class で制御 */
+.event-title{
+  margin:0;           /* ← これが無いと上下余白がズレる */
+  line-height:1.2;
+}
+
+/* meta bar は右寄せ・文字長に合わせる */
+.event-meta-bar{
+  margin-left:auto;   /* 右端へ */
+  display:inline-flex;
+  align-items:center;
+
+  width:fit-content;  /* 文字長に合わせる */
+  max-width:70%;
+
+  padding:6px 10px;
+  border-radius:10px;
+  border:1px solid #e2e5ea;
+  background:#f2f3f5;
+
+  color:#444;
+  font-size:0.95rem;
+  line-height:1.2;
+}
+
+/* 文字が長いときは省略 */
+.event-meta-text{
+  white-space:nowrap;
+  overflow:hidden;
+  text-overflow:ellipsis;
+}
+
+/* 幹事モード：グレー背景を維持（hoverあり） */
+.event-meta-bar.is-admin{
+  background:rgba(0,0,0,0.08);
+  border:1px solid rgba(0,0,0,0.08);
+}
+.event-meta-bar.is-clickable{ cursor:pointer; }
+.event-meta-bar.is-admin.is-clickable:hover{
+  background:rgba(0,0,0,0.12);
+}
+
+/* 一般モード：枠・背景・余白を完全に消す（表示は右寄せのまま） */
+.event-meta-bar.is-public{
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+  outline:none !important;
+
+  padding:0 !important;
+  border-radius:0 !important;
+}
+
+/* 念のためテキスト側も潰す（どこかで装飾されても無効化） */
+.event-meta-bar.is-public .event-meta-text{
+  background:transparent !important;
+  border:none !important;
+  box-shadow:none !important;
+  padding:0 !important;
+}
+
+/* =========================================================
+   [Event Page] cancelled tone down
+   ========================================================= */
+
+.event-page.is-cancelled {
+  opacity: 0.72;
+  filter: grayscale(0.25);
+}
+
+/* 文字が薄すぎる場合の救済（タイトルは少しだけ濃く） */
+.event-page.is-cancelled .event-title,
+.event-page.is-cancelled .section-title {
+  opacity: 0.95;
+}
+
+/* キャンセルバッジ */
+.event-cancel-badge {
+  margin-left: 12px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid rgba(0,0,0,0.18);
+  background: rgba(0,0,0,0.06);
+  color: #222;
+  font-size: 0.9rem;
+  line-height: 1.1;
+  white-space: nowrap;
+}

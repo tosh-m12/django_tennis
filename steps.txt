@@ -1,0 +1,370 @@
+改修方針（全体像）
+最優先で揃える“仕様の正”
+
+**settings（クラブ幹事ページ）**は「クラブ全体の設定」だけ
+　- イベント作成（カレンダー）
+　- フラグ追加/削除/名称変更
+　- クラブ名変更
+　- ※出欠表は“ダミーUI”として置く（保存しない）
+
+**event（イベントページ）**は「参加者が触る本体」
+　- public：出欠・コメント・フラグ・ゲスト追加
+　- admin：上記 + 試合参加ON/OFF + 対戦表生成/公開 + スコア入力
+
+JSは1画面1責務（競合を絶対に作らない）
+　- settings.html：calendar.js と club_settings.js の役割を明確分離
+　- event.html：event.js が唯一の統合JS（admin/public兼用）
+
+ステップ1：競合を消す（最初にやるべき土台）
+目的
+
+「同じことを2つのJSがやってる」状態を解消して、以降の修正が必ず積み上がるようにする。
+
+対象
+
+settings の「イベント作成」が calendar.js と club_settings.js で二重
+
+settings の「ダミー出欠・ダミーチェック」は club_settings.js だけでOK
+
+event は event.js だけでOK（admin.js を使うなら役割再定義が必要）
+
+やること（方針）
+
+イベント作成は calendar.js に一本化
+
+club_settings.js から イベント作成ブロック（[F]）を撤去（または完全無効化）
+
+settings側の「ダミー出欠」「ダミーチェック」「フラグ管理」「クラブ名変更」は club_settings.js に残す
+
+ここを最初に片付けるのが重要。じゃないと「直したはずが別JSが上書き」が起きます。
+
+ステップ2：URL生成の仕様を固定する（JSでURLを組まない）
+目的
+
+URL設計変更があっても壊れないようにする。JSでURLを手組みしない。
+
+やること
+
+settingsのイベント作成APIレスポンスは必ず
+event: { id, title, date, admin_url, public_url } を返す（どれか最低 admin_url）
+
+JSは data.event.admin_url をそのまま <a href=""> に入れる
+
+「/e/...」みたいな直書きURL生成は全廃。今後の改修コストが激減します。
+
+ステップ3：サーバAPI（views）を先に確定する
+目的
+
+JSを書く前に、POSTで何を投げて何が返るかを確定させる。
+（ここが曖昧だとフロントを直しても動きません）
+
+イベントページのAPI（event.jsが呼ぶもの）
+
+出欠保存
+
+POST: event_id, (ep_id or member_id), attendance
+
+RETURN: { ok:true, ep_id? }
+
+コメント保存
+
+POST: event_id, (ep_id or member_id), comment
+
+RETURN: { ok:true, ep_id? }
+
+フラグON/OFF
+
+POST: event_id, (ep_id or member_id), flag_id, checked
+
+RETURN: { ok:true, ep_id? }
+
+ゲスト追加（public）
+
+POST: event_id, display_name
+
+RETURN: { ok:true }（後はreloadでもOK）
+
+試合参加ON/OFF（admin）
+
+POST: event_id, (ep_id or member_id), checked
+
+RETURN: { ok:true, ep_id? }
+
+対戦表生成（admin）
+
+POST: participant_ids（ep_idのCSV）, game_type, num_courts, num_rounds
+
+RETURN: schedule_html, stats_html, publish_state, num_courts, match_count, num_rounds, game_type
+
+公開（admin）
+
+POST: event_id, schedule_json, force?
+
+RETURN: { ok:true } or 409 { error:"score_exists", message:"..." }
+
+スコア保存（admin）
+ここだけは 方式を一つに決めてから進む：
+
+A案：match_id方式（公開後にmatchをDB化してIDを持つ）
+
+B案：event_id + round_no + court_no + side方式（match_id無し）
+
+※どちらでもいいが、“テンプレが出すdata属性”と“viewが受けるPOST”を一致させるのが絶対条件。
+
+ステップ4：settings（クラブ設定）の保存系を完成させる
+目的
+
+クラブ単位の設定が安定してからイベント本体に入る（逆にすると土台が揺れる）。
+
+やること
+
+クラブ名変更API（club_id, name → {ok:true, name}）
+
+フラグ追加/削除/名称変更API（club_id/flag_idベース）
+
+イベント作成API（club_id,date,title,start_time?,end_time? → event返却）
+
+settings出欠表は「ダミーなので保存しない」を維持（仕様どおり）
+
+ステップ5：event（参加者ページ）の“共通機能”を通す
+目的
+
+public/admin共通で必須な4機能を先に安定させる：
+
+出欠
+
+コメント
+
+フラグ
+
+ゲスト追加
+
+テスト観点
+
+ep_id無し固定行でも、最初の保存でep化され以降はep_id運用になる
+
+失敗時のUI巻き戻し（フラグ）やエラー表示
+
+ステップ6：event（幹事機能）を通す
+目的
+
+幹事側の追加要素を段階的に。
+
+試合参加ON/OFF（参加人数が正しく数えられる）
+
+面数上限ロジック（singles=2人/面、doubles=4人/面）
+
+対戦表再生成AJAX（schedule_html/stats_html差し替え）
+
+公開（publish_state管理、changed/published/no_scheduleのUI整合）
+
+ステップ7：スコア保存方式を確定して実装
+ここは最後でOK（理由）
+
+スコアはDB設計と絡むので、他が固まってからやる方が手戻りが少ない。
+
+決め方（おすすめ判断基準）
+
+match_id方式：
+公開時にDBへMatchを作り、スコアはMatchに保存。ランキング集計も楽。
+→ 将来の拡張（履歴・集計・修正ログ）に強い
+
+複合キー方式（event+round+court+side）：
+DBを増やさず軽いが、将来の集計や再公開との整合が難しくなりがち。
+→ V1の超軽量運用ならアリ
+
+ステップ8：ランキング（club_home）を最後に接続
+目的
+
+ランキングは「スコアが確定して初めて正しく出る」ので最後。
+
+「公開済みの試合」かつ「スコア入力済み」を集計対象
+
+仕様にある「当月」「3試合以上」などを反映
+
+実作業の進め方（あなた向け：最小の手戻り手順）
+
+settingsの二重実装解消（calendar.js一本化、club_settings.jsの[F]撤去）
+
+イベント作成APIの戻り値を admin_url付きに統一（JSはそれを使う）
+
+settingsの保存系（クラブ名/フラグ/イベント作成）を通す
+
+eventの共通機能（出欠/コメント/フラグ/ゲスト）を通す
+
+admin（試合参加→生成→公開）を通す
+
+スコア保存方式を決めて実装
+
+ランキング接続
+
+
+
+
+
+Step1：競合を消す（最優先）
+1-1. settings側「イベント作成」を一本化する
+
+現状
+
+calendar.js にもイベント作成（モーダル→POST→DOM追加）がある
+
+club_settings.js にもイベント作成（[F]）がある
+→ どっちが動くか/二重送信/DOM二重追加の原因
+
+直す方針
+
+settingsのイベント作成は calendar.js のみにする
+
+club_settings.js の [F] initCreateEvent() を削除 or 完全無効化
+
+✅ 作業チェック
+
+club_settings.js から [F] イベント追加（保存あり）... ブロックを丸ごと撤去
+
+settingsページで日付セルを押すと calendar.js のモーダルだけが開く
+
+登録後、カードが 1個だけ追加される
+
+1-2. settings側「ダミー出欠」「ダミーチェック」は club_settings.js に残す
+
+現状
+
+settingsの出欠モーダルはダミー（保存しない）でOK
+
+settingsの赤チェックもダミーでOK
+
+直す方針
+
+club_settings.js の
+
+[D] 出欠モーダル（ダミー）
+
+[E] ダミーチェック
+は 維持（ただし settings専用であることを保証）
+
+✅ 作業チェック
+
+settingsの participants-table が data-mode="club_settings_dummy" のときだけ反応する
+
+eventページではこれらが反応しない
+
+1-3. event側は event.js を唯一の統合JSにする
+
+現状
+
+eventページは event.js を読んでいる（OK）
+
+もし admin.js が残っていると競合する可能性がある
+
+直す方針
+
+eventページ（event.html）では event.jsだけが参加者テーブルを操作する状態にする
+
+✅ 作業チェック
+
+eventページでフラグ/コメント/出欠/試合参加が「二重に動く」挙動が消える
+
+participants-table へのイベントリスナが複数箇所から入らない
+
+Step2：URL生成を仕様固定（JSでURLを組まない）
+2-1. settingsのイベント作成レスポンスに admin_url を必須で返す
+
+現状
+
+calendar.js は data.event.admin_url を使う実装になっている（前半のcalendar.js）
+
+club_settings.js 側は public_token/admin_token からURLを手組みしている箇所がある
+→ Step1で削除するが、APIの戻り値の仕様はここで固定する
+
+直す方針
+
+club_create_event のJSONレスポンスは必ず：
+
+{ "ok": true, "event": { "id": 1, "title": "...", "date": "YYYY-MM-DD", "admin_url": "...", "public_url": "..." } }
+
+
+calendar.js は admin_url をそのままリンクに入れる（既にそうする）
+
+✅ 作業チェック
+
+URL設計を変えてもJSを触らなくていい（admin_urlが正ならOK）
+
+settingsで追加したイベントカードのリンクが常に正しい
+
+Step3：APIを先に確定（viewsの入出力を固定）
+
+ここは「後で迷わないための契約」です。最初にこの一覧どおりに揃える。
+
+3-1. eventページ（event.js）が叩くAPI契約
+(A) public共通
+
+出欠保存
+
+POST: event_id, ep_id|member_id, attendance(yes/no/maybe)
+
+RETURN: { ok:true, ep_id? }
+
+コメント保存
+
+POST: event_id, ep_id|member_id, comment
+
+RETURN: { ok:true, ep_id? }
+
+フラグON/OFF
+
+POST: event_id, ep_id|member_id, flag_id, checked(true/false)
+
+RETURN: { ok:true, ep_id? }
+
+ゲスト追加
+
+POST: event_id, display_name
+
+RETURN: { ok:true }
+
+(B) admin追加
+
+試合参加ON/OFF
+
+POST: event_id, ep_id|member_id, checked(true/false)
+
+RETURN: { ok:true, ep_id? }
+
+対戦表生成（AJAX）
+
+POST: participant_ids（ep_id CSV）, game_type, num_courts, num_rounds
+
+RETURN:
+schedule_html, stats_html, publish_state, game_type, num_courts, num_rounds, match_count
+
+公開
+
+POST: event_id, schedule_json, force?
+
+RETURN: { ok:true }
+or 409 { error:"score_exists", message:"..." }
+
+スコア保存（※これは後工程で方式決め）
+
+いまは 受け口だけ仮でOK（Step7で確定）
+
+✅ 作業チェック
+
+event.js の dataset.xxxUrl と urls.py の name が一致している
+
+どのAPIも {ok:true/false} を返す（JSがok判定で統一できる）
+
+ここまでやったら次に進める「完了条件」
+
+Step1〜3の完了条件はこれです：
+
+settings：イベント作成が calendar.js単独で動く（二重無し）
+
+settings：フラグ管理/クラブ名変更が club_settings.jsで動く
+
+event：参加者操作は event.jsだけが動く
+
+イベント作成APIが admin_url付きで返す
+
+event系APIが 全部 {ok:true} を返す形で揃う

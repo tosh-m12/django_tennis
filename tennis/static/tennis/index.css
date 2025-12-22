@@ -1,0 +1,60 @@
+/* ===============================
+   index.html 専用スタイル
+   （横方向のみ中央寄せ）
+   =============================== */
+
+.index-wrap {
+  max-width: 720px;
+  margin: 0 auto;        /* ← 水平方向だけ中央 */
+  padding: 28px 16px;
+  text-align: center;
+}
+
+/* フォーム全体 */
+.index-form {
+  margin-top: 14px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+
+/* ラベル + 入力欄を中央に */
+.index-field-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.index-field-row label {
+  margin: 0;
+  font-weight: 600;
+}
+
+.index-field-row input[type="text"] {
+  width: 260px;
+  max-width: 100%;
+}
+
+/* エラーメッセージ（中央配置） */
+.index-alert {
+  display: inline-block;
+  text-align: left;
+  max-width: 640px;
+  width: 100%;
+}
+
+.club-name-input{
+  width: min(360px, 92vw);
+  padding: 10px 12px;
+
+  border: none;
+  border-radius: 10px;
+  outline: none;
+
+  background: #f3f6ff;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
