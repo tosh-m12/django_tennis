@@ -31,19 +31,24 @@ from .models import (
 # Config
 # ============================================================
 
+
 MAX_FLAGS = 3  # V1仕様
+
 
 # ============================================================
 # [AUTH] Admin session flag for token-based admin access
 # ============================================================
 
+
 def _admin_session_key(event_id: int) -> str:
     return f"tennis_event_admin:{event_id}"
+
 
 def _mark_event_admin_session(request, event_id: int) -> None:
     request.session[_admin_session_key(event_id)] = True
     # セッション保存を確実に
     request.session.modified = True
+
 
 def _is_event_admin_session(request, event_id: int) -> bool:
     return bool(request.session.get(_admin_session_key(event_id), False))
@@ -52,6 +57,7 @@ def _is_event_admin_session(request, event_id: int) -> bool:
 # ============================================================
 # Helpers
 # ============================================================
+
 
 def _parse_int(value, default=None, min_v=None, max_v=None):
     try:
@@ -244,6 +250,7 @@ def _build_ep_name_map(event: Event) -> dict:
 # publish_state
 # ============================================================
 
+
 def _norm_schedule_json(x):
     return x if x is not None else []
 
@@ -412,6 +419,7 @@ def build_month_ranking(events_qs, game_type: str, min_matches: int = 3):
 # Pages
 # ============================================================
 
+
 @require_http_methods(["GET", "POST"])
 def index(request):
     """
@@ -474,6 +482,7 @@ def club_settings(request, club_public_token, club_admin_token):
             "next_month": next_month,
             "flags": club_flags,
             "max_flags": MAX_FLAGS,
+            "is_admin": True,
             "show_topbar": True,
         },
     )
@@ -582,13 +591,16 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         for ep in EventParticipant.objects.filter(event=event, member_id__in=member_ids).select_related("member")
     }
 
+    from collections import defaultdict
+
     pf_qs = ParticipantFlag.objects.filter(
         event_participant__event=event,
         flag_definition__club=club,
-    )
-    flag_states = {}
+    ).values("event_participant_id", "flag_definition_id", "is_on")
+
+    flag_states = defaultdict(dict)
     for pf in pf_qs:
-        flag_states[f"{pf.event_participant_id}:{pf.flag_definition_id}"] = bool(pf.is_on)
+        flag_states[pf["event_participant_id"]][pf["flag_definition_id"]] = bool(pf["is_on"])
 
     # ============================================================
     # A案：Draftは「公開のための一時データ」であり、GET描画では必ず破棄する
@@ -654,19 +666,30 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
     else:
         game_type = GameType.DOUBLES
         num_rounds = 8
-        num_courts = 1
-        match_count = EventParticipant.objects.filter(event=event, participates_match=True).count() if is_admin else 0
+
+        # ★ デフォルト面数仕様：
+        #   - 4人未満: 0面
+        #   - 4人以上: 2面（8人以上でも勝手に増えない）
+        if is_admin:
+            match_count = EventParticipant.objects.filter(
+                event=event, participates_match=True
+            ).count()
+        else:
+            match_count = 0
+
+        num_courts = 0 if match_count < 4 else 2
 
         publish_state = "no_schedule"
         schedule_for_view = []
         schedule_json_for_publish = None
+
 
     ctx = {
         "club": club,
         "event": event,
         "is_admin": is_admin,
         "flags": flags,
-        "flag_states": flag_states,
+        "flag_states": {k: dict(v) for k, v in flag_states.items()},
         "fixed_rows": fixed_rows,
         "guest_rows": guest_rows,
         "max_flags": MAX_FLAGS,
@@ -696,6 +719,7 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
 # ============================================================
 # Club APIs
 # ============================================================
+
 
 @require_POST
 def club_add_flag(request):
@@ -875,6 +899,7 @@ def _guard_admin_only(request, event) -> JsonResponse | None:
 # Participant APIs
 # ============================================================
 
+
 @require_POST
 def update_attendance(request):
     event_id = request.POST.get("event_id")
@@ -957,12 +982,18 @@ def update_comment(request):
 @require_POST
 def set_participates_match(request):
     event_id = (request.POST.get("event_id") or "").strip()
+
     checked = request.POST.get("checked")
     if checked is None:
         checked = request.POST.get("value")
+    checked = (checked or "").strip().lower()
 
-    if not event_id or checked not in ("true", "false"):
-        return JsonResponse({"ok": False, "error": "bad_request"}, status=400)
+    if not event_id:
+        return JsonResponse({"ok": False, "error": "missing_event_id"}, status=400)
+    if checked not in ("true", "false", "1", "0", "yes", "no", "on", "off"):
+        return JsonResponse({"ok": False, "error": "bad_checked"}, status=400)
+
+    will_on = checked in ("true", "1", "yes", "on")
 
     event = get_object_or_404(Event, id=int(event_id))
 
@@ -977,15 +1008,12 @@ def set_participates_match(request):
         ep = get_object_or_404(EventParticipant, id=int(ep_id), event=event)
     elif member_id:
         member = get_object_or_404(Member, id=int(member_id), club=event.club, is_active=True)
+        member.touch()
         ep = _get_or_create_ep(event, member, member.display_name)
     else:
         return JsonResponse({"ok": False, "error": "missing_target"}, status=400)
 
-    will_on = (checked == "true")
-
-    # =========================
-    # A案：attendance が yes 以外なら試合参加は許可しない
-    # =========================
+    # A案：attendance が yes 以外なら試合参加は強制OFF
     if (ep.attendance or "") != "yes":
         will_on = False
 
@@ -993,22 +1021,38 @@ def set_participates_match(request):
         ep.participates_match = will_on
         ep.save(update_fields=["participates_match", "updated_at"])
 
-    return JsonResponse({"ok": True, "ep_id": ep.id, "participates_match": bool(ep.participates_match)})
+    return JsonResponse({
+        "ok": True,
+        "ep_id": ep.id,
+        "participates_match": bool(ep.participates_match),
+    })
 
 
 @require_POST
 def toggle_participant_flag(request):
-    event_id = request.POST.get("event_id")
-    flag_id = request.POST.get("flag_id")
-    checked = request.POST.get("checked")
+    event_id = (request.POST.get("event_id") or "").strip()
+    flag_id = (request.POST.get("flag_id") or "").strip()
+    checked = (request.POST.get("checked") or "").strip().lower()
 
-    if not event_id or not flag_id or checked not in ("true", "false"):
-        return JsonResponse({"error": "bad_request"}, status=400)
+    if not event_id or not flag_id:
+        return JsonResponse({"ok": False, "error": "bad_request"}, status=400)
+    if checked not in ("true", "false", "1", "0", "yes", "no", "on", "off"):
+        return JsonResponse({"ok": False, "error": "bad_request"}, status=400)
+
+    is_on = checked in ("true", "1", "yes", "on")
 
     event = get_object_or_404(Event, id=int(event_id))
-    flagdef = get_object_or_404(ClubFlagDefinition, id=int(flag_id), club=event.club, is_active=True)
+    flagdef = get_object_or_404(
+        ClubFlagDefinition, id=int(flag_id), club=event.club, is_active=True
+    )
 
-    ep_id = (request.POST.get("ep_id") or "").strip()
+    # ★他のAPI同様、公開後は一般を弾く（不要なら消してOK）
+    blocked = _guard_participant_change(request, event, require_admin_when_published=True)
+    if blocked:
+        return blocked
+
+    ep_id = ((request.POST.get("ep_id") or "").strip()
+             or (request.POST.get("participant_id") or "").strip())
     member_id = (request.POST.get("member_id") or "").strip()
 
     if ep_id:
@@ -1018,20 +1062,31 @@ def toggle_participant_flag(request):
         member.touch()
         ep = _get_or_create_ep(event, member, member.display_name)
     else:
-        return JsonResponse({"error": "missing_target"}, status=400)
+        return JsonResponse({"ok": False, "error": "missing_target"}, status=400)
 
-    is_on = (checked == "true")
-
-    obj, created = ParticipantFlag.objects.get_or_create(
+    obj, _created = ParticipantFlag.objects.get_or_create(
         event_participant=ep,
         flag_definition=flagdef,
-        defaults={"is_on": is_on},
     )
-    if not created and obj.is_on != is_on:
-        obj.is_on = is_on
-        obj.save(update_fields=["is_on", "updated_at"])
 
-    return JsonResponse({"ok": True, "ep_id": ep.id, "flag_id": flagdef.id, "checked": obj.is_on})
+    # ★ここが肝：created/既存に関係なく「必ず」反映して保存
+    if obj.is_on != is_on:
+        obj.is_on = is_on
+        # updated_at が auto_now なら update_fields でもOK
+        # auto_now じゃない/存在しないなら update_fields を外して obj.save() にする
+        try:
+            obj.save(update_fields=["is_on", "updated_at"])
+        except Exception:
+            obj.save()
+
+    print("[toggle_flag]", event.id, ep.id, flagdef.id, "=>", obj.is_on)
+
+    return JsonResponse({
+        "ok": True,
+        "ep_id": ep.id,
+        "flag_id": flagdef.id,
+        "checked": bool(obj.is_on),
+    })
 
 
 @require_POST
@@ -1061,6 +1116,7 @@ def add_guest_participant(request):
 # ============================================================
 # Schedule
 # ============================================================
+
 
 @require_POST
 def ajax_generate_schedule(request, event_id):
@@ -1176,11 +1232,20 @@ def ajax_generate_schedule(request, event_id):
             "ok": True,
             "schedule_html": schedule_html,
             "stats_html": stats_html,
+
+            # ★JSが publish ボタンを制御するために必要
             "publish_state": ctx["publish_state"],
+
+            # ★JSが pills を更新するために必要
             "game_type": game_type,
             "num_courts": int(num_courts),
             "num_rounds": int(num_rounds),
             "match_count": int(match_count),
+
+            # ★これが無いと「生成したのに公開できない」になる
+            # publishSchedule() は current-schedule-json の中身（JSON）を送る設計なので、
+            # 生成APIでも必ず返して、JS側で script#current-schedule-json に保存する。
+            "schedule_json": json.dumps(schedule, ensure_ascii=False),
         }
     )
 

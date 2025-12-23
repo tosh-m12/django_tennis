@@ -3,23 +3,36 @@
 
 {% comment %}
 ============================================================
-共通UIモーダル（ui_modal.js / calendar.js が操作）
+共通UIモーダル（ui_modal.js / event.js / calendar.js / club_settings.js が操作）
 - ui-message-modal : 一時メッセージ（自動クローズ）
 - ui-confirm-modal : OKのみ確認
-- club-event-modal : 幹事カレンダー用「イベント作成/編集」
+- attendance-modal : 出欠選択（event/settings で共通）
+- add-guest-modal  : 参加登録（eventのみ）
+- match-settings-modal : 対戦表の条件変更（event + adminのみ）
+- club-event-modal : 幹事カレンダー用「イベント作成/編集」（club_home など adminのみ）
+- club-rename-modal : クラブ名変更（settings adminのみ）
+- flag-rename-modal : フラグ名変更（settings adminのみ）
 ============================================================
+【重要】
+- 同じ id のモーダルを event.html / settings.html に置かない（重複すると壊れる）
+- event / club / flags / is_admin などの変数が存在しないページでは {% if %} でガードする
 {% endcomment %}
 
-{# ===== メッセージモーダル（数秒で自動クローズ） ===== #}
+{% comment %}
+[1] メッセージモーダル（数秒で自動クローズ）
+{% endcomment %}
 <div id="ui-message-modal" class="modal-backdrop" aria-hidden="true">
   <div class="modal-content ui-message-content" role="dialog" aria-modal="true">
     <div id="ui-message-body" class="ui-message-body"></div>
   </div>
 </div>
 
-{# ===== 確認モーダル（OKのみ / キャンセル無し） ===== #}
+{% comment %}
+[2] 確認モーダル（OKのみ / キャンセル無し）
+{% endcomment %}
 <div id="ui-confirm-modal" class="modal-backdrop" aria-hidden="true">
-  <div class="modal-content ui-confirm-content" role="dialog" aria-modal="true" aria-labelledby="ui-confirm-title">
+  <div class="modal-content ui-confirm-content"
+       role="dialog" aria-modal="true" aria-labelledby="ui-confirm-title">
     <h3 class="ui-confirm-title" id="ui-confirm-title">確認</h3>
     <div id="ui-confirm-body" class="ui-confirm-body"></div>
     <div class="modal-actions ui-confirm-actions">
@@ -28,17 +41,177 @@
   </div>
 </div>
 
-{% if is_admin %}
 {% comment %}
-============================================================
-club-event-modal（幹事のみ）
-- calendar.js が id を参照して open/close/submit する
-- 日付は「クリックした日付」：表示のみ（編集不可）
-- 送信用 date は hidden に保持（disabled にしない）
-- event.js が edit のときこのモーダルを流用して更新を行う
-============================================================
+[3] 出欠モーダル（event / settings 共通）
+- event.js / club_settings.js が open/close/反映を行う
 {% endcomment %}
+<div id="attendance-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content event-modal modal-has-topbar"
+       role="dialog" aria-modal="true" aria-labelledby="attendance-modal-title">
 
+    <div class="modal-topbar">
+      <div class="modal-topbar-title" id="attendance-modal-title">出欠を選択</div>
+      <button type="button"
+              class="modal-topbar-btn"
+              id="close-attendance-modal"
+              aria-label="閉じる">×</button>
+    </div>
+
+    <div class="modal-form" style="padding-top:14px;">
+      <div class="attendance-choice-row">
+        <button type="button" class="attendance-choice" data-attendance="yes">
+          <span class="attendance-icon attendance-yes">✓</span>
+        </button>
+        <button type="button" class="attendance-choice" data-attendance="no">
+          <span class="attendance-icon attendance-no">×</span>
+        </button>
+        <button type="button" class="attendance-choice" data-attendance="maybe">
+          <span class="attendance-icon attendance-maybe">?</span>
+        </button>
+      </div>
+
+      {% comment %}
+settings 側はダミー運用で OK を置く／event 側は choice で即閉じでもOK。
+JS側で両対応できるよう OK ボタンは常設しておく。
+{% endcomment %}
+      <!-- <div class="modal-actions" style="justify-content:center; margin-top:14px;">
+        <button type="button" class="btn btn-pill btn-primary" id="attendance-modal-ok">OK</button>
+      </div> -->
+
+      {% comment %}
+settings でだけ注意文を出したい場合：
+ここは共通なので「非表示デフォルト」→ settings.js が必要なら表示しても良い。
+{% endcomment %}
+      <p id="attendance-modal-note"
+         style="display:none; margin-top:10px; color:#666; font-size:0.9rem; text-align:center;">
+        ※ settingsページではダミーです（保存しません）
+      </p>
+    </div>
+  </div>
+</div>
+
+{% comment %}
+[4] 参加登録モーダル（eventのみ）
+- event.js が open/close/submit
+{% endcomment %}
+{% if event %}
+<div id="add-guest-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content event-modal modal-has-topbar"
+       role="dialog" aria-modal="true" aria-labelledby="add-guest-modal-title">
+
+    <div class="modal-topbar">
+      <div class="modal-topbar-title" id="add-guest-modal-title">参加登録</div>
+      <button type="button"
+              id="close-add-guest-modal"
+              class="modal-topbar-btn"
+              aria-label="閉じる">×</button>
+    </div>
+
+    <form class="modal-form" id="add-guest-form">
+      <div class="field-group">
+        <label for="guest-name-input">名前</label>
+        <input
+          type="text"
+          id="guest-name-input"
+          class="event-title-input"
+          placeholder="例：山田（ゲスト）"
+          autocomplete="name"
+        >
+      </div>
+
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-pill btn-primary">追加する</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% comment %}
+[5] 対戦表条件モーダル（event + adminのみ）
+- event.js が open/close/値のstepper、送信、バリデーション
+{% endcomment %}
+{% if event and is_admin %}
+<div id="match-settings-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content event-modal modal-has-topbar"
+       role="dialog" aria-modal="true" aria-labelledby="match-settings-modal-title">
+
+    <div class="modal-topbar">
+      <div class="modal-topbar-title" id="match-settings-modal-title">条件を変更する</div>
+      <button type="button"
+              id="close-settings-modal"
+              class="modal-topbar-btn"
+              aria-label="閉じる">×</button>
+    </div>
+
+    <form method="post"
+          id="match-settings-form"
+          class="modal-form"
+          data-generate-url="{% url 'tennis:ajax_generate_schedule' event.id %}">
+      {% csrf_token %}
+      <input type="hidden" name="generate_schedule" value="1">
+
+      <div class="field-group">
+        <div class="toggle-row">
+          <button type="button"
+                  class="toggle-btn {% if game_type == 'singles' %}active{% endif %}"
+                  data-game-type="singles">シングルス</button>
+          <button type="button"
+                  class="toggle-btn {% if game_type != 'singles' %}active{% endif %}"
+                  data-game-type="doubles">ダブルス</button>
+        </div>
+        <input type="hidden" name="game_type" id="id_game_type" value="{{ game_type|default:'doubles' }}">
+      </div>
+
+      <div class="field-group field-group-count">
+        <label>人数</label>
+        <p class="count-pill modal-number">{{ match_count }}</p>
+      </div>
+
+      <div class="field-group">
+        <label>面数</label>
+        <div class="stepper-row">
+          <button type="button" class="stepper-btn" data-target="num_courts" data-step="-1">－</button>
+          <input type="number"
+                 id="id_num_courts"
+                 name="num_courts"
+                 class="modal-number"
+                 min="0"
+                 max="8"
+                 value="{{ num_courts }}">
+          <button type="button" class="stepper-btn" data-target="num_courts" data-step="1">＋</button>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label>ラウンド数</label>
+        <div class="stepper-row">
+          <button type="button" class="stepper-btn" data-target="num_rounds" data-step="-1">－</button>
+          <input type="number"
+                 id="id_num_rounds"
+                 name="num_rounds"
+                 class="modal-number"
+                 min="1"
+                 max="20"
+                 value="{{ num_rounds }}">
+          <button type="button" class="stepper-btn" data-target="num_rounds" data-step="1">＋</button>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-pill btn-primary">条件を変更する</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% comment %}
+[6] club-event-modal（幹事のみ / カレンダー用）
+- calendar.js が open/close/submit
+- event.js が edit のとき流用して更新を行う場合もある
+{% endcomment %}
+{% if is_admin %}
 <div id="club-event-modal" class="modal-backdrop" aria-hidden="true">
   <div class="modal-content event-modal modal-has-topbar"
        role="dialog" aria-modal="true" aria-labelledby="club-event-modal-title">
@@ -56,7 +229,9 @@ club-event-modal（幹事のみ）
       <input type="hidden" id="club-event-mode" name="mode" value="create">
       <input type="hidden" id="club-event-event-id" name="event_id" value="">
 
-      {# 日付：表示のみ #}
+      {% comment %}
+日付：表示のみ（送信用 date は hidden に保持）
+{% endcomment %}
       <div class="field-group">
         <label>日付</label>
         <div class="event-date-display">
@@ -117,7 +292,6 @@ club-event-modal（幹事のみ）
       <input id="club-event-start-time" name="start_time" type="hidden" value="">
       <input id="club-event-end-time" name="end_time" type="hidden" value="">
 
-      {# ===== 更新ボタン（従来どおり / JSが edit時に disabled/文言 を制御） ===== #}
       <div class="club-event-actions">
         <button type="submit"
                 id="club-event-submit-btn"
@@ -126,7 +300,6 @@ club-event-modal（幹事のみ）
         </button>
       </div>
 
-      {# ===== 中止/復活（更新ボタンのさらに下・中央） ===== #}
       <div class="club-event-cancel-wrap">
         <button type="button"
                 id="club-event-cancel-toggle"
@@ -137,6 +310,84 @@ club-event-modal（幹事のみ）
         </button>
       </div>
 
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% comment %}
+[7] クラブ名変更モーダル（settings adminのみ）
+- club_settings.js が open/close/submit
+- settings.html からは撤去し、ここに一本化する
+{% endcomment %}
+{% if club and is_admin %}
+<div id="club-rename-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content event-modal modal-has-topbar"
+       role="dialog" aria-modal="true" aria-labelledby="club-rename-modal-title">
+
+    <div class="modal-topbar">
+      <div class="modal-topbar-title" id="club-rename-modal-title">クラブ名変更</div>
+      <button type="button"
+              class="modal-topbar-btn"
+              id="club-rename-modal-close"
+              aria-label="閉じる">×</button>
+    </div>
+
+    <form id="club-rename-modal-form" class="modal-form">
+      {% csrf_token %}
+      <input type="hidden" id="club-rename-club-id" value="{{ club.id }}">
+
+      <div class="field-group">
+        <label for="club-rename-input">クラブ名</label>
+        <input type="text"
+               id="club-rename-input"
+               class="event-title-input"
+               maxlength="255"
+               autocomplete="off">
+      </div>
+
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-pill btn-primary">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% comment %}
+[8] フラグ名変更モーダル（settings adminのみ）
+- club_settings.js が open/close/submit
+- 「event の参加登録モーダル」に寄せたデザイン（topbar + field-group + primary pill）
+{% endcomment %}
+{% if club and is_admin %}
+<div id="flag-rename-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content event-modal modal-has-topbar"
+       role="dialog" aria-modal="true" aria-labelledby="flag-rename-modal-title">
+
+    <div class="modal-topbar">
+      <div class="modal-topbar-title" id="flag-rename-modal-title">フラグ名変更</div>
+      <button type="button"
+              id="close-flag-rename-modal"
+              class="modal-topbar-btn"
+              aria-label="閉じる">×</button>
+    </div>
+
+    <form class="modal-form" id="flag-rename-form">
+      {% csrf_token %}
+      <input type="hidden" id="flag-rename-flag-id" value="">
+
+      <div class="field-group">
+        <label for="flag-rename-input">フラグ名</label>
+        <input type="text"
+               id="flag-rename-input"
+               class="event-title-input"
+               maxlength="80"
+               autocomplete="off">
+      </div>
+
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-pill btn-primary">保存</button>
+      </div>
     </form>
   </div>
 </div>

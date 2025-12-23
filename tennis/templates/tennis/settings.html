@@ -5,12 +5,6 @@
 {% block title %}クラブ設定 - 幹事用{% endblock %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{% static 'tennis/base.css' %}">
-<link rel="stylesheet" href="{% static 'tennis/modal.css' %}">
-<link rel="stylesheet" href="{% static 'tennis/participants.css' %}">
-<link rel="stylesheet" href="{% static 'tennis/calendar.css' %}">
-<script src="{% static 'tennis/ui_modal.js' %}" defer></script>
-<script src="{% static 'tennis/calendar.js' %}" defer></script>
 <script src="{% static 'tennis/club_settings.js' %}" defer></script>
 {% endblock %}
 
@@ -20,8 +14,10 @@
   <a href="{% url 'tennis:club_home_admin' club.public_token club.admin_token %}">← 戻る</a>
 </div>
 <hr>
+<h3>クラブ名編集</h3>
+
 {% if club %}
-  <div style="margin:12px 0; padding:10px; border:1px solid #cfe3ff; background:#f4f9ff; border-radius:6px;">
+  <div class="theme-box" style="margin:12px 0; padding:10px;">
 
     {# ★クラブ名（クリックでモーダル） #}
     <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
@@ -39,102 +35,24 @@
     {# JS 用フック（API情報） #}
     <div id="club-rename-hooks"
         data-club-id="{{ club.id }}"
+        data-admin-token="{{ club.admin_token }}"
         data-rename-url="{% url 'tennis:club_rename_club' %}"
         data-current-name="{{ club.name|escape }}">
     </div>
 
-    <div style="margin-top:10px;"><strong>メンバー用URL：</strong><br>
-      <a href="{{ member_url }}" class="wrap-url">{{ member_url }}</a>
-    </div>
-    <div style="margin-top:4px;"><strong>幹事用URL：</strong><br>
-      <a href="{{ admin_url }}" class="wrap-url">{{ admin_url }}</a>
-    </div>
-    <div style="margin-top:6px; color:#666; font-size:0.9rem;">
-      ※幹事用URLは忘れないよう保存してください。
-    </div>
   </div>
 {% endif %}
 
 <hr>
 
-<h3>① クラブイベントの設定</h3>
-
-<div id="club-calendar-hooks"
-     data-club-id="{{ club.id }}"
-     data-create-url="{% url 'tennis:club_create_event' %}">
-</div>
-
-<div class="calendar-nav cal-header">
-  <a class="cal-nav-btn cal-prev"
-     href="{% url 'tennis:club_settings' club.public_token club.admin_token %}?year={{ prev_year }}&month={{ prev_month }}">
-    ‹
-  </a>
-
-  <div class="cal-title-area">
-    <div class="cal-title">{{ year }}年{{ month }}月</div>
-    <a class="cal-today-btn"
-       href="{% url 'tennis:club_settings' club.public_token club.admin_token %}?year={{ today.year }}&month={{ today.month }}">
-      本日
-    </a>
-  </div>
-
-  <a class="cal-nav-btn cal-next"
-     href="{% url 'tennis:club_settings' club.public_token club.admin_token %}?year={{ next_year }}&month={{ next_month }}">
-    ›
-  </a>
-</div>
-
-
-<table class="practice-calendar">
-    <thead>
-        <tr>
-            <th>MON</th>
-            <th>TUE</th>
-            <th>WED</th>
-            <th>THU</th>
-            <th>FRI</th>
-            <th class="weekend">SAT</th>
-            <th class="weekend">SUN</th>
-        </tr>
-    </thead>
-    <tbody>
-    {% for week in month_weeks %}
-        <tr>
-        {% for cell in week %}
-            {% if cell.is_current_month %}
-                <td class="day-cell{% if cell.date == today %} today{% endif %}"
-                  data-date="{{ cell.date|date:'Y-m-d' }}">
-                    <div class="day-number">{{ cell.date.day }}</div>
-
-                    {# この日のイベント #}
-                    {% for ev in cell.events %}
-                    <div class="event-card" data-event-id="{{ ev.id }}">
-                      <div class="event-title">
-                        <a href="{% url 'tennis:event_admin' club.public_token club.admin_token ev.id %}">
-                          {{ ev.title }}
-                        </a>
-                      </div>
-                    </div>
-                    {% endfor %}
-                </td>
-            {% else %}
-                <td class="day-cell other-month"></td>
-            {% endif %}
-        {% endfor %}
-        </tr>
-    {% endfor %}
-    </tbody>
-</table>
-
-<hr style="margin: 24px 0;">
-
-<h3>② 出席表フォーマット設定</h3>
+<h3>出席表フォーマット設定</h3>
 
 <div class="flag-add-area">
   <button type="button"
           id="club-add-flag-btn"
           class="flag-add-btn"
           data-club-id="{{ club.id }}"
+          data-admin-token="{{ club.admin_token }}"
           data-add-flag-url="{% url 'tennis:club_add_flag' %}"
           {% if flags|length >= max_flags %}disabled{% endif %}>
       フラグ追加
@@ -144,6 +62,7 @@
           id="club-delete-flag-btn"
           class="flag-delete-btn"
           data-club-id="{{ club.id }}"
+          data-admin-token="{{ club.admin_token }}"
           data-delete-flag-url="{% url 'tennis:club_delete_flag' %}"
           {% if flags|length == 0 %}disabled{% endif %}>
       フラグ削除
@@ -151,17 +70,17 @@
 
   <br>
   <small class="flag-note">
-      任意のフラグを５つまで追加できます。（フラグ名をクリックすると編集できます）
+      任意のフラグを３つまで追加できます。（フラグ名をクリックすると編集できます）
   </small>
 </div>
-
-
-{# ===== ② 出席表フォーマット設定 ===== #}
 
 <table id="participants-table"
        class="participants-table"
        data-mode="club_settings_dummy"
+       data-club-id="{{ club.id }}"
+       data-admin-token="{{ club.admin_token }}"
        data-rename-flag-url="{% url 'tennis:club_rename_flag' %}">
+
   <colgroup>
     <col style="width: 40px;">     {# 連番 #}
     <col style="width: 150px;">    {# 名前 #}
@@ -220,122 +139,14 @@
 
       {# ★ コメント：枠なしのインライン編集（ダミー入力） #}
       <td class="comment-cell">
-        <div class="comment-editable" contenteditable="true" data-placeholder="コメントを入力…"></div>
+        <div class="comment-editable" contenteditable="true"></div>
       </td>
     </tr>
     {% endfor %}
   </tbody>
 </table>
 
-{# ===== 出欠モーダル（ダミー） ===== #}
-<div id="attendance-modal" class="modal-backdrop" aria-hidden="true">
-  <div class="modal-content">
-    <button type="button" class="modal-close" id="close-attendance-modal">×</button>
-    <h3>出欠を選択</h3>
-
-    <div class="attendance-choice-row">
-      <button type="button" class="attendance-choice" data-attendance="yes">
-        <span class="attendance-icon attendance-yes">✓</span>
-      </button>
-      <button type="button" class="attendance-choice" data-attendance="no">
-        <span class="attendance-icon attendance-no">×</span>
-      </button>
-      <button type="button" class="attendance-choice" data-attendance="maybe">
-        <span class="attendance-icon attendance-maybe">?</span>
-      </button>
-    </div>
-
-    <p style="margin-top:10px; color:#666; font-size:0.9rem;">
-      ※ settingsページではダミーです（保存しません）。
-    </p>
-  </div>
-</div>
-
-{# ===== クラブ名変更モーダル（event modal を継承） ===== #}
-<div id="club-rename-modal" class="modal-backdrop" aria-hidden="true">
-  <div class="modal-content event-modal">
-    <button type="button" class="modal-close" id="club-rename-modal-close">×</button>
-    <h3 id="club-rename-modal-title">クラブ名変更</h3>
-
-    <form id="club-rename-modal-form" class="modal-form">
-      {% csrf_token %}
-      <input type="hidden" id="club-rename-club-id" value="{{ club.id }}">
-
-      <div class="field-group">
-        <label>クラブ名</label>
-        <input type="text"
-               id="club-rename-input"
-               class="event-title-input"
-               maxlength="255"
-               autocomplete="off">
-      </div>
-
-      <div class="modal-actions">
-        <button type="submit" class="btn-primary">保存</button>
-      </div>
-    </form>
-  </div>
-</div>
-
-
-{# ===== イベント追加モーダル（settings用） ===== #}
-<div id="club-event-modal" class="modal-backdrop" aria-hidden="true">
-  <div class="modal-content event-modal">
-    <button type="button" class="modal-close" id="club-event-modal-close">×</button>
-    <h3 id="club-event-modal-title">イベント追加</h3>
-
-    <form id="club-event-form" class="modal-form">
-      {% csrf_token %}
-      <input type="hidden" id="club-event-date" name="date" value="">
-      <input type="hidden" id="club-event-club-id" name="club_id" value="{{ club.id }}">
-
-      <div class="field-group">
-        <label>タイトル</label>
-        <input type="text"
-               id="club-event-title"
-               name="title"
-               class="event-title-input"
-               placeholder="例：定例練習 / G1・G2"
-               autocomplete="off">
-      </div>
-
-      <div class="field-group">
-        <label>時間（任意）</label>
-
-        <div class="time-range">
-          <div class="time-picker">
-            <div class="time-label">開始</div>
-            <div class="time-selects">
-              <select id="club-start-hour" class="time-select"></select>
-              <span class="time-colon">:</span>
-              <select id="club-start-min" class="time-select"></select>
-            </div>
-          </div>
-
-          <div class="time-sep">〜</div>
-
-          <div class="time-picker">
-            <div class="time-label">終了</div>
-            <div class="time-selects">
-              <select id="club-end-hour" class="time-select"></select>
-              <span class="time-colon">:</span>
-              <select id="club-end-min" class="time-select"></select>
-            </div>
-          </div>
-        </div>
-
-        {# JSで値を入れる hidden #}
-        <input type="hidden" id="club-event-start-time" name="start_time" value="">
-        <input type="hidden" id="club-event-end-time" name="end_time" value="">
-      </div>
-
-
-      <div class="modal-actions">
-        <button type="submit" class="btn-primary">イベントを作成</button>
-      </div>
-    </form>
-  </div>
-</div>
-
+<hr>
+<h3>メンバー管理</h3>
 
 {% endblock %}

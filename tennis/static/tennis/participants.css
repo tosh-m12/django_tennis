@@ -3,10 +3,11 @@
    ========================================= */
 
 #participants-table {
-    width: 100%;
-    table-layout: fixed;       /* colgroup の幅を優先 */
+    width: max-content;      /* ★中身の合計幅で止める（左に詰まる） */
+    max-width: 100%;         /* ★画面より大きい場合の保険 */
+    table-layout: fixed;
     border-collapse: separate;
-    border-spacing: 0 6px;     /* 行間に余白 */
+    border-spacing: 0 6px;
 }
 
 /* ヘッダー */
@@ -25,13 +26,22 @@
     vertical-align: middle;
 }
 
-/* 左端の番号 */
-#participants-table .participant-index {
-    width: 32px;
-    text-align: right;
-    color: #777;
-    font-size: 0.8rem;
+/* 連番セル：中身を上下中央 */
+#participants-table td.participant-index{
+  padding: 4px 8px;         /* 他tdと揃える（必要なら） */
 }
+
+/* ラッパーで確実に中央寄せ */
+#participants-table td.participant-index .idx{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  height: 100%;             /* tdの高さに追従 */
+  min-height: 34px;         /* 行の最小高さを確保（他セルと釣る） */
+}
+
+
 
 /* チェックボックス列 */
 #participants-table .checkbox-cell {
@@ -71,6 +81,16 @@
   outline: none;
 }
 
+/* 出欠：カラム中央に固定 */
+.attendance-btn{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 100%;          /* ★セル幅いっぱいを基準に中央化 */
+  padding: 0;           /* ★左右paddingで中心がズレるのを防ぐ */
+}
+
 .attendance-btn:focus{ outline: none; }
 .attendance-btn:active{ transform: translateY(1px); }
 
@@ -88,20 +108,46 @@
 
 
 
-/* ===== settings: コメント（枠なしインライン編集） ===== */
-.comment-editable {
-  min-height: 28px;
-  padding: 6px 8px;
+/* ===== コメント（グレーのテキストボックス風：モーダル入力欄に寄せる） ===== */
+.comment-editable{
+  min-height: 34px;
+  padding: 8px 10px;
+
+  border: 1px solid #e2e5ea;
+  border-radius: 10px;
+  background: #f2f3f5;
+
   outline: none;
-  border: none;
-  background: transparent;
   text-align: left;
+
+  /* 文章が長い時に自然に折り返す */
+  white-space: normal;
+  word-break: break-word;
+
+  /* セル幅いっぱいに */
+  width: 100%;
+  box-sizing: border-box;
+
+  /* 触った感（inputっぽさ） */
+  transition: background 0.15s ease, border-color 0.15s ease;
 }
 
-.comment-editable:empty:before {
+/* hover/active で少しだけ濃く（入力欄らしさ） */
+.comment-editable:hover{
+  background: #eceef1;
+}
+
+.comment-editable:focus{
+  background: #ffffff;
+  border-color: rgba(0,0,0,0.18);
+}
+
+/* placeholder（空のとき） */
+.comment-editable:empty:before{
   content: attr(data-placeholder);
   color: #9ca3af;
 }
+
 
 /* ===== 共通：チェックマークUI（出欠/試合参加/フラグ） ===== */
 
@@ -114,6 +160,16 @@
   background: transparent;
   cursor: pointer;
   padding: 2px 6px;
+}
+
+/* 試合参加/フラグ：カラム中央に固定 */
+.check-btn{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+
+  width: 100%;          /* ★セル幅いっぱいを基準に中央化 */
+  padding: 0;           /* ★左右paddingで中心がズレるのを防ぐ */
 }
 
 .check-btn:focus{ outline: none; }
@@ -242,3 +298,31 @@
   visibility: hidden;
   pointer-events: none;
 }
+
+/* ===== 出席者リスト：カラムは中央ぞろえ ===== */
+#participants-table th,
+#participants-table td {
+  text-align: center;
+  vertical-align: middle;
+}
+
+
+/* セル内UIだけ中央 */
+#participants-table .attendance-cell > *,
+#participants-table .check-cell > *,
+#participants-table .participant-index {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* コメント列：ボックスは中央、文字は左 */
+#participants-table .comment-cell {
+  text-align: center;   /* ボックスを中央 */
+}
+
+.comment-editable {
+  text-align: left;     /* ← 中の文字だけ左寄せ */
+}
+
+

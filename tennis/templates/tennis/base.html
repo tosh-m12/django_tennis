@@ -35,11 +35,20 @@
           </div>
 
           <div class="topbar-actions">
-          {% if is_admin %}
+            {% if is_admin %}
               <span class="topbar-admin-badge">幹事モード</span>
-          {% endif %}
-          {# 将来：ナビ・設定・ユーザー等 #}
+
+              {# 設定ページ（幹事のみ） #}
+              {% if club %}
+                <a href="{% url 'tennis:club_settings' club.public_token club.admin_token %}"
+                  class="topbar-link">
+                  設定
+                </a>
+              {% endif %}
+            {% endif %}
+            {# 将来：ナビ・設定・ユーザー等 #}
           </div>
+
         </div>
       </div>
     {% endif %}

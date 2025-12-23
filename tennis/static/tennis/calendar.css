@@ -208,8 +208,9 @@
   justify-content:center;
 }
 
-/* ピル本体：セル幅いっぱい（左右に少し余白） */
-.event-card .event-title a{
+/* ピル本体：a と span(cal-event-link) を同じ見た目にする */
+.event-card .event-title a,
+.event-card .event-title .cal-event-link{
   display:block;
   width: calc(100% - var(--pill-side-gap));
   margin: 0 auto;
@@ -220,7 +221,6 @@
   padding: 0 8px;
   border-radius: var(--pill-radius);
 
-  /* テーマ色 */
   background: linear-gradient(180deg, var(--accent), var(--accent-dark));
   color:#fff;
 
@@ -232,19 +232,14 @@
   text-overflow:ellipsis;
   white-space:nowrap;
 
-  /* ちょい立体感 */
   box-shadow: 0 2px 0 rgba(0,0,0,0.15);
 }
+
 
 .event-card .event-title a:hover{
   filter: brightness(0.98);
 }
 
-/* 中止表示（将来用） */
-.event-card.is-cancelled .event-title a{
-  opacity: 0.45;
-  text-decoration: line-through;
-}
 
 
 /* =========================

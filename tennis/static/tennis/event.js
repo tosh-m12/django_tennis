@@ -23,25 +23,70 @@
     if (window.UI?.showMessage) window.UI.showMessage(msg, ms);
     else alert(msg);
   }
+
+  // ★追記：confirm も UI モーダル化（無ければ window.confirm にフォールバック）
+  function safeConfirm(message, opts = {}) {
+    // opts: { title, okText, cancelText }
+    return new Promise((resolve) => {
+      const ui = window.UI;
+
+      // UI.confirm がある前提：onOk / onCancel を受けられる形を想定
+      if (ui?.confirm) {
+        ui.confirm(message, {
+          title: opts.title || "確認",
+          okText: opts.okText || "OK",
+          cancelText: opts.cancelText || "キャンセル",
+          onOk: () => resolve(true),
+          onCancel: () => resolve(false),
+          // UI.confirm の実装によっては onClose がある場合もある
+          onClose: () => resolve(false),
+        });
+        return;
+      }
+
+      // フォールバック（ブラウザ confirm）
+      resolve(window.confirm(message));
+    });
+  }
+
   function getRowFromEl(el) {
     return el?.closest?.("tr.participant-row") || null;
   }
   function getIdsFromEl(el) {
-    const epId = (el?.dataset?.epId ?? "").trim();
-    const memberId = (el?.dataset?.memberId ?? "").trim();
+    const epId = (el?.getAttribute?.("data-ep-id") || el?.dataset?.epId || "").trim();
+    const memberId = (el?.getAttribute?.("data-member-id") || el?.dataset?.memberId || "").trim();
     return { epId, memberId };
   }
+
   function applyEpIdToRow(row, newEpId) {
     if (!row || !newEpId) return;
-    row.dataset.epId = String(newEpId);
-    qsa("[data-ep-id]", row).forEach((n) => (n.dataset.epId = String(newEpId)));
+    const v = String(newEpId);
+
+    // row の data-ep-id を更新
+    row.dataset.epId = v;      // data-ep-id に反映されるのは row が data-ep-id を持つ場合
+    row.setAttribute("data-ep-id", v); // ★確実に属性を更新
+
+    // row内の全ての data-ep-id 保持要素も更新（ボタン/コメントdiv等）
+    qsa("[data-ep-id]", row).forEach((n) => n.setAttribute("data-ep-id", v));
+
+    // ついでに ep_id を読む側が data-ep-id なら、これで次回確実に拾える
   }
 
+
   // 参加者指定：epがあれば ep_id、なければ member_id
-  function appendParticipant(fd, ids) {
-    if (ids.epId) fd.append("ep_id", ids.epId);
-    else if (ids.memberId) fd.append("member_id", ids.memberId);
+  function appendParticipant(fd, ids, row) {
+    // 1) element側
+    let epId = (ids?.epId || "").trim();
+    let memberId = (ids?.memberId || "").trim();
+
+    // 2) row側にフォールバック（←ここが肝）
+    if (!epId && row) epId = String(row.dataset.epId || "").trim();
+    if (!memberId && row) memberId = String(row.dataset.memberId || "").trim();
+
+    if (epId) fd.append("ep_id", epId);
+    else if (memberId) fd.append("member_id", memberId);
   }
+
 
   document.addEventListener("DOMContentLoaded", () => {
     const csrftoken = getCookie("csrftoken");
@@ -54,13 +99,27 @@
     const publishState = (participantsTable.dataset.publishState || "").trim();
     const isPublished = publishState === "published";
 
+    // ★追加：公開後編集の1回確認フラグ（未定義だと全クリックが死ぬ）
+    let adminConfirmedAfterPublish = false;
+
+
+    // ------------------------------------------------------------
+    // 初回生成ゲート
+    // - 既に生成済み（current-schedule-json がある等）なら true
+    // - 初回生成前は、参加者増減で自動生成しない
+    // ------------------------------------------------------------
+    let hasScheduleEverGenerated = false;
+
+    const scriptTagInit = document.getElementById("current-schedule-json");
+    if (scriptTagInit && (scriptTagInit.textContent || "").trim()) {
+      hasScheduleEverGenerated = true;
+    }
+
     // 公開後：一般は操作不可
     const lockPublicEdits = !isAdmin && isPublished;
 
     // 公開後：幹事も警告を出す（最初の1回だけ確認）
-    let adminConfirmedAfterPublish = false;
-
-    function warnIfAdminEditingPublished() {
+    async function warnIfAdminEditingPublished() {
       if (!isAdmin || !isPublished) return true;
       if (adminConfirmedAfterPublish) return true;
 
@@ -69,7 +128,12 @@
         "ここで出欠/試合参加を変更すると、公開内容とズレが発生します。\n" +
         "変更後は「再公開」が必要です。続行しますか？";
 
-      const ok = window.confirm(msg);
+      const ok = await safeConfirm(msg, {
+        title: "確認",
+        okText: "続行する",
+        cancelText: "やめる",
+      });
+
       if (ok) adminConfirmedAfterPublish = true;
       return ok;
     }
@@ -125,7 +189,7 @@
     // - 幹事：confirm（1回OKしたら以降は聞かない）
     let adminConfirmedForEndedEvent = false;
 
-    function guardParticipantChangeIfEnded() {
+    async function guardParticipantChangeIfEnded() {
       const ended = isEventEndedNow();
       if (!ended) return true;
 
@@ -139,7 +203,12 @@
 
       if (adminConfirmedForEndedEvent) return true;
 
-      const ok = window.confirm("終了したイベントです。\n出席者変更しますか？");
+      const ok = await safeConfirm("終了したイベントです。\n出席者変更しますか？", {
+        title: "確認",
+        okText: "変更する",
+        cancelText: "やめる",
+      });
+
       if (ok) adminConfirmedForEndedEvent = true;
       return ok;
     }
@@ -170,6 +239,15 @@
       const btn = getPublishBtn();
       if (!btn) return;
 
+      // ★ 初回生成前は必ず no_schedule に固定
+      if (!hasScheduleEverGenerated) {
+        btn.dataset.publishState = "no_schedule";
+        btn.textContent = "📢 対戦表を公開";
+        btn.disabled = true;
+        btn.classList.add("pill-disabled");
+        return;
+      }
+
       btn.dataset.publishState = state;
 
       btn.classList.remove("pill-disabled");
@@ -191,25 +269,31 @@
         btn.textContent = "再公開";
         return;
       }
+
       btn.textContent = "📢 対戦表を公開";
     }
 
-    // 公開済みが正：公開済みが存在する状態で draft を触ったら必ず changed にする
+
     function markChangedIfPublishedExists() {
+      // ★ そもそも未生成なら publishState を触らない
+      if (!hasScheduleEverGenerated) {
+        setPublishStateUI("no_schedule");
+        return;
+      }
+
       const state = getPublishState();
       if (state === "published") {
         setPublishStateUI("changed");
         if (!window.hasShownChangedNotice) {
           safeShowMessage(
             "対戦表が更新されました。\n参加者ページへ反映するには「再公開」を押してください。",
-            4000
+            3000
           );
           window.hasShownChangedNotice = true;
         }
-      } else if (state === "no_schedule") {
-        setPublishStateUI("ready");
       }
     }
+
 
     function setMatchVisible(row, visible) {
       if (!row) return;
@@ -334,9 +418,9 @@
 
         const fd = new FormData();
         fd.append("event_id", eventId);
-        appendParticipant(fd, ids);
+        appendParticipant(fd, ids, row);
         fd.append("flag_id", flagId);
-        fd.append("checked", willOn ? "true" : "false");
+        fd.append("checked", willOn ? "1" : "0");
 
         try {
           const r = await fetch(urls.toggleFlag, {
@@ -386,7 +470,7 @@
           if (ev.key === "Escape" && modal.classList.contains("is-open")) close();
         });
 
-        participantsTable.addEventListener("click", (ev) => {
+        participantsTable.addEventListener("click", async (ev) => {
           const btn = ev.target.closest(".attendance-btn");
           if (!btn) return;
 
@@ -396,13 +480,14 @@
             return blockPublicEdit("公開後は出欠を変更できません（幹事のみ）");
           }
 
-          if (!warnIfAdminEditingPublished()) {
+          // ★ここから await
+          if (!(await warnIfAdminEditingPublished())) {
             ev.preventDefault();
             ev.stopPropagation();
             return;
           }
 
-          if (!guardParticipantChangeIfEnded()) {
+          if (!(await guardParticipantChangeIfEnded())) {
             ev.preventDefault();
             ev.stopPropagation();
             return;
@@ -437,9 +522,12 @@
               if (data.ep_id) applyEpIdToRow(row, data.ep_id);
 
               let html = `<span class="attendance-icon attendance-maybe">?</span>`;
-              if (attendance === "yes") html = `<span class="attendance-icon attendance-yes">✓</span>`;
-              if (attendance === "no") html = `<span class="attendance-icon attendance-no">×</span>`;
-              if (attendance === "maybe") html = `<span class="attendance-icon attendance-maybe">?</span>`;
+              if (attendance === "yes")
+                html = `<span class="attendance-icon attendance-yes">✓</span>`;
+              if (attendance === "no")
+                html = `<span class="attendance-icon attendance-no">×</span>`;
+              if (attendance === "maybe")
+                html = `<span class="attendance-icon attendance-maybe">?</span>`;
               currentBtn.innerHTML = html;
               currentBtn.dataset.attendance = attendance;
 
@@ -455,7 +543,7 @@
               if (isAdmin) {
                 markChangedIfPublishedExists();
                 syncCourtsLimitByCurrentState();
-                ajaxGenerateSchedule();
+                ajaxGenerateSchedule(false); // 初回生成前は何もしない
               }
 
               close();
@@ -492,10 +580,13 @@
           modal.setAttribute("aria-hidden", "true");
         };
 
-        addBtn.addEventListener("click", () => {
-          if (lockPublicEdits) return blockPublicEdit("公開後は出席者追加できません（幹事のみ）");
-          if (!warnIfAdminEditingPublished()) return;
-          if (!guardParticipantChangeIfEnded()) return;
+        addBtn.addEventListener("click", async () => {
+          if (lockPublicEdits)
+            return blockPublicEdit("公開後は出席者追加できません（幹事のみ）");
+
+          if (!(await warnIfAdminEditingPublished())) return;
+          if (!(await guardParticipantChangeIfEnded())) return;
+
           open();
         });
 
@@ -593,7 +684,10 @@
       return ids;
     }
 
-    async function ajaxGenerateSchedule() {
+    async function ajaxGenerateSchedule(force = false) {
+      // ★初回生成前は「手動（force=true）」以外は生成しない
+      if (!force && !hasScheduleEverGenerated) return;
+
       const matchForm = document.getElementById("match-settings-form");
       if (!matchForm) return;
       const url = matchForm.dataset.generateUrl;
@@ -622,6 +716,29 @@
         const statsArea2 = document.getElementById("stats-area");
         if (scheduleArea2 && typeof data.schedule_html === "string") scheduleArea2.innerHTML = data.schedule_html;
         if (statsArea2 && typeof data.stats_html === "string") statsArea2.innerHTML = data.stats_html;
+
+        // ===== ★追加：publish 用 JSON をDOMに保存 =====
+        if (typeof data.schedule_json === "string" && data.schedule_json.trim()) {
+          let st = document.getElementById("current-schedule-json");
+          if (!st) {
+            st = document.createElement("script");
+            st.id = "current-schedule-json";
+            st.type = "application/json";
+            document.body.appendChild(st);
+          }
+          st.textContent = data.schedule_json;
+        }
+
+
+        // ★成功したら「生成済み」にする（ここが肝）
+        hasScheduleEverGenerated = true;
+
+        // ★初回生成直後：公開ボタンを有効化
+        //  - 既に published なら changed（再公開）へ
+        //  - それ以外は ready（公開可能）へ
+        const cur = getPublishState();
+        if (cur === "published") setPublishStateUI("changed");
+        else setPublishStateUI("ready");
 
         const pillGameType = document.getElementById("pill-game-type");
         const pillNumCourts = document.getElementById("pill-num-courts");
@@ -653,6 +770,7 @@
       }
     }
 
+
     // ============================================================
     // [COMMON] 試合参加 ON/OFF（admin/public 共通）
     // ============================================================
@@ -667,13 +785,13 @@
           return blockPublicEdit("公開後は試合参加を変更できません（幹事のみ）");
         }
 
-        if (!warnIfAdminEditingPublished()) {
+        if (!(await warnIfAdminEditingPublished())) {
           e.preventDefault();
           e.stopPropagation();
           return;
         }
 
-        if (!guardParticipantChangeIfEnded()) {
+        if (!(await guardParticipantChangeIfEnded())) {
           e.preventDefault();
           e.stopPropagation();
           return;
@@ -694,7 +812,7 @@
         const fd = new FormData();
         fd.append("event_id", eventId);
         appendParticipant(fd, ids);
-        fd.append("checked", willOn ? "true" : "false");
+        fd.append("checked", willOn ? "1" : "0");
 
         try {
           const r = await fetch(urls.setParticipatesMatch, {
@@ -709,7 +827,7 @@
           if (isAdmin) {
             markChangedIfPublishedExists();
             syncCourtsLimitByCurrentState();
-            ajaxGenerateSchedule();
+            ajaxGenerateSchedule(false); // 初回生成前は何もしない
           }
         } catch {
           btn.classList.toggle("is-on", !willOn);
@@ -801,7 +919,7 @@
 
         matchForm.addEventListener("submit", (ev) => {
           ev.preventDefault();
-          ajaxGenerateSchedule();
+          ajaxGenerateSchedule(true); // ★初回生成はここだけ
           closeModal();
         });
       }
@@ -993,25 +1111,29 @@
           let { r, data } = await postPublish(false);
 
           if (r.status === 409 && data && data.error === "score_exists") {
-            window.UI?.confirm?.(data.message || "スコアが登録されています。再公開すると登録済みスコアがリセットされますが、よろしいでしょうか？", {
-              okText: "スコアを破棄して再公開",
-              onOk: async () => {
-                try {
-                  const res2 = await postPublish(true);
-                  if (!res2.r.ok || (res2.data && res2.data.error)) {
-                    safeShowMessage("公開に失敗しました。", 2600);
-                    console.error(res2.data);
-                    return;
+            window.UI?.confirm?.(
+              data.message ||
+                "スコアが登録されています。再公開すると登録済みスコアがリセットされますが、よろしいでしょうか？",
+              {
+                okText: "スコアを破棄して再公開",
+                onOk: async () => {
+                  try {
+                    const res2 = await postPublish(true);
+                    if (!res2.r.ok || (res2.data && res2.data.error)) {
+                      safeShowMessage("公開に失敗しました。", 2600);
+                      console.error(res2.data);
+                      return;
+                    }
+                    applyPublishedUI();
+                    safeShowMessage("対戦表を公開しました。", 2200);
+                    setTimeout(() => window.location.reload(), 900);
+                  } catch (err2) {
+                    console.error(err2);
+                    safeShowMessage("公開に失敗しました（ネットワーク）。", 2600);
                   }
-                  applyPublishedUI();
-                  safeShowMessage("対戦表を公開しました。", 2200);
-                  setTimeout(() => window.location.reload(), 900);
-                } catch (err2) {
-                  console.error(err2);
-                  safeShowMessage("公開に失敗しました（ネットワーク）。", 2600);
-                }
-              },
-            });
+                },
+              }
+            );
             return;
           }
 
@@ -1039,12 +1161,10 @@
       const hooks = document.getElementById("event-edit-hooks");
 
       const updateUrl =
-        (hooks?.dataset?.updateUrl || "").trim() ||
-        (metaBar?.dataset?.updateUrl || "").trim();
+        (hooks?.dataset?.updateUrl || "").trim() || (metaBar?.dataset?.updateUrl || "").trim();
 
       const adminToken =
-        (hooks?.dataset?.adminToken || "").trim() ||
-        (metaBar?.dataset?.adminToken || "").trim();
+        (hooks?.dataset?.adminToken || "").trim() || (metaBar?.dataset?.adminToken || "").trim();
 
       const modal = document.getElementById("club-event-modal");
       const closeBtn = document.getElementById("club-event-modal-close");
@@ -1052,8 +1172,7 @@
 
       const cancelToggleBtn = document.getElementById("club-event-cancel-toggle");
       const submitBtn =
-        document.getElementById("club-event-submit") ||
-        form?.querySelector?.('button[type="submit"]');
+        document.getElementById("club-event-submit") || form?.querySelector?.('button[type="submit"]');
 
       const mode = document.getElementById("club-event-mode");
       const eventIdInput = document.getElementById("club-event-event-id");
@@ -1077,7 +1196,8 @@
       if (!modal) console.warn("[event-edit] club-event-modal missing (check _ui_modals include)");
       if (!form) console.warn("[event-edit] club-event-form missing");
       if (!updateUrl) console.warn("[event-edit] updateUrl missing (check event-edit-hooks / dataset)");
-      if (!adminToken) console.warn("[event-edit] adminToken missing (check event-edit-hooks / dataset)");
+      if (!adminToken)
+        console.warn("[event-edit] adminToken missing (check event-edit-hooks / dataset)");
 
       if (metaBar && modal && form && updateUrl && adminToken) {
         let watchersAttached = false;
@@ -1122,10 +1242,12 @@
           const hh = [...Array(24)].map((_, i) => String(i).padStart(2, "0"));
           const mm = ["00", "15", "30", "45"];
           [sh, eh].forEach((sel) => {
-            if (sel) sel.innerHTML = hh.map((v) => `<option value="${v}">${v}</option>`).join("");
+            if (sel)
+              sel.innerHTML = hh.map((v) => `<option value="${v}">${v}</option>`).join("");
           });
           [sm, em].forEach((sel) => {
-            if (sel) sel.innerHTML = mm.map((v) => `<option value="${v}">${v}</option>`).join("");
+            if (sel)
+              sel.innerHTML = mm.map((v) => `<option value="${v}">${v}</option>`).join("");
           });
         }
 
@@ -1220,10 +1342,16 @@
               const nowCancelled = (cancelToggleBtn.dataset.cancelled || "0") === "1";
               const nextCancelled = !nowCancelled;
 
-              const ok = window.confirm(
-                nextCancelled ? "このイベントを中止にしますか？" : "このイベントを復活させますか？"
+              const ok = await safeConfirm(
+                nextCancelled ? "このイベントを中止にしますか？" : "このイベントを復活させますか？",
+                {
+                  title: "確認",
+                  okText: nextCancelled ? "中止にする" : "復活させる",
+                  cancelText: "やめる",
+                }
               );
               if (!ok) return;
+
 
               const prevDisabled = cancelToggleBtn.disabled;
               cancelToggleBtn.disabled = true;
@@ -1257,7 +1385,6 @@
                 // ★成功したら閉じる → リロード
                 close();
                 setTimeout(() => window.location.reload(), 600);
-
               } catch (err) {
                 console.error(err);
                 safeShowMessage("中止状態の更新に失敗しました（ネットワーク）", 2600);

@@ -81,11 +81,11 @@
   >
     <colgroup>
       <col style="width: 40px;">
-      <col style="width: 180px;">
+      <col style="width: 160px;">
 
       {# ★両方表示 #}
-      <col style="width: 70px;">   {# 出欠 #}
-      <col style="width: 70px;">   {# 試合参加 #}
+      <col style="width: 80px;">   {# 出欠 #}
+      <col style="width: 80px;">   {# 試合参加 #}
 
       {% for flag in flags %}<col>{% endfor %}
       <col style="width: 200px;">
@@ -113,7 +113,7 @@
           data-row-kind="fixed"
           data-member-id="{{ row.member_id }}"
           data-ep-id="{{ row.ep_id|default_if_none:'' }}">
-        <td class="participant-index">{{ forloop.counter }}</td>
+        <td class="participant-index"><span class="idx">{{ forloop.counter }}</span></td>
 
         <td><div class="tb-player-card-sm">{{ row.display_name }}</div></td>
 
@@ -153,8 +153,8 @@
         {% for flag in flags %}
         <td class="check-cell">
           {% if row.ep_id %}
-            {% with key=row.ep_id|stringformat:"s"|add:":"|add:flag.id|stringformat:"s" %}
-              {% with on=flag_states|dict_get:key %}
+            {% with ep_flags=flag_states|get_item:row.ep_id %}
+              {% with on=ep_flags|get_item:flag.id %}
                 <button type="button"
                         class="check-btn toggle-check {% if on %}is-on{% endif %}"
                         data-member-id="{{ row.member_id }}"
@@ -165,7 +165,6 @@
               {% endwith %}
             {% endwith %}
           {% else %}
-            {# ep無し（未登録行）は常にOFF表示（クリックされてもJS側でep作る想定） #}
             <button type="button"
                     class="check-btn toggle-check"
                     data-member-id="{{ row.member_id }}"
@@ -174,6 +173,7 @@
               <span class="check-icon check-off">✓</span>
             </button>
           {% endif %}
+
         </td>
         {% endfor %}
 
@@ -181,8 +181,7 @@
           <div class="comment-editable"
               contenteditable="true"
               data-member-id="{{ row.member_id }}"
-              data-ep-id="{{ row.ep_id|default_if_none:'' }}"
-              data-placeholder="コメントを入力…">{{ row.comment|default:'' }}</div>
+              data-ep-id="{{ row.ep_id|default_if_none:'' }}">{{ row.comment|default:'' }}</div>
         </td>
       </tr>
       {% endfor %}
@@ -192,7 +191,7 @@
       <tr class="participant-row"
           data-row-kind="guest"
           data-ep-id="{{ row.ep_id }}">
-        <td class="participant-index">{{ fixed_rows|length|add:forloop.counter }}</td>
+        <td class="participant-index"><span class="idx">{{ fixed_rows|length|add:forloop.counter }}</span></td>
 
         <td><div class="tb-player-card-sm">{{ row.display_name }}</div></td>
 
@@ -229,8 +228,8 @@
         {# ===== flags ===== #}
         {% for flag in flags %}
         <td class="check-cell">
-          {% with key=row.ep_id|stringformat:"s"|add:":"|add:flag.id|stringformat:"s" %}
-            {% with on=flag_states|dict_get:key %}
+          {% with ep_flags=flag_states|get_item:row.ep_id %}
+            {% with on=ep_flags|get_item:flag.id %}
               <button type="button"
                       class="check-btn toggle-check {% if on %}is-on{% endif %}"
                       data-ep-id="{{ row.ep_id }}"
@@ -239,14 +238,14 @@
               </button>
             {% endwith %}
           {% endwith %}
+
         </td>
         {% endfor %}
 
         <td class="comment-cell">
           <div class="comment-editable"
               contenteditable="true"
-              data-ep-id="{{ row.ep_id }}"
-              data-placeholder="コメントを入力…">{{ row.comment|default:'' }}</div>
+              data-ep-id="{{ row.ep_id }}">{{ row.comment|default:'' }}</div>
         </td>
       </tr>
       {% endfor %}
@@ -294,67 +293,6 @@
       {% endif %}
     </button>
   </div>
-
-  <div id="match-settings-modal" class="modal-backdrop" aria-hidden="true">
-    <div class="modal-content event-modal modal-has-topbar"
-        role="dialog" aria-modal="true" aria-labelledby="match-settings-modal-title">
-
-      <div class="modal-topbar">
-        <div class="modal-topbar-title" id="match-settings-modal-title">条件を変更する</div>
-        <button type="button"
-                id="close-settings-modal"
-                class="modal-topbar-btn"
-                aria-label="閉じる">×</button>
-      </div>
-
-      <form method="post"
-            id="match-settings-form"
-            class="modal-form"
-            data-generate-url="{% url 'tennis:ajax_generate_schedule' event.id %}">
-        {% csrf_token %}
-        <input type="hidden" name="generate_schedule" value="1">
-
-        <div class="field-group">
-          <div class="toggle-row">
-            <button type="button"
-                    class="toggle-btn {% if game_type == 'singles' %}active{% endif %}"
-                    data-game-type="singles">シングルス</button>
-            <button type="button"
-                    class="toggle-btn {% if game_type != 'singles' %}active{% endif %}"
-                    data-game-type="doubles">ダブルス</button>
-          </div>
-          <input type="hidden" name="game_type" id="id_game_type" value="{{ game_type|default:'doubles' }}">
-        </div>
-
-        <div class="field-group field-group-count">
-          <label>人数</label>
-          <p class="count-pill modal-number">{{ match_count }}</p>
-        </div>
-
-        <div class="field-group">
-          <label>面数</label>
-          <div class="stepper-row">
-            <button type="button" class="stepper-btn" data-target="num_courts" data-step="-1">－</button>
-            <input type="number" id="id_num_courts" name="num_courts" class="modal-number" min="1" max="8" value="{{ num_courts }}">
-            <button type="button" class="stepper-btn" data-target="num_courts" data-step="1">＋</button>
-          </div>
-        </div>
-
-        <div class="field-group">
-          <label>ラウンド数</label>
-          <div class="stepper-row">
-            <button type="button" class="stepper-btn" data-target="num_rounds" data-step="-1">－</button>
-            <input type="number" id="id_num_rounds" name="num_rounds" class="modal-number" min="1" max="20" value="{{ num_rounds }}">
-            <button type="button" class="stepper-btn" data-target="num_rounds" data-step="1">＋</button>
-          </div>
-        </div>
-
-        <div class="modal-actions">
-          <button type="submit" class="btn btn-pill btn-primary">条件を変更する</button>
-        </div>
-      </form>
-    </div>
-  </div>
   {% endif %}
 
   <h3>対戦表</h3>
@@ -368,58 +306,6 @@
       {% include "tennis/_stats_block.html" %}
     </div>
   {% endif %}
-
-  {# ===== 参加登録モーダル：幹事/一般 共通 ===== #}
-  <div id="add-guest-modal" class="modal-backdrop" aria-hidden="true">
-    <div class="modal-content event-modal modal-has-topbar"
-        role="dialog" aria-modal="true" aria-labelledby="add-guest-modal-title">
-
-      <div class="modal-topbar">
-        <div class="modal-topbar-title" id="add-guest-modal-title">参加登録</div>
-        <button type="button"
-                id="close-add-guest-modal"
-                class="modal-topbar-btn"
-                aria-label="閉じる">×</button>
-      </div>
-
-      <form class="modal-form" id="add-guest-form">
-        <div class="field-group">
-          <label for="guest-name-input">名前</label>
-          <input
-            type="text"
-            id="guest-name-input"
-            class="event-title-input"
-            placeholder="例：山田（ゲスト）"
-            autocomplete="name"
-          >
-        </div>
-
-        <div class="modal-actions">
-          <button type="submit" class="btn btn-pill btn-primary">追加する</button>
-        </div>
-      </form>
-    </div>
-  </div>
-
-  {# ===== 出欠モーダル：幹事/一般 共通 ===== #}
-  <div id="attendance-modal" class="modal-backdrop" aria-hidden="true">
-    <div class="modal-content">
-      <button type="button" class="modal-close" id="close-attendance-modal">×</button>
-      <h3>出欠を選択</h3>
-
-      <div class="attendance-choice-row">
-        <button type="button" class="attendance-choice" data-attendance="yes">
-          <span class="attendance-icon attendance-yes">✓</span>
-        </button>
-        <button type="button" class="attendance-choice" data-attendance="no">
-          <span class="attendance-icon attendance-no">×</span>
-        </button>
-        <button type="button" class="attendance-choice" data-attendance="maybe">
-          <span class="attendance-icon attendance-maybe">?</span>
-        </button>
-      </div>
-    </div>
-  </div>
 
 </div>
 {% endblock %}
