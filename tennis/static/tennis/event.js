@@ -321,7 +321,7 @@
       const ids = getIdsFromEl(btn);
       const fd = new FormData();
       fd.append("event_id", eventId);
-      appendParticipant(fd, ids);
+      appendParticipant(fd, ids, row);
       fd.append("checked", checked ? "true" : "false");
 
       try {
@@ -361,7 +361,7 @@
 
           const fd = new FormData();
           fd.append("event_id", eventId);
-          appendParticipant(fd, ids);
+          appendParticipant(fd, ids, row);
           fd.append("comment", comment);
 
           lastSent = key;
@@ -507,7 +507,7 @@
 
             const fd = new FormData();
             fd.append("event_id", eventId);
-            appendParticipant(fd, ids);
+            appendParticipant(fd, ids, row);
             fd.append("attendance", attendance);
 
             try {
@@ -811,7 +811,7 @@
 
         const fd = new FormData();
         fd.append("event_id", eventId);
-        appendParticipant(fd, ids);
+        appendParticipant(fd, ids, row);
         fd.append("checked", willOn ? "1" : "0");
 
         try {

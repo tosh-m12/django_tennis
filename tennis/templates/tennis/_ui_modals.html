@@ -392,3 +392,76 @@ settings でだけ注意文を出したい場合：
   </div>
 </div>
 {% endif %}
+
+{% comment %}
+[9] フラグ追加モーダル（settings adminのみ）
+- club_settings.js が open/close/submit
+- 「追加ボタン押下 → 先に名前入力 → 作成」
+{% endcomment %}
+{% if club and is_admin %}
+<div id="flag-add-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content event-modal modal-has-topbar"
+       role="dialog" aria-modal="true" aria-labelledby="flag-add-modal-title">
+
+    <div class="modal-topbar">
+      <div class="modal-topbar-title" id="flag-add-modal-title">フラグ追加</div>
+      <button type="button"
+              id="close-flag-add-modal"
+              class="modal-topbar-btn"
+              aria-label="閉じる">×</button>
+    </div>
+
+    <form class="modal-form" id="flag-add-form">
+      {% csrf_token %}
+
+      <div class="field-group">
+        <label for="flag-add-input">フラグ名</label>
+        <input type="text"
+               id="flag-add-input"
+               class="event-title-input"
+               maxlength="80"
+               autocomplete="off"
+               placeholder="例：かご / ボール">
+      </div>
+
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-pill btn-primary">追加</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% if club and is_admin %}
+<div id="member-rename-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content event-modal modal-has-topbar"
+       role="dialog" aria-modal="true" aria-labelledby="member-rename-modal-title">
+
+    <div class="modal-topbar">
+      <div class="modal-topbar-title" id="member-rename-modal-title">メンバー名変更</div>
+      <button type="button"
+              id="close-member-rename-modal"
+              class="modal-topbar-btn"
+              aria-label="閉じる">×</button>
+    </div>
+
+    <form class="modal-form" id="member-rename-form">
+      {% csrf_token %}
+      <input type="hidden" id="member-rename-member-id" value="">
+
+      <div class="field-group">
+        <label for="member-rename-input">メンバー名</label>
+        <input type="text"
+               id="member-rename-input"
+               class="event-title-input"
+               maxlength="80"
+               autocomplete="off">
+      </div>
+
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-pill btn-primary">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}

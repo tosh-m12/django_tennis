@@ -63,5 +63,9 @@ urlpatterns = [
 
     # score
     path("api/match/save_score/", views.save_match_score, name="save_match_score"),
-    
+
+    path("api/club/add_member/", views.club_add_member, name="club_add_member"),
+    path("api/club/rename_member/", views.club_rename_member, name="club_rename_member"),
+    path("api/club/toggle_member_fixed/", views.club_toggle_member_fixed, name="club_toggle_member_fixed"),
+
 ]

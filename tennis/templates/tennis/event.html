@@ -82,11 +82,8 @@
     <colgroup>
       <col style="width: 40px;">
       <col style="width: 160px;">
-
-      {# ★両方表示 #}
       <col style="width: 80px;">   {# 出欠 #}
       <col style="width: 80px;">   {# 試合参加 #}
-
       {% for flag in flags %}<col>{% endfor %}
       <col style="width: 200px;">
     </colgroup>
@@ -107,6 +104,8 @@
     </thead>
 
     <tbody>
+
+
       {# ============= 固定メンバー（未登録行=ep_id空の可能性あり） ============= #}
       {% for row in fixed_rows %}
       <tr class="participant-row"
@@ -173,7 +172,6 @@
               <span class="check-icon check-off">✓</span>
             </button>
           {% endif %}
-
         </td>
         {% endfor %}
 
@@ -186,12 +184,15 @@
       </tr>
       {% endfor %}
 
-      {# ============= ゲスト（必ずep_idあり） ============= #}
+      {# ============= ゲスト（臨時参加：追加されたらこの表に表示される） ============= #}
       {% for row in guest_rows %}
       <tr class="participant-row"
           data-row-kind="guest"
+          data-member-id="{{ row.member_id|default_if_none:'' }}"
           data-ep-id="{{ row.ep_id }}">
-        <td class="participant-index"><span class="idx">{{ fixed_rows|length|add:forloop.counter }}</span></td>
+        <td class="participant-index">
+          <span class="idx">{{ fixed_rows|length|add:forloop.counter }}</span>
+        </td>
 
         <td><div class="tb-player-card-sm">{{ row.display_name }}</div></td>
 
@@ -199,6 +200,7 @@
         <td class="attendance-cell">
           <button type="button"
                   class="attendance-btn"
+                  data-member-id="{{ row.member_id|default_if_none:'' }}"
                   data-ep-id="{{ row.ep_id }}"
                   data-attendance="{{ row.attendance|default_if_none:'' }}">
             {% if row.attendance == "yes" %}
@@ -220,6 +222,7 @@
                         {% if row.participates_match %}is-on{% endif %}
                         {% if row.attendance != 'yes' %}is-hidden{% endif %}"
                   data-kind="match"
+                  data-member-id="{{ row.member_id|default_if_none:'' }}"
                   data-ep-id="{{ row.ep_id }}">
             <span class="check-icon {% if row.participates_match %}check-on{% else %}check-off{% endif %}">✓</span>
           </button>
@@ -232,19 +235,20 @@
             {% with on=ep_flags|get_item:flag.id %}
               <button type="button"
                       class="check-btn toggle-check {% if on %}is-on{% endif %}"
+                      data-member-id="{{ row.member_id|default_if_none:'' }}"
                       data-ep-id="{{ row.ep_id }}"
                       data-flag-id="{{ flag.id }}">
                 <span class="check-icon {% if on %}check-on{% else %}check-off{% endif %}">✓</span>
               </button>
             {% endwith %}
           {% endwith %}
-
         </td>
         {% endfor %}
 
         <td class="comment-cell">
           <div class="comment-editable"
               contenteditable="true"
+              data-member-id="{{ row.member_id|default_if_none:'' }}"
               data-ep-id="{{ row.ep_id }}">{{ row.comment|default:'' }}</div>
         </td>
       </tr>

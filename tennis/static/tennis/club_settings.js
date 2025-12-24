@@ -98,24 +98,76 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ============================================================
   // [B] フラグ追加 / 削除（保存あり）
+  //  - 追加は「先に名前を決める」モーダル経由
   // ============================================================
   (function initFlagsAddDelete() {
     const addBtn = document.getElementById("club-add-flag-btn");
     const delBtn = document.getElementById("club-delete-flag-btn");
 
+    // --- 共通モーダル（_ui_modals.html）
+    const addModal = document.getElementById("flag-add-modal");
+    const addCloseBtn = document.getElementById("close-flag-add-modal");
+    const addForm = document.getElementById("flag-add-form");
+    const addInput = document.getElementById("flag-add-input");
+
+    function openAddModal() {
+      if (!addModal || !addInput) return;
+      addInput.value = "";
+      addModal.classList.add("is-open");
+      addModal.setAttribute("aria-hidden", "false");
+      setTimeout(() => addInput.focus(), 0);
+    }
+
+    function closeAddModal() {
+      if (!addModal) return;
+      addModal.classList.remove("is-open");
+      addModal.setAttribute("aria-hidden", "true");
+    }
+
+    // ------------------------
+    // 追加ボタン → モーダルを開く
+    // ------------------------
     if (addBtn) {
-      addBtn.addEventListener("click", async () => {
+      addBtn.addEventListener("click", (e) => {
+        e.preventDefault();
         if (addBtn.disabled) return;
+        openAddModal();
+      });
+    }
+
+    // × / 背景 / ESC で閉じる（共通ルール）
+    addCloseBtn?.addEventListener("click", closeAddModal);
+    addModal?.addEventListener("click", (e) => {
+      if (e.target === addModal) closeAddModal();
+    });
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && addModal?.classList.contains("is-open")) {
+        closeAddModal();
+      }
+    });
+
+    // ------------------------
+    // モーダル submit → API
+    // ------------------------
+    if (addForm && addBtn) {
+      addForm.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const name = (addInput.value || "").trim();
+        if (!name) {
+          UI.showMessage("フラグ名を入力してください。", 2400);
+          return;
+        }
 
         const clubId = addBtn.dataset.clubId;
         const url = addBtn.dataset.addFlagUrl;
-        if (!clubId || !url) return;
-
         const adminToken = getAdminTokenFromEl(addBtn);
+        if (!clubId || !url) return;
 
         const fd = new FormData();
         fd.append("club_id", clubId);
         fd.append("admin_token", adminToken);
+        fd.append("name", name);
 
         try {
           const r = await fetch(url, {
@@ -135,14 +187,17 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
           }
 
+          closeAddModal();
           window.location.reload();
         } catch (err) {
-          console.error(err);
           UI.showMessage("フラグ追加に失敗しました（ネットワーク）。", 2600);
         }
       });
     }
 
+    // ------------------------
+    // 削除（既存ロジックそのまま）
+    // ------------------------
     if (delBtn) {
       delBtn.addEventListener("click", () => {
         if (delBtn.disabled) return;
@@ -390,4 +445,187 @@ document.addEventListener("DOMContentLoaded", () => {
       if (willOn) icon.textContent = "✓";
     });
   })();
+
+  // =============================
+  // [B] メンバー管理（固定/非固定のみ）
+  // =============================
+  (function initMemberManage() {
+    const hooks = document.getElementById("member-hooks");
+    if (!hooks) return;
+
+    const clubId = hooks.dataset.clubId;
+    const adminToken = hooks.dataset.adminToken;
+
+    const addUrl = hooks.dataset.addUrl;
+    const renameUrl = hooks.dataset.renameUrl;
+    const toggleFixedUrl = hooks.dataset.toggleFixedUrl;
+
+    const input = document.getElementById("member-add-input");
+    const addBtn = document.getElementById("member-add-btn");
+    const table = document.getElementById("members-table");
+
+    const post = async (url, fd) => {
+      const res = await fetch(url, {
+        method: "POST",
+        headers: { "X-CSRFToken": csrftoken },
+        body: fd,
+      });
+      return await res.json();
+    };
+
+    // 追加
+    if (addBtn) {
+      addBtn.addEventListener("click", async () => {
+        const name = (input?.value || "").trim();
+        if (!name) return;
+
+        const fd = new FormData();
+        fd.append("club_id", clubId);
+        fd.append("admin_token", adminToken);
+        fd.append("display_name", name);
+
+        const data = await post(addUrl, fd);
+        if (!data.ok) {
+          alert("追加に失敗しました: " + (data.error || ""));
+          return;
+        }
+        location.reload();
+      });
+    }
+
+    if (!table) return;
+
+    // 名前変更（クリック→モーダル）
+    (function initMemberRenameModal() {
+      const modal = document.getElementById("member-rename-modal");
+      const closeBtn = document.getElementById("close-member-rename-modal");
+      const form = document.getElementById("member-rename-form");
+      const input = document.getElementById("member-rename-input");
+      const hiddenId = document.getElementById("member-rename-member-id");
+
+      if (!table || !modal || !form || !input || !hiddenId) return;
+
+      let currentNameEl = null;
+
+      function openModal(memberId, currentName, nameEl) {
+        currentNameEl = nameEl || null;
+        hiddenId.value = memberId || "";
+        input.value = currentName || "";
+        modal.classList.add("is-open");
+        modal.setAttribute("aria-hidden", "false");
+        setTimeout(() => input.focus(), 0);
+      }
+
+      function closeModal() {
+        modal.classList.remove("is-open");
+        modal.setAttribute("aria-hidden", "true");
+        hiddenId.value = "";
+        currentNameEl = null;
+      }
+
+      closeBtn?.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeModal();
+      });
+
+      modal.addEventListener("click", (e) => {
+        if (e.target === modal) closeModal();
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && modal.classList.contains("is-open")) closeModal();
+      });
+
+      // 「名前セル」クリックで開く
+      table.addEventListener("click", (e) => {
+        const nameEl = e.target.closest(".member-name");
+        if (!nameEl) return;
+
+        const tr = nameEl.closest("tr[data-member-id]");
+        if (!tr) return;
+
+        e.preventDefault();
+        e.stopPropagation();
+
+        const memberId = (tr.dataset.memberId || "").trim();
+        const cur = (nameEl.textContent || "").trim();
+
+        if (!memberId) return;
+        openModal(memberId, cur, nameEl);
+      });
+
+      // 保存
+      form.addEventListener("submit", async (e) => {
+        e.preventDefault();
+
+        const memberId = (hiddenId.value || "").trim();
+        const newName = (input.value || "").trim();
+
+        if (!memberId) return;
+        if (!newName) {
+          UI.showMessage("メンバー名を入力してください。", 2400);
+          return;
+        }
+
+        const fd = new FormData();
+        fd.append("club_id", clubId);
+        fd.append("admin_token", adminToken);
+        fd.append("member_id", memberId);
+        fd.append("display_name", newName);
+
+        try {
+          const data = await post(renameUrl, fd);
+          if (!data.ok) {
+            UI.showMessage("変更に失敗しました。", 2600);
+            return;
+          }
+
+          if (currentNameEl) currentNameEl.textContent = data.display_name || newName;
+
+          closeModal();
+          UI.showMessage("メンバー名を更新しました。", 1800);
+        } catch (err) {
+          console.error(err);
+          UI.showMessage("変更に失敗しました（ネットワーク）。", 2600);
+        }
+      });
+    })();
+
+
+    // fixed トグルのみ
+    table.addEventListener("click", async (e) => {
+      const btn = e.target.closest(".member-fixed-toggle");
+      if (!btn) return;
+
+      const tr = btn.closest("tr[data-member-id]");
+      if (!tr) return;
+
+      const memberId = tr.dataset.memberId;
+      const isOn = btn.classList.contains("is-on");
+      const next = !isOn;
+
+      const fd = new FormData();
+      fd.append("club_id", clubId);
+      fd.append("admin_token", adminToken);
+      fd.append("member_id", memberId);
+      fd.append("checked", next ? "true" : "false");
+
+      const data = await post(toggleFixedUrl, fd);
+      if (!data.ok) {
+        alert("更新に失敗しました: " + (data.error || ""));
+        return;
+      }
+
+      // UI反映
+      btn.classList.toggle("is-on", next);
+      const icon = btn.querySelector(".check-icon");
+      if (icon) {
+        icon.classList.toggle("check-on", next);
+        icon.classList.toggle("check-off", !next);
+      }
+    });
+  })();
+
+
 });

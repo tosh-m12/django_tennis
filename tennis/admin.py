@@ -58,20 +58,43 @@ class EventAdmin(admin.ModelAdmin):
 # Member
 # ============================================================
 
+
 @admin.register(Member)
 class MemberAdmin(admin.ModelAdmin):
     list_display = (
-        "id",
+        "id",          # DB用ID（内部）
         "club",
+        "member_no",   # ★クラブ内連番（表示・運用用）
         "display_name",
         "is_fixed",
-        "is_active",
-        "last_seen_at",
+        "created_at",
+        "updated_at",
     )
-    list_filter = ("club", "is_fixed", "is_active")
-    search_fields = ("display_name",)
-    autocomplete_fields = ("club",)
-    readonly_fields = ("created_at", "updated_at", "last_seen_at")
+
+    list_filter = (
+        "club",
+        "is_fixed",
+    )
+
+    search_fields = (
+        "display_name",
+    )
+
+    autocomplete_fields = (
+        "club",
+    )
+
+    readonly_fields = (
+        "member_no",
+        "created_at",
+        "updated_at",
+    )
+
+    ordering = (
+        "club",
+        "member_no",
+        "id",
+    )
 
 
 # ============================================================

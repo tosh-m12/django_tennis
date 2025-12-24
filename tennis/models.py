@@ -1,7 +1,7 @@
 # tennis/models.py
 import uuid
-from django.db import models
-from django.db.models import Q
+from django.db import models, transaction
+from django.db.models import Q, Max
 from django.utils import timezone
 
 
@@ -63,40 +63,31 @@ class Event(models.Model):
         t = self.title or "練習"
         return f"{self.date} {t}"
 
-
 class Member(models.Model):
-    """
-    クラブ名簿（固定/非固定）
-    - V1：同名別人・表記ゆれ許容。unique(club, display_name) は置かない。
-    - last_seen_at + 48h で非固定が整理対象（運用/バッチ側）
-    """
-    club = models.ForeignKey(
-        Club, on_delete=models.CASCADE, related_name="members"
-    )
-
+    club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name="members")
     display_name = models.CharField(max_length=100)
 
-    is_fixed = models.BooleanField(default=False)     # 幹事が設定
-    is_active = models.BooleanField(default=True)     # 整理/退会等で false
-    last_seen_at = models.DateTimeField(null=True, blank=True)
+    is_fixed = models.BooleanField(default=False)
+
+    # ★まずは nullable で追加（既存行があるため）
+    member_no = models.PositiveIntegerField(blank=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         indexes = [
-            models.Index(fields=["club", "is_fixed", "is_active"]),
-            models.Index(fields=["club", "last_seen_at"]),
+            models.Index(fields=["club", "is_fixed"]),
+            models.Index(fields=["club", "member_no"]),
         ]
         ordering = ["-is_fixed", "display_name", "id"]
-
-    def touch(self):
-        self.last_seen_at = timezone.now()
-        self.save(update_fields=["last_seen_at", "updated_at"])
+        constraints = [
+            # ★後でNOT NULLにしてから有効化でもOK（まずは付けても動くがNULLがある間は注意）
+            models.UniqueConstraint(fields=["club", "member_no"], name="uniq_member_no_per_club"),
+        ]
 
     def __str__(self) -> str:
         return f"{self.club_id}:{self.display_name}"
-
 
 class Attendance(models.TextChoices):
     YES = "yes", "参加"

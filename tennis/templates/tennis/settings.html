@@ -10,9 +10,7 @@
 
 {% block content %}
 <h2>クラブ設定画面</h2>
-<div style="margin:10px 0;">
-  <a href="{% url 'tennis:club_home_admin' club.public_token club.admin_token %}">← 戻る</a>
-</div>
+
 <hr>
 <h3>クラブ名編集</h3>
 
@@ -42,6 +40,53 @@
 
   </div>
 {% endif %}
+
+<hr>
+<h3>メンバー管理</h3>
+
+<div id="member-hooks"
+     data-club-id="{{ club.id }}"
+     data-admin-token="{{ club.admin_token }}"
+     data-add-url="{% url 'tennis:club_add_member' %}"
+     data-rename-url="{% url 'tennis:club_rename_member' %}"
+     data-toggle-fixed-url="{% url 'tennis:club_toggle_member_fixed' %}">
+</div>
+
+<table class="participants-table" id="members-table">
+  <colgroup>
+    <col style="width:60px;">
+    <col style="width:320px;">
+    <col style="width:120px;">
+  </colgroup>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>名前（クリックで変更）</th>
+      <th>固定</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for m in members %}
+      <tr data-member-id="{{ m.id }}" data-member-no="{{ m.member_no }}">
+        <td>{{ m.member_no }}</td>
+        <td>
+          <span class="member-name"
+                style="cursor:pointer; text-decoration:underline; font-weight:700;"
+                title="クリックして変更">
+            {{ m.display_name }}
+          </span>
+        </td>
+        <td>
+          <button type="button"
+                  class="check-btn toggle-check member-fixed-toggle {% if m.is_fixed %}is-on{% endif %}"
+                  data-kind="fixed">
+            <span class="check-icon {% if m.is_fixed %}check-on{% else %}check-off{% endif %}">✓</span>
+          </button>
+        </td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
 
 <hr>
 
@@ -145,8 +190,5 @@
     {% endfor %}
   </tbody>
 </table>
-
-<hr>
-<h3>メンバー管理</h3>
 
 {% endblock %}

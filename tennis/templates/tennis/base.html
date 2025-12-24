@@ -29,16 +29,31 @@
           <div class="topbar-title">
             {% if club %}
               {{ club.name }}
+              {% if is_admin %}
+                <span class="topbar-admin-badge">- 幹事モード</span>
+              {% endif %}
             {% else %}
               テニスサークル管理アプリ
             {% endif %}
           </div>
 
           <div class="topbar-actions">
-            {% if is_admin %}
-              <span class="topbar-admin-badge">幹事モード</span>
+            {% if club %}
+              {% if is_admin %}
+                <a href="{% url 'tennis:club_home_admin' club.public_token club.admin_token %}"
+                  class="topbar-link">
+                  ホーム
+                </a>
+              {% else %}
+                <a href="{% url 'tennis:club_home' club.public_token %}"
+                  class="topbar-link">
+                  ホーム
+                </a>
+              {% endif %}
+            {% endif %}
 
-              {# 設定ページ（幹事のみ） #}
+            {% if is_admin %}
+
               {% if club %}
                 <a href="{% url 'tennis:club_settings' club.public_token club.admin_token %}"
                   class="topbar-link">
@@ -46,8 +61,9 @@
                 </a>
               {% endif %}
             {% endif %}
-            {# 将来：ナビ・設定・ユーザー等 #}
+
           </div>
+
 
         </div>
       </div>

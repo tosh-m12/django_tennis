@@ -392,3 +392,30 @@ th {
   color: #666;
   font-size: 0.8rem;
 }
+
+/* =========================================
+   Topbar links (force white text)
+   ========================================= */
+.topbar .topbar-link {
+  color: #ffffff;
+}
+
+.topbar .topbar-link:hover {
+  color: #ffffff;
+  text-decoration: underline; /* ホバー時に分かりやすく */
+}
+
+/* =========================================
+   Topbar admin badge → link と同じ見た目に
+   ========================================= */
+.topbar-title .topbar-admin-badge {
+  font-weight: normal;          /* 太字をやめる */
+  font-size: inherit;           /* 親（クラブ名）に合わせる */
+  color: #ffffff;               /* リンクと同じ白 */
+  margin-left: 6px;             /* 「-」の後に少し余白 */
+}
+
+/* もし既存CSSで bold が強制されている場合の保険 */
+.topbar-admin-badge {
+  font-weight: normal !important;
+}
