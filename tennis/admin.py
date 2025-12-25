@@ -1,27 +1,21 @@
 from django.contrib import admin
-from .models import (
-    Club,
-    Event,
-    Member,
-    EventParticipant,
-    ClubFlagDefinition,
-    ParticipantFlag,
-    MatchSchedule,
-    MatchScheduleDraft,
-    MatchScore,
-    Substitution,
-    AuditLog,
-)
+from django.urls import reverse
+from django.utils.html import format_html
+
+from .models import Club, Event, Member, EventParticipant, ClubFlagDefinition, ParticipantFlag, \
+    MatchSchedule, MatchScheduleDraft, MatchScore, Substitution, AuditLog
 
 # ============================================================
 # Club
 # ============================================================
+
 
 @admin.register(Club)
 class ClubAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "name",
+        "club_home_urls",
         "public_token",
         "admin_token",
         "is_active",
@@ -31,6 +25,18 @@ class ClubAdmin(admin.ModelAdmin):
     list_filter = ("is_active",)
     readonly_fields = ("public_token", "admin_token", "created_at", "updated_at")
 
+    @admin.display(description="Home URLs")
+    def club_home_urls(self, obj: Club):
+        public_url = reverse("tennis:club_home", args=[obj.public_token])
+        admin_url = reverse("tennis:club_home_admin", args=[obj.public_token, obj.admin_token])
+
+        return format_html(
+            '<a href="{}" target="_blank" rel="noopener">一般用ホーム</a>'
+            ' ｜ '
+            '<a href="{}" target="_blank" rel="noopener">幹事用ホーム</a>',
+            public_url,
+            admin_url,
+        )
 
 # ============================================================
 # Event

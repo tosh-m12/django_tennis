@@ -1082,9 +1082,10 @@
         }, 0);
 
         const renderSpan = (v) => {
-          scoreSpan.textContent = String(v || "").trim() === "" ? "-" : String(v).trim();
+          const s = (v === null || v === undefined) ? "" : String(v).trim();
+          scoreSpan.textContent = (s === "") ? "-" : s;
         };
-
+        
         const finishEdit = async (cancel = false) => {
           const nextVal = cancel ? currentValue : (input.value || "").trim();
 
