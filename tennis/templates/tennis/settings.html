@@ -52,41 +52,48 @@
      data-toggle-fixed-url="{% url 'tennis:club_toggle_member_fixed' %}">
 </div>
 
-<table class="participants-table" id="members-table">
-  <colgroup>
-    <col style="width:60px;">
-    <col style="width:320px;">
-    <col style="width:120px;">
-  </colgroup>
-  <thead>
-    <tr>
-      <th>ID</th>
-      <th>名前（クリックで変更）</th>
-      <th>固定</th>
-    </tr>
-  </thead>
-  <tbody>
-    {% for m in members %}
-      <tr data-member-id="{{ m.id }}" data-member-no="{{ m.member_no }}">
-        <td>{{ m.member_no }}</td>
-        <td>
-          <span class="member-name"
-                style="cursor:pointer; text-decoration:underline; font-weight:700;"
-                title="クリックして変更">
-            {{ m.display_name }}
-          </span>
-        </td>
-        <td>
-          <button type="button"
-                  class="check-btn toggle-check member-fixed-toggle {% if m.is_fixed %}is-on{% endif %}"
-                  data-kind="fixed">
-            <span class="check-icon {% if m.is_fixed %}check-on{% else %}check-off{% endif %}">✓</span>
-          </button>
-        </td>
+<div class="members-admin-area">
+
+  <table class="participants-table" id="members-table">
+    <colgroup>
+      <col style="width:50px;">
+      <col style="width:200px;">
+      <col style="width:120px;">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>名前（クリックで変更）</th>
+        <th>固定メンバー</th>
       </tr>
-    {% endfor %}
-  </tbody>
-</table>
+    </thead>
+    <tbody>
+      {% for m in members %}
+        <tr data-member-id="{{ m.id }}" data-member-no="{{ m.member_no }}">
+          <td>{{ m.member_no }}</td>
+          <td>
+            <span class="member-name"
+                  style="cursor:pointer; text-decoration:underline; font-weight:700;"
+                  title="クリックして変更">
+              {{ m.display_name }}
+            </span>
+          </td>
+          <td>
+            <button type="button"
+                    class="check-btn toggle-check member-fixed-toggle {% if m.is_fixed %}is-on{% endif %}"
+                    data-kind="fixed">
+              <span class="check-icon {% if m.is_fixed %}check-on{% else %}check-off{% endif %}">✓</span>
+            </button>
+          </td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+{% if not members %}
+  <div class="participant-empty">名前がまだ登録されていません。</div>
+{% endif %}
 
 <hr>
 

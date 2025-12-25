@@ -465,3 +465,68 @@ settings でだけ注意文を出したい場合：
   </div>
 </div>
 {% endif %}
+
+
+<div id="substitute-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content event-modal modal-has-topbar"
+       role="dialog" aria-modal="true" aria-labelledby="substitute-modal-title">
+
+    <div class="modal-topbar">
+      <div class="modal-topbar-title" id="substitute-modal-title">代打を選択</div>
+      <button type="button"
+              id="close-substitute-modal"
+              class="modal-topbar-btn"
+              aria-label="閉じる">×</button>
+    </div>
+
+    <div class="modal-form">
+
+      <div class="field-group">
+        <div class="modal-select-wrap">
+          <select id="substitute-select" class="modal-select">
+            <option value="">-- 選択 --</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-pill btn-primary" id="substitute-ok-btn">適用</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+{# =========================
+   フラグ削除モーダル（選択式）
+   ========================= #}
+<div id="flag-delete-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content event-modal modal-has-topbar"
+       role="dialog" aria-modal="true" aria-labelledby="flag-delete-modal-title">
+
+    <div class="modal-topbar">
+      <div class="modal-topbar-title" id="flag-delete-modal-title">削除するフラグを選択</div>
+      <button type="button"
+              id="close-flag-delete-modal"
+              class="modal-topbar-btn"
+              aria-label="閉じる">×</button>
+    </div>
+
+    <div class="modal-form">
+
+      <div class="field-group">
+        <select id="flag-delete-select" class="modal-select" style="width:80%;">
+          <option value="">-- 選択 --</option>
+          {% for flag in flags %}
+            <option value="{{ flag.id }}">{{ flag.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-pill btn-primary" id="flag-delete-ok-btn">削除</button>
+      </div>
+
+    </div>
+  </div>
+</div>

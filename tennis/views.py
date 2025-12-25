@@ -1,4 +1,4 @@
-# tennis/views.py
+# tennis/views.pydt
 import calendar
 import json
 import datetime as dt
@@ -599,14 +599,16 @@ def club_home(request, club_public_token, club_admin_token=None):
 
 
 # ============================================================
-# Event (統合ビュー)
+# Event (統合ビュー) : 完成版 event_view
 # ============================================================
-
 
 def event_view(request, club_public_token, event_id, club_admin_token=None):
     club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
     event = get_object_or_404(Event, id=int(event_id), club=club)
 
+    # ------------------------------------------------------------
+    # admin 判定（token一致なら admin セッションを立てる）
+    # ------------------------------------------------------------
     is_admin = False
     if club_admin_token is not None:
         if club.admin_token != club_admin_token:
@@ -619,7 +621,9 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         .order_by("display_order", "id")
     )
 
-    # ★固定メンバーのみをデフォルト出欠行として表示
+    # ------------------------------------------------------------
+    # 固定メンバー（デフォルト行）
+    # ------------------------------------------------------------
     members = list(
         Member.objects.filter(club=club, is_fixed=True)
         .order_by("member_no", "id")
@@ -635,6 +639,9 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         )
     }
 
+    # ------------------------------------------------------------
+    # フラグ状態
+    # ------------------------------------------------------------
     pf_qs = ParticipantFlag.objects.filter(
         event_participant__event=event,
         flag_definition__club=club,
@@ -644,9 +651,12 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
     for pf in pf_qs:
         flag_states[pf["event_participant_id"]][pf["flag_definition_id"]] = bool(pf["is_on"])
 
+    # ------------------------------------------------------------
+    # 公開済み対戦表
+    # ------------------------------------------------------------
     ms = MatchSchedule.objects.filter(event=event, published=True).first()
 
-    # A案：GETのたびにDraft破棄（現行踏襲）
+    # A案：GETのたびに Draft 破棄（現行踏襲）
     MatchScheduleDraft.objects.filter(event=event).delete()
 
     fixed_rows = []
@@ -656,14 +666,18 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
             {
                 "member_id": m.id,
                 "ep_id": ep.id if ep else None,
-                "display_name": (ep.member.display_name if (ep and ep.member_id) else (ep.display_name if ep else m.display_name)),
+                "display_name": (
+                    ep.member.display_name
+                    if (ep and ep.member_id and ep.member)
+                    else (ep.display_name if ep else m.display_name)
+                ),
                 "attendance": ep.attendance if ep else None,
                 "comment": ep.comment if ep else "",
                 "participates_match": bool(ep.participates_match) if ep else False,
             }
         )
 
-    # ★固定メンバー以外はゲスト枠へ（非固定メンバー含む）
+    # 固定メンバー以外はゲスト枠へ（非固定メンバー含む）
     guest_eps = (
         EventParticipant.objects.filter(event=event)
         .exclude(member_id__in=member_ids)
@@ -674,8 +688,8 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
     guest_rows = [
         {
             "ep_id": ep.id,
-            "member_id": ep.member_id,  # ★追加（Noneの可能性あり）
-            "display_name": (ep.member.display_name if ep.member_id else ep.display_name),
+            "member_id": ep.member_id,  # None の可能性あり
+            "display_name": (ep.member.display_name if (ep.member_id and ep.member) else (ep.display_name or "")),
             "attendance": ep.attendance,
             "comment": ep.comment or "",
             "participates_match": bool(ep.participates_match),
@@ -683,6 +697,30 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         for ep in guest_eps
     ]
 
+    # ------------------------------------------------------------
+    # 代打候補（仕様：attendance=yes のみ / participates_match は無視）
+    # 公開済み対戦表のときだけ渡す（public/admin共通）
+    # ------------------------------------------------------------
+    sub_candidates = []
+    if ms:  # published schedule exists
+        sub_candidates_qs = (
+            EventParticipant.objects
+            .filter(event=event, attendance="yes")
+            .select_related("member")
+            .order_by("id")
+        )
+        sub_candidates = [
+            {
+                "ep_id": ep.id,
+                "name": (ep.member.display_name if (ep.member_id and ep.member) else (ep.display_name or str(ep.id))),
+            }
+            for ep in sub_candidates_qs
+        ]
+
+
+    # ------------------------------------------------------------
+    # 対戦表表示用
+    # ------------------------------------------------------------
     if ms:
         game_type = ms.game_type or GameType.DOUBLES
         num_rounds = int(ms.round_count or 8)
@@ -733,6 +771,7 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         "pill_match_count": match_count,
 
         "ep_name_map": _build_ep_name_map(event),
+        "sub_candidates": sub_candidates,  # ✅ 追加（幹事のときだけ中身あり）
         "show_topbar": True,
     }
     return render(request, "tennis/event.html", ctx)
@@ -786,17 +825,34 @@ def club_add_flag(request):
 
 @require_POST
 def club_delete_flag(request):
-    club_id = request.POST.get("club_id")
+    club_id = (request.POST.get("club_id") or "").strip()
+    admin_token = (request.POST.get("admin_token") or "").strip()
+    flag_id = (request.POST.get("flag_id") or "").strip()  # ★追加
+
     if not club_id:
         return JsonResponse({"error": "club_id required"}, status=400)
-    club = get_object_or_404(Club, id=club_id, is_active=True)
+    if not admin_token:
+        return JsonResponse({"error": "admin_token required"}, status=400)
+    if not flag_id:
+        return JsonResponse({"error": "flag_id required"}, status=400)
 
-    last_flag = ClubFlagDefinition.objects.filter(club=club, is_active=True).order_by("-display_order", "-id").first()
-    if not last_flag:
-        return JsonResponse({"error": "no_flag"}, status=400)
+    club = get_object_or_404(Club, id=int(club_id), is_active=True)
 
-    last_flag.is_active = False
-    last_flag.save(update_fields=["is_active", "updated_at"])
+    # ★幹事トークンチェック（必須）
+    if club.admin_token != admin_token:
+        return JsonResponse({"error": "admin token mismatch"}, status=400)
+
+    # ★選択されたフラグを削除（論理削除）
+    flag = get_object_or_404(
+        ClubFlagDefinition,
+        id=int(flag_id),
+        club=club,
+        is_active=True,
+    )
+
+    flag.is_active = False
+    flag.save(update_fields=["is_active", "updated_at"])
+
     return JsonResponse({"ok": True})
 
 
@@ -1639,3 +1695,248 @@ def club_toggle_member_fixed(request):
     m.save(update_fields=["is_fixed", "updated_at"])
     return JsonResponse({"ok": True, "member_id": m.id, "is_fixed": m.is_fixed})
 
+
+# ============================================================
+# Substitute (代打) : 完成版 substitute_slot
+# 仕様：
+# - 代打は1試合単位（round/court/team/slot）
+# - 代打候補：attendance=yes（participates_matchは無視）
+# - 同一ラウンド内に new_ep がいる場合は必ずスワップ（重複防止）
+# - new_ep がラウンド内にいない場合：old_ep を rests に回す
+# - 履歴は残さない
+# - スコアが入っていた場合：その試合のスコアは破棄
+# - rests を「全再計算」しない（他コートを壊さない）
+# - 一般画面でも操作可（admin_only ガード無し）
+# ============================================================
+
+@require_POST
+def substitute_slot(request):
+    event_id = request.POST.get("event_id")
+    round_no = request.POST.get("round_no")
+    court_no = request.POST.get("court_no")
+    team = request.POST.get("team")         # "1" or "2"
+    slot_index = request.POST.get("slot_index")
+    new_ep_id = request.POST.get("new_ep_id")
+
+    if not (event_id and round_no and court_no and team and slot_index and new_ep_id):
+        return JsonResponse({"ok": False, "error": "bad_request"}, status=400)
+
+    try:
+        event_id_i = int(event_id)
+        round_no_i = int(round_no)
+        court_no_i = int(court_no)
+        team_i = int(team)
+        slot_index_i = int(slot_index)
+        new_ep_id_i = int(new_ep_id)
+    except Exception:
+        return JsonResponse({"ok": False, "error": "bad_number"}, status=400)
+
+    if team_i not in (1, 2):
+        return JsonResponse({"ok": False, "error": "bad_team"}, status=400)
+
+    event = get_object_or_404(Event, id=event_id_i)
+
+    # ✅ attendance=yes のみ許可（participates_match は無視）
+    new_ep = (
+        EventParticipant.objects
+        .filter(id=new_ep_id_i, event=event)
+        .select_related("member")
+        .first()
+    )
+    if not new_ep:
+        return JsonResponse({"ok": False, "error": "no_participant"}, status=404)
+    if (new_ep.attendance or "") != "yes":
+        return JsonResponse({"ok": False, "error": "not_attendance_yes"}, status=409)
+
+    with transaction.atomic():
+        ms = (
+            MatchSchedule.objects
+            .select_for_update()
+            .filter(event=event, published=True)
+            .first()
+        )
+        if not ms:
+            return JsonResponse({"ok": False, "error": "no_published_schedule"}, status=409)
+
+        sched = ms.schedule_json or []
+        if not isinstance(sched, list):
+            return JsonResponse({"ok": False, "error": "bad_schedule"}, status=500)
+
+        # --- 対象ラウンド
+        target_round = None
+        for r in sched:
+            if not isinstance(r, dict):
+                continue
+            try:
+                rr = int(r.get("round", -1))
+            except Exception:
+                continue
+            if rr == round_no_i:
+                target_round = r
+                break
+        if not target_round:
+            return JsonResponse({"ok": False, "error": "no_round"}, status=404)
+
+        matches = target_round.get("matches") or []
+        if not isinstance(matches, list):
+            return JsonResponse({"ok": False, "error": "bad_matches"}, status=500)
+
+        # court_no は 1-based を前提に「-1 index」アクセス
+        if not (1 <= court_no_i <= len(matches)):
+            return JsonResponse({"ok": False, "error": "no_court"}, status=404)
+
+        m = matches[court_no_i - 1]
+        if not isinstance(m, dict):
+            return JsonResponse({"ok": False, "error": "bad_match"}, status=500)
+
+        team_key = "team1" if team_i == 1 else "team2"
+        if team_key not in m or not isinstance(m.get(team_key), list):
+            return JsonResponse({"ok": False, "error": "bad_team"}, status=500)
+
+        if not (0 <= slot_index_i < len(m[team_key])):
+            return JsonResponse({"ok": False, "error": "bad_slot"}, status=400)
+
+        # old_ep_id
+        try:
+            old_ep_id = int(m[team_key][slot_index_i])
+        except Exception:
+            return JsonResponse({"ok": False, "error": "bad_old_ep_id"}, status=500)
+
+        # 同一人物なら何もしない（スコア破棄もしない）
+        if old_ep_id == new_ep_id_i:
+            score_map = _build_score_map(ms)
+            schedule_for_view = _merge_scores_into_schedule(ms.schedule_json, score_map)
+            ctx = {
+                "event": event,
+                "schedule": schedule_for_view,
+                "schedule_json": None,
+                "ep_name_map": _build_ep_name_map(event),
+                "show_controls": True,
+                "pill_game_type": ms.game_type or GameType.DOUBLES,
+                "pill_num_courts": int(ms.court_count or 1),
+                "pill_num_rounds": int(ms.round_count or 8),
+                "pill_match_count": int(
+                    EventParticipant.objects.filter(event=event, participates_match=True).count()
+                ),
+                "publish_state": "published",
+            }
+            schedule_html = render_to_string("tennis/_schedule_block.html", ctx, request=request)
+            return JsonResponse({"ok": True, "schedule_html": schedule_html})
+
+        # --- new_ep が同一ラウンド内のどこにいるか（重複防止）
+        # found_pos: ("match", match_index, "team1|team2", slot_index) or ("rest", rest_index)
+        found_pos = None
+
+        # matches 内
+        for mi, mm in enumerate(matches):
+            if not isinstance(mm, dict):
+                continue
+            for tk in ("team1", "team2"):
+                lst = mm.get(tk) or []
+                if not isinstance(lst, list):
+                    continue
+                for si, pid in enumerate(lst):
+                    try:
+                        if int(pid) == new_ep_id_i:
+                            found_pos = ("match", mi, tk, si)
+                            break
+                    except Exception:
+                        continue
+                if found_pos:
+                    break
+            if found_pos:
+                break
+
+        # rests 内
+        rests = target_round.get("rests") or []
+        if not isinstance(rests, list):
+            rests = []
+
+        if not found_pos:
+            for ri, pid in enumerate(rests):
+                try:
+                    if int(pid) == new_ep_id_i:
+                        found_pos = ("rest", ri)
+                        break
+                except Exception:
+                    continue
+
+        # --- 代打反映
+        if found_pos:
+            # 1) new_ep が同一ラウンド内に既にいる → 必ずスワップ
+            if found_pos[0] == "match":
+                _t, mi, tk, si = found_pos
+                if isinstance(matches[mi], dict) and isinstance(matches[mi].get(tk), list) and 0 <= si < len(matches[mi][tk]):
+                    matches[mi][tk][si] = old_ep_id
+                else:
+                    return JsonResponse({"ok": False, "error": "bad_found_pos"}, status=500)
+            else:
+                _t, ri = found_pos
+                if 0 <= ri < len(rests):
+                    rests[ri] = old_ep_id
+                else:
+                    return JsonResponse({"ok": False, "error": "bad_found_pos"}, status=500)
+
+            m[team_key][slot_index_i] = new_ep_id_i
+
+            # rests の中に new_ep が残っていたら除去（念のため）
+            rests = [x for x in rests if str(x) != str(new_ep_id_i)]
+
+        else:
+            # 2) new_ep がラウンド内に居ない → 置換 + old を rests へ
+            m[team_key][slot_index_i] = new_ep_id_i
+
+            # old_ep を rests へ（重複防止）
+            existing_rest_ints = []
+            for x in rests:
+                try:
+                    existing_rest_ints.append(int(x))
+                except Exception:
+                    continue
+            if old_ep_id not in existing_rest_ints:
+                rests.append(old_ep_id)
+
+            # new_ep が rests にいた場合は除去（念のため）
+            rests = [x for x in rests if str(x) != str(new_ep_id_i)]
+
+        # 反映
+        target_round["matches"] = matches
+        target_round["rests"] = rests
+
+        ms.schedule_json = sched
+        ms.save(update_fields=["schedule_json", "updated_at"])
+
+        # ✅ 該当1試合のスコアは破棄（仕様確定）
+        MatchScore.objects.filter(
+            match_schedule=ms,
+            round_no=round_no_i,
+            court_no=court_no_i,
+        ).delete()
+
+    # =========================
+    # 返却HTML：公開済み対戦表を再描画
+    # =========================
+    ms2 = MatchSchedule.objects.filter(event=event, published=True).first()
+    if not ms2:
+        return JsonResponse({"ok": False, "error": "no_published_schedule"}, status=409)
+
+    score_map = _build_score_map(ms2)
+    schedule_for_view = _merge_scores_into_schedule(ms2.schedule_json, score_map)
+
+    ctx = {
+        "event": event,
+        "schedule": schedule_for_view,
+        "schedule_json": None,
+        "ep_name_map": _build_ep_name_map(event),
+        "show_controls": True,
+        "pill_game_type": ms2.game_type or GameType.DOUBLES,
+        "pill_num_courts": int(ms2.court_count or 1),
+        "pill_num_rounds": int(ms2.round_count or 8),
+        "pill_match_count": int(
+            EventParticipant.objects.filter(event=event, participates_match=True).count()
+        ),
+        "publish_state": "published",
+    }
+
+    schedule_html = render_to_string("tennis/_schedule_block.html", ctx, request=request)
+    return JsonResponse({"ok": True, "schedule_html": schedule_html})

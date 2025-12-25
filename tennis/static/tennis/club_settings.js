@@ -99,12 +99,13 @@ document.addEventListener("DOMContentLoaded", () => {
   // ============================================================
   // [B] フラグ追加 / 削除（保存あり）
   //  - 追加は「先に名前を決める」モーダル経由
+  //  - 削除は「選択モーダル」方式（ドロップダウンで対象選択）
   // ============================================================
   (function initFlagsAddDelete() {
     const addBtn = document.getElementById("club-add-flag-btn");
     const delBtn = document.getElementById("club-delete-flag-btn");
 
-    // --- 共通モーダル（_ui_modals.html）
+    // --- 追加モーダル（_ui_modals.html 側に存在する前提）
     const addModal = document.getElementById("flag-add-modal");
     const addCloseBtn = document.getElementById("close-flag-add-modal");
     const addForm = document.getElementById("flag-add-form");
@@ -130,16 +131,23 @@ document.addEventListener("DOMContentLoaded", () => {
     if (addBtn) {
       addBtn.addEventListener("click", (e) => {
         e.preventDefault();
+        e.stopPropagation();
         if (addBtn.disabled) return;
         openAddModal();
       });
     }
 
-    // × / 背景 / ESC で閉じる（共通ルール）
-    addCloseBtn?.addEventListener("click", closeAddModal);
+    // × / 背景 / ESC で閉じる（追加）
+    addCloseBtn?.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      closeAddModal();
+    });
+
     addModal?.addEventListener("click", (e) => {
       if (e.target === addModal) closeAddModal();
     });
+
     document.addEventListener("keydown", (e) => {
       if (e.key === "Escape" && addModal?.classList.contains("is-open")) {
         closeAddModal();
@@ -147,20 +155,20 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     // ------------------------
-    // モーダル submit → API
+    // 追加モーダル submit → API
     // ------------------------
     if (addForm && addBtn) {
       addForm.addEventListener("submit", async (e) => {
         e.preventDefault();
 
-        const name = (addInput.value || "").trim();
+        const name = (addInput?.value || "").trim();
         if (!name) {
           UI.showMessage("フラグ名を入力してください。", 2400);
           return;
         }
 
-        const clubId = addBtn.dataset.clubId;
-        const url = addBtn.dataset.addFlagUrl;
+        const clubId = (addBtn.dataset.clubId || "").trim();
+        const url = (addBtn.dataset.addFlagUrl || "").trim();
         const adminToken = getAdminTokenFromEl(addBtn);
         if (!clubId || !url) return;
 
@@ -196,47 +204,101 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     // ------------------------
-    // 削除（既存ロジックそのまま）
+    // 削除（選択モーダル方式）
     // ------------------------
-    if (delBtn) {
-      delBtn.addEventListener("click", () => {
+    (function initFlagDeleteModal() {
+      if (!delBtn) return;
+
+      const delModal = document.getElementById("flag-delete-modal");
+      const delCloseBtn = document.getElementById("close-flag-delete-modal");
+      const delSelect = document.getElementById("flag-delete-select");
+      const delOkBtn = document.getElementById("flag-delete-ok-btn");
+
+      if (!delModal || !delSelect || !delOkBtn) return;
+
+      function openDelModal() {
         if (delBtn.disabled) return;
 
-        UI.confirm("最後に追加したフラグを削除します。よろしいですか？", {
-          okText: "削除",
-          onOk: async () => {
-            const clubId = delBtn.dataset.clubId;
-            const url = delBtn.dataset.deleteFlagUrl;
-            if (!clubId || !url) return;
+        delSelect.value = "";
+        delModal.classList.add("is-open");
+        delModal.setAttribute("aria-hidden", "false");
+        setTimeout(() => delSelect.focus(), 0);
+      }
 
-            const adminToken = getAdminTokenFromEl(delBtn);
+      function closeDelModal() {
+        delModal.classList.remove("is-open");
+        delModal.setAttribute("aria-hidden", "true");
+        delSelect.value = "";
+      }
 
-            const fd = new FormData();
-            fd.append("club_id", clubId);
-            fd.append("admin_token", adminToken);
-
-            try {
-              const r = await fetch(url, {
-                method: "POST",
-                headers: { "X-CSRFToken": csrftoken },
-                body: fd,
-              });
-              const data = await r.json().catch(() => ({}));
-
-              if (!r.ok || data.error) {
-                UI.showMessage("削除できませんでした。", 2600);
-                return;
-              }
-
-              window.location.reload();
-            } catch (err) {
-              UI.showMessage("削除に失敗しました（ネットワーク）。", 2600);
-            }
-          },
-        });
+      // ボタン → 開く
+      delBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openDelModal();
       });
-    }
-  })();
+
+      // ×
+      delCloseBtn?.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeDelModal();
+      });
+
+      // 背景
+      delModal.addEventListener("click", (e) => {
+        if (e.target === delModal) closeDelModal();
+      });
+
+      // ESC
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && delModal.classList.contains("is-open")) closeDelModal();
+      });
+
+      // 削除実行
+      delOkBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const flagId = (delSelect.value || "").trim();
+        if (!flagId) {
+          UI.showMessage("削除するフラグを選択してください。", 2200);
+          return;
+        }
+
+        const clubId = (delBtn.dataset.clubId || "").trim();
+        const url = (delBtn.dataset.deleteFlagUrl || "").trim();
+        if (!clubId || !url) return;
+
+        const adminToken = getAdminTokenFromEl(delBtn);
+
+        const fd = new FormData();
+        fd.append("club_id", clubId);
+        fd.append("admin_token", adminToken);
+        fd.append("flag_id", flagId);
+
+        try {
+          const r = await fetch(url, {
+            method: "POST",
+            headers: { "X-CSRFToken": csrftoken },
+            body: fd,
+          });
+          const data = await r.json().catch(() => ({}));
+
+          if (!r.ok || data.error) {
+            UI.showMessage("削除できませんでした。", 2600);
+            return;
+          }
+
+          closeDelModal();
+          window.location.reload();
+        } catch (err) {
+          UI.showMessage("削除に失敗しました（ネットワーク）。", 2600);
+        }
+      });
+    })();
+  })(); // ★ここ重要：initFlagsAddDelete を必ず閉じる
+
 
   // ============================================================
   // [C] フラグ名称変更（保存あり）: eventの参加登録モーダルに揃える

@@ -24,30 +24,46 @@
     else alert(msg);
   }
 
-  // ★追記：confirm も UI モーダル化（無ければ window.confirm にフォールバック）
   function safeConfirm(message, opts = {}) {
-    // opts: { title, okText, cancelText }
-    return new Promise((resolve) => {
-      const ui = window.UI;
+    const ui = window.UI;
 
-      // UI.confirm がある前提：onOk / onCancel を受けられる形を想定
+    // 1) UI.confirm が Promise を返すならそれを使う
+    try {
       if (ui?.confirm) {
-        ui.confirm(message, {
+        const ret = ui.confirm(message, {
           title: opts.title || "確認",
           okText: opts.okText || "OK",
           cancelText: opts.cancelText || "キャンセル",
-          onOk: () => resolve(true),
-          onCancel: () => resolve(false),
-          // UI.confirm の実装によっては onClose がある場合もある
-          onClose: () => resolve(false),
+          onOk: opts.onOk,
+          onCancel: opts.onCancel,
+          onClose: opts.onClose,
         });
-        return;
-      }
 
-      // フォールバック（ブラウザ confirm）
-      resolve(window.confirm(message));
-    });
+        if (ret && typeof ret.then === "function") {
+          // Promise<boolean> を期待
+          return ret.then((v) => !!v).catch(() => false);
+        }
+
+        // 2) コールバック式の場合に備えて Promise ラップ
+        return new Promise((resolve) => {
+          ui.confirm(message, {
+            title: opts.title || "確認",
+            okText: opts.okText || "OK",
+            cancelText: opts.cancelText || "キャンセル",
+            onOk: () => resolve(true),
+            onCancel: () => resolve(false),
+            onClose: () => resolve(false),
+          });
+        });
+      }
+    } catch (e) {
+      console.warn("UI.confirm failed, fallback to window.confirm", e);
+    }
+
+    // 3) fallback
+    return Promise.resolve(window.confirm(message));
   }
+
 
   function getRowFromEl(el) {
     return el?.closest?.("tr.participant-row") || null;
@@ -457,9 +473,14 @@
           modal.setAttribute("aria-hidden", "false");
         };
         const close = () => {
+          // aria-hidden 警告対策：中にフォーカスが残ってたら外す
+          const active = document.activeElement;
+          if (active && modal.contains(active)) active.blur();
+
           modal.classList.remove("is-open");
           modal.setAttribute("aria-hidden", "true");
-          currentBtn = null;
+
+          // ❌ hideEditOnlyButtons() は出欠モーダルでは不要（未定義で落ちる）
         };
 
         closeBtn?.addEventListener("click", close);
@@ -542,8 +563,7 @@
 
               if (isAdmin) {
                 markChangedIfPublishedExists();
-                syncCourtsLimitByCurrentState();
-                ajaxGenerateSchedule(false); // 初回生成前は何もしない
+                updateSettingsPillsLive();   // ★ピルだけ更新（対戦表は更新しない）
               }
 
               close();
@@ -649,24 +669,95 @@
       return c;
     }
 
-    function syncCourtsLimitByCurrentState() {
-      const input = document.getElementById("id_num_courts");
-      if (!input) return;
+    // ============================================================
+    // [ADMIN] pills live update (NO schedule generation)
+    // ============================================================
+    let courtsManuallySet = false;
+    let lastAutoCourts = null;
 
+    function computeDefaultCourtsByCount(matchCount) {
+      // ★要求仕様：<4 → 0 / 4-7 → 1 / 8+ → 2（どれだけ多くてもデフォルトは2）
+      if (matchCount < 4) return 0;
+      if (matchCount < 8) return 1;
+      return 2;
+    }
+
+    function getCourtsMaxByCurrentState() {
       const gt = document.getElementById("id_game_type")?.value || "doubles";
       const matchCount = getMatchCountFromCheckboxes();
       const perCourt = gt === "singles" ? 2 : 4;
 
-      let maxCourts = 1;
-      if (matchCount >= perCourt) maxCourts = Math.max(1, Math.floor(matchCount / perCourt));
-      if (matchCount === 0) maxCourts = 1;
+      // 0人～(perCourt-1)人 → 0面
+      let maxCourts = Math.floor(matchCount / perCourt);
+      if (maxCourts < 0) maxCourts = 0;
+      if (maxCourts > 8) maxCourts = 8;
+      return maxCourts;
+    }
 
+    function syncCourtsLimitByCurrentState() {
+      const input = document.getElementById("id_num_courts");
+      if (!input) return;
+
+      const matchCount = getMatchCountFromCheckboxes();
+      const maxCourts = getCourtsMaxByCurrentState();
+
+      input.min = "0";
       input.max = String(maxCourts);
 
-      let v = parseInt(input.value || "1", 10) || 1;
-      if (v < 1) v = 1;
+      const auto = computeDefaultCourtsByCount(matchCount);
+      const autoClamped = Math.min(auto, maxCourts);
+
+      let v = parseInt(input.value || "", 10);
+      if (Number.isNaN(v)) v = autoClamped;
+
+      // ★「手動で面数を変えていない」or「直近も自動値だった」場合は自動追従
+      const shouldAutoFollow = (!courtsManuallySet) || (lastAutoCourts !== null && v === lastAutoCourts);
+      if (shouldAutoFollow) {
+        v = autoClamped;
+      }
+
+      // clamp
+      if (v < 0) v = 0;
       if (v > maxCourts) v = maxCourts;
+
       input.value = String(v);
+      lastAutoCourts = autoClamped;
+    }
+
+    function updateSettingsPillsLive() {
+      const pillMatchCount = document.getElementById("pill-match-count");
+      const pillNumCourts = document.getElementById("pill-num-courts");
+      const pillNumRounds = document.getElementById("pill-num-rounds");
+      const pillGameType = document.getElementById("pill-game-type");
+
+      const matchCount = getMatchCountFromCheckboxes();
+
+      // ★面数の自動追従（ここで input.value が更新される）
+      syncCourtsLimitByCurrentState();
+
+      const courtsVal = parseInt(document.getElementById("id_num_courts")?.value || "0", 10) || 0;
+      const roundsVal = parseInt(document.getElementById("id_num_rounds")?.value || "10", 10) || 10;
+      const gt = document.getElementById("id_game_type")?.value || "doubles";
+
+      if (pillMatchCount) pillMatchCount.textContent = `${matchCount} 人`;
+      if (pillNumCourts) pillNumCourts.textContent = `${courtsVal} 面`;
+      if (pillNumRounds) pillNumRounds.textContent = `${roundsVal} ラウンド`;
+
+      // ついでにゲーム種別もピルは同期（生成はしない）
+      if (pillGameType) {
+        pillGameType.classList.remove("pill-singles", "pill-doubles");
+        if (gt === "singles") {
+          pillGameType.classList.add("pill-singles");
+          pillGameType.textContent = "シングルス";
+        } else {
+          pillGameType.classList.add("pill-doubles");
+          pillGameType.textContent = "ダブルス";
+        }
+      }
+
+      // モーダル内の人数表示も同期（生成はしない）
+      const modalCountPill = document.querySelector("#match-settings-modal .count-pill");
+      if (modalCountPill) modalCountPill.textContent = String(matchCount);
     }
 
     function collectMatchParticipantEpIds() {
@@ -826,8 +917,7 @@
 
           if (isAdmin) {
             markChangedIfPublishedExists();
-            syncCourtsLimitByCurrentState();
-            ajaxGenerateSchedule(false); // 初回生成前は何もしない
+            updateSettingsPillsLive();   // ★ピルだけ更新
           }
         } catch {
           btn.classList.toggle("is-on", !willOn);
@@ -1154,17 +1244,22 @@
     };
 
     // ============================================================
-    // [ADMIN] イベントメタ編集：club-event-modal を流用
+    // [ADMIN] イベントメタ編集：club-event-modal を流用（完成版 / 修正版）
+    //  - metaBar クリックで編集モーダルを開く（←欠けていた）
+    //  - dirty判定/hidden time 同期/submit制御をブロック内に内包（←未定義呼び出し根絶）
+    //  - 中止/復活は「先に編集モーダルを閉じて」confirm → okなら更新 → reload
     // ============================================================
     if (isAdmin) {
       const metaBar = document.getElementById("event-meta-bar");
       const hooks = document.getElementById("event-edit-hooks");
 
       const updateUrl =
-        (hooks?.dataset?.updateUrl || "").trim() || (metaBar?.dataset?.updateUrl || "").trim();
+        (hooks?.dataset?.updateUrl || "").trim() ||
+        (metaBar?.dataset?.updateUrl || "").trim();
 
       const adminToken =
-        (hooks?.dataset?.adminToken || "").trim() || (metaBar?.dataset?.adminToken || "").trim();
+        (hooks?.dataset?.adminToken || "").trim() ||
+        (metaBar?.dataset?.adminToken || "").trim();
 
       const modal = document.getElementById("club-event-modal");
       const closeBtn = document.getElementById("club-event-modal-close");
@@ -1172,7 +1267,8 @@
 
       const cancelToggleBtn = document.getElementById("club-event-cancel-toggle");
       const submitBtn =
-        document.getElementById("club-event-submit") || form?.querySelector?.('button[type="submit"]');
+        document.getElementById("club-event-submit-btn") ||
+        form?.querySelector?.('button[type="submit"]');
 
       const mode = document.getElementById("club-event-mode");
       const eventIdInput = document.getElementById("club-event-event-id");
@@ -1196,40 +1292,42 @@
       if (!modal) console.warn("[event-edit] club-event-modal missing (check _ui_modals include)");
       if (!form) console.warn("[event-edit] club-event-form missing");
       if (!updateUrl) console.warn("[event-edit] updateUrl missing (check event-edit-hooks / dataset)");
-      if (!adminToken)
-        console.warn("[event-edit] adminToken missing (check event-edit-hooks / dataset)");
+      if (!adminToken) console.warn("[event-edit] adminToken missing (check event-edit-hooks / dataset)");
 
-      if (metaBar && modal && form && updateUrl && adminToken) {
+      if (!(metaBar && modal && form && updateUrl && adminToken)) {
+        // 必須不足なら何もしない（JS全体を落とさない）
+      } else {
         let watchersAttached = false;
         let initialSnapshot = null;
         let isDirty = false;
 
-        const open = () => {
+        function showEditOnlyButtons() {
+          if (cancelToggleBtn) cancelToggleBtn.style.display = "inline-flex";
+        }
+        function hideEditOnlyButtonsSafe() {
+          if (cancelToggleBtn) cancelToggleBtn.style.display = "none";
+        }
+
+        function openModal() {
           modal.classList.add("is-open");
           modal.setAttribute("aria-hidden", "false");
-        };
+        }
 
-        const showEditOnlyButtons = () => {
-          if (cancelToggleBtn) cancelToggleBtn.style.display = "inline-flex";
-        };
+        function closeModal() {
+          const active = document.activeElement;
+          if (active && modal.contains(active)) active.blur();
 
-        const hideEditOnlyButtons = () => {
-          if (cancelToggleBtn) cancelToggleBtn.style.display = "none";
-        };
-
-        const close = () => {
           modal.classList.remove("is-open");
           modal.setAttribute("aria-hidden", "true");
-          hideEditOnlyButtons();
-          if (mode) mode.value = "create"; // ★重要：閉じたら戻す（状態残り防止）
-        };
+          hideEditOnlyButtonsSafe();
+        }
 
-        closeBtn?.addEventListener("click", close);
+        closeBtn?.addEventListener("click", closeModal);
         modal.addEventListener("click", (ev) => {
-          if (ev.target === modal) close();
+          if (ev.target === modal) closeModal();
         });
         document.addEventListener("keydown", (ev) => {
-          if (ev.key === "Escape" && modal.classList.contains("is-open")) close();
+          if (ev.key === "Escape" && modal.classList.contains("is-open")) closeModal();
         });
 
         function setCancelToggleUI(cancelled) {
@@ -1242,18 +1340,17 @@
           const hh = [...Array(24)].map((_, i) => String(i).padStart(2, "0"));
           const mm = ["00", "15", "30", "45"];
           [sh, eh].forEach((sel) => {
-            if (sel)
-              sel.innerHTML = hh.map((v) => `<option value="${v}">${v}</option>`).join("");
+            if (sel) sel.innerHTML = hh.map((v) => `<option value="${v}">${v}</option>`).join("");
           });
           [sm, em].forEach((sel) => {
-            if (sel)
-              sel.innerHTML = mm.map((v) => `<option value="${v}">${v}</option>`).join("");
+            if (sel) sel.innerHTML = mm.map((v) => `<option value="${v}">${v}</option>`).join("");
           });
         }
 
         function setTimeToSelects(startHHMM, endHHMM) {
           const [sH, sM] = (startHHMM || "").split(":");
           const [eH, eM] = (endHHMM || "").split(":");
+
           if (sH && sh) sh.value = sH;
           if (sM && sm) sm.value = sM;
           if (eH && eh) eh.value = eH;
@@ -1279,19 +1376,6 @@
           };
         }
 
-        function setSubmitState(editMode, dirty) {
-          if (!submitBtn) return;
-          if (!editMode) return;
-
-          submitBtn.textContent = "更新";
-
-          const disabled = !dirty;
-          submitBtn.disabled = disabled;
-
-          submitBtn.classList.toggle("pill-disabled", disabled);
-          submitBtn.classList.toggle("is-disabled", disabled);
-        }
-
         function computeDirty() {
           if (!initialSnapshot) return false;
           const cur = snapshotNow();
@@ -1301,6 +1385,18 @@
             cur.start !== initialSnapshot.start ||
             cur.end !== initialSnapshot.end
           );
+        }
+
+        function setSubmitState(editMode, dirty) {
+          if (!submitBtn) return;
+          if (!editMode) return;
+
+          submitBtn.textContent = "更新";
+
+          const disabled = !dirty;
+          submitBtn.disabled = disabled;
+          submitBtn.classList.toggle("pill-disabled", disabled);
+          submitBtn.classList.toggle("is-disabled", disabled);
         }
 
         function updateDirtyState() {
@@ -1322,81 +1418,14 @@
             el?.addEventListener("input", updateDirtyState);
             el?.addEventListener("change", updateDirtyState);
           });
-
           [sh, sm, eh, em].forEach((sel) => {
             sel?.addEventListener("change", updateDirtyState);
           });
         }
 
-        // ★中止/復活：submit の外で1回だけ登録（増殖させない）
-        if (cancelToggleBtn) {
-          cancelToggleBtn.addEventListener(
-            "click",
-            async (ev) => {
-              ev.preventDefault();
-              ev.stopPropagation();
-
-              const currentMode = (mode?.value || "create").trim();
-              if (currentMode !== "edit") return;
-
-              const nowCancelled = (cancelToggleBtn.dataset.cancelled || "0") === "1";
-              const nextCancelled = !nowCancelled;
-
-              const ok = await safeConfirm(
-                nextCancelled ? "このイベントを中止にしますか？" : "このイベントを復活させますか？",
-                {
-                  title: "確認",
-                  okText: nextCancelled ? "中止にする" : "復活させる",
-                  cancelText: "やめる",
-                }
-              );
-              if (!ok) return;
-
-
-              const prevDisabled = cancelToggleBtn.disabled;
-              cancelToggleBtn.disabled = true;
-
-              const fd = new FormData();
-              fd.set("event_id", eventId);
-              fd.set("admin_token", adminToken);
-              fd.set("cancelled", nextCancelled ? "1" : "0");
-
-              try {
-                const r = await fetch(updateUrl, {
-                  method: "POST",
-                  headers: { "X-CSRFToken": csrftoken },
-                  body: fd,
-                });
-                const data = await r.json().catch(() => ({}));
-                if (!r.ok || !data.ok) {
-                  console.error(data);
-                  safeShowMessage("中止状態の更新に失敗しました", 2600);
-                  return;
-                }
-
-                metaBar.dataset.cancelled = data.event.cancelled ? "1" : "0";
-                setCancelToggleUI(!!data.event.cancelled);
-
-                const metaText2 = document.getElementById("event-meta-text");
-                if (metaText2 && data.event.meta_text) metaText2.textContent = data.event.meta_text;
-
-                safeShowMessage(data.event.cancelled ? "中止にしました" : "復活しました", 1600);
-
-                // ★成功したら閉じる → リロード
-                close();
-                setTimeout(() => window.location.reload(), 600);
-              } catch (err) {
-                console.error(err);
-                safeShowMessage("中止状態の更新に失敗しました（ネットワーク）", 2600);
-              } finally {
-                cancelToggleBtn.disabled = prevDisabled;
-              }
-            },
-            true
-          );
-        }
-
-        // ★クリックで編集モード起動
+        // ============================================================
+        // ★開く：metaBar クリックで edit モード起動（←欠けていた）
+        // ============================================================
         metaBar.addEventListener("click", () => {
           if (mode) mode.value = "edit";
           if (titleEl) titleEl.textContent = "イベント編集";
@@ -1406,7 +1435,7 @@
           const cancelled = (metaBar.dataset.cancelled || "").trim() === "1";
           setCancelToggleUI(cancelled);
 
-          if (eventIdInput) eventIdInput.value = eventId;
+          if (eventIdInput) eventIdInput.value = String(eventId);
 
           const d = (metaBar.dataset.date || "").trim();
           const t = (metaBar.dataset.title || "").trim();
@@ -1425,34 +1454,52 @@
 
           attachDirtyWatchersOnce();
           syncHiddenTime();
+
           initialSnapshot = snapshotNow();
           isDirty = false;
           setSubmitState(true, false);
 
-          open();
+          openModal();
         });
 
-        // ★submit（編集のみ横取り）
-        form.addEventListener(
-          "submit",
+        // ============================================================
+        // 中止/復活：先に close → confirm → okなら更新
+        // ============================================================
+        modal.addEventListener(
+          "click",
           async (ev) => {
-            const currentMode = (mode?.value || "create").trim();
-            if (currentMode !== "edit") return;
+            const btn = ev.target.closest("#club-event-cancel-toggle");
+            if (!btn) return;
 
             ev.preventDefault();
+            ev.stopPropagation();
 
-            syncHiddenTime();
-            if (!computeDirty()) {
-              safeShowMessage("変更がありません", 1600);
+            const nowCancelled = (btn.dataset.cancelled || "0") === "1";
+            const nextCancelled = !nowCancelled;
+
+            closeModal();
+
+            const ok = await safeConfirm(
+              nextCancelled ? "このイベントを中止しますか？" : "このイベントを復活させますか？",
+              {
+                title: "確認",
+                okText: nextCancelled ? "中止する" : "復活する",
+                cancelText: "やめる",
+              }
+            );
+
+            if (!ok) {
+              openModal();
               return;
             }
 
-            const prevDisabled = submitBtn?.disabled;
-            if (submitBtn) submitBtn.disabled = true;
+            const prevDisabled = btn.disabled;
+            btn.disabled = true;
 
-            const fd = new FormData(form);
-            fd.set("event_id", eventId);
+            const fd = new FormData();
+            fd.set("event_id", String(eventId));
             fd.set("admin_token", adminToken);
+            fd.set("cancelled", nextCancelled ? "1" : "0");
 
             try {
               const r = await fetch(updateUrl, {
@@ -1461,62 +1508,269 @@
                 body: fd,
               });
               const data = await r.json().catch(() => ({}));
-              if (!r.ok || !data.ok) {
-                console.error(data);
-                safeShowMessage("イベント更新に失敗しました", 2600);
-                if (submitBtn) submitBtn.disabled = !!prevDisabled;
-                return;
-              }
+              if (!r.ok || !data.ok) throw new Error("not ok");
 
-              metaBar.dataset.date = data.event.date || "";
-              metaBar.dataset.title = data.event.title || "";
-              metaBar.dataset.place = data.event.place || "";
-              metaBar.dataset.start = data.event.start_time || "";
-              metaBar.dataset.end = data.event.end_time || "";
-              if (data.event.cancelled !== undefined) {
-                metaBar.dataset.cancelled = data.event.cancelled ? "1" : "0";
-                setCancelToggleUI(!!data.event.cancelled);
-              }
+              metaBar.dataset.cancelled = data.event.cancelled ? "1" : "0";
+              setCancelToggleUI(!!data.event.cancelled);
 
-              const metaText2 = document.getElementById("event-meta-text");
-              if (metaText2 && data.event.meta_text) metaText2.textContent = data.event.meta_text;
-
-              const h2 = document.querySelector(".event-title");
-              if (h2) h2.textContent = data.event.title || "";
-              document.title = (data.event.title || "") + " - 幹事用";
-
-              initialSnapshot = {
-                title: (data.event.title || "").trim(),
-                place: (data.event.place || "").trim(),
-                start: (data.event.start_time || "").trim(),
-                end: (data.event.end_time || "").trim(),
-              };
-              isDirty = false;
-              setSubmitState(true, false);
-
-              close();
-              safeShowMessage("更新しました", 1600);
-
-              try {
-                localStorage.setItem(
-                  "tennis_event_updated",
-                  JSON.stringify({
-                    club_id: data.event.club_id,
-                    event_id: data.event.id,
-                    updated_at: Date.now(),
-                  })
-                );
-              } catch {}
+              safeShowMessage(data.event.cancelled ? "中止にしました" : "復活しました", 1600);
+              setTimeout(() => window.location.reload(), 1600);
             } catch (err) {
               console.error(err);
-              safeShowMessage("イベント更新に失敗しました（ネットワーク）", 2600);
-              if (submitBtn) submitBtn.disabled = !!prevDisabled;
+              safeShowMessage("中止状態の更新に失敗しました", 2600);
+              openModal();
+            } finally {
+              btn.disabled = prevDisabled;
             }
           },
           true
         );
+
+        // ============================================================
+        // submit（編集のみ）
+        // ============================================================
+        form.addEventListener("submit", async (ev) => {
+          const currentMode = (mode?.value || "create").trim();
+          if (currentMode !== "edit") return;
+
+          ev.preventDefault();
+
+          syncHiddenTime();
+          if (!computeDirty()) {
+            safeShowMessage("変更がありません", 1600);
+            return;
+          }
+
+          const prevDisabled = submitBtn?.disabled;
+          if (submitBtn) submitBtn.disabled = true;
+
+          const fd = new FormData(form);
+          fd.set("event_id", String(eventId));
+          fd.set("admin_token", adminToken);
+
+          try {
+            const r = await fetch(updateUrl, {
+              method: "POST",
+              headers: { "X-CSRFToken": csrftoken },
+              body: fd,
+            });
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok || !data.ok) {
+              console.error(data);
+              safeShowMessage("イベント更新に失敗しました", 2600);
+              if (submitBtn) submitBtn.disabled = !!prevDisabled;
+              return;
+            }
+
+            metaBar.dataset.date = data.event.date || "";
+            metaBar.dataset.title = data.event.title || "";
+            metaBar.dataset.place = data.event.place || "";
+            metaBar.dataset.start = data.event.start_time || "";
+            metaBar.dataset.end = data.event.end_time || "";
+            if (data.event.cancelled !== undefined) {
+              metaBar.dataset.cancelled = data.event.cancelled ? "1" : "0";
+              setCancelToggleUI(!!data.event.cancelled);
+            }
+
+            const metaText2 = document.getElementById("event-meta-text");
+            if (metaText2 && data.event.meta_text) metaText2.textContent = data.event.meta_text;
+
+            const h2 = document.querySelector(".event-title");
+            if (h2) h2.textContent = data.event.title || "";
+            document.title = (data.event.title || "") + " - 幹事用";
+
+            initialSnapshot = {
+              title: (data.event.title || "").trim(),
+              place: (data.event.place || "").trim(),
+              start: (data.event.start_time || "").trim(),
+              end: (data.event.end_time || "").trim(),
+            };
+            isDirty = false;
+            setSubmitState(true, false);
+
+            closeModal();
+            safeShowMessage("更新しました", 1600);
+
+            try {
+              localStorage.setItem(
+                "tennis_event_updated",
+                JSON.stringify({
+                  club_id: data.event.club_id,
+                  event_id: data.event.id,
+                  updated_at: Date.now(),
+                })
+              );
+            } catch {}
+          } catch (err) {
+            console.error(err);
+            safeShowMessage("イベント更新に失敗しました（ネットワーク）", 2600);
+            if (submitBtn) submitBtn.disabled = !!prevDisabled;
+          }
+        });
       }
     }
+
+    // ============================================================
+    // [COMMON] 代打（名前カード click → modal → apply）【完成版】
+    //  - 公開済み（canEditScore=1）なら一般画面でも可能
+    //  - data-substitute-url と sub-candidates-json が必須
+    // ============================================================
+    const subUrl = (participantsTable.dataset.substituteUrl || "").trim();
+    const subModal = document.getElementById("substitute-modal");
+    const subClose = document.getElementById("close-substitute-modal");
+    const subOk = document.getElementById("substitute-ok-btn");
+    const subSelect = document.getElementById("substitute-select");
+    const candScript = document.getElementById("sub-candidates-json");
+
+    let subTarget = null; // {roundNo,courtNo,team,slotIndex,oldEpId}
+
+    function openSub() {
+      if (!subModal) return;
+      subModal.classList.add("is-open");
+      subModal.setAttribute("aria-hidden", "false");
+    }
+
+    function closeSub() {
+      if (!subModal) return;
+      const active = document.activeElement;
+      if (active && subModal.contains(active)) active.blur();
+
+      subModal.classList.remove("is-open");
+      subModal.setAttribute("aria-hidden", "true");
+
+      subTarget = null;
+      if (subSelect) subSelect.value = "";
+    }
+
+    // 候補を select に詰める（attendance=yes 想定）
+    (function initSubCandidatesOnce() {
+      if (!subSelect) return;
+
+      // 既に option が入っているなら二重投入しない
+      if (subSelect.options.length > 1) return;
+
+      if (!candScript) {
+        console.warn("[substitute] sub-candidates-json not found");
+        return;
+      }
+
+      try {
+        const cands = JSON.parse((candScript.textContent || "[]").trim() || "[]");
+        cands.forEach((c) => {
+          const opt = document.createElement("option");
+          opt.value = String(c.ep_id);
+          opt.textContent = c.name || String(c.ep_id);
+          subSelect.appendChild(opt);
+        });
+      } catch (e) {
+        console.warn("failed to parse sub-candidates-json", e);
+      }
+    })();
+
+    // モーダル閉じ
+    subClose?.addEventListener("click", closeSub);
+    subModal?.addEventListener("click", (ev) => {
+      if (ev.target === subModal) closeSub();
+    });
+    document.addEventListener("keydown", (ev) => {
+      if (ev.key === "Escape" && subModal?.classList.contains("is-open")) closeSub();
+    });
+
+    // 名前カード click → 代打モーダル
+    document.addEventListener("click", (ev) => {
+      const card = ev.target.closest(".js-sub-slot");
+      if (!card) return;
+
+      const scheduleArea = document.getElementById("schedule-area");
+      if (!scheduleArea || !scheduleArea.contains(card)) return;
+
+      // 公開済みでのみ代打可能（一般もOK）
+      const canEditScore = (scheduleArea.dataset.canEditScore || "0") === "1";
+      if (!canEditScore) {
+        safeShowMessage("未公開の対戦表では代打設定できません（公開後に可能）", 2200);
+        return;
+      }
+
+      if (!subUrl) {
+        safeShowMessage("代打URLが設定されていません（participants-table の data-substitute-url）", 3000);
+        return;
+      }
+
+      // 候補ゼロガード（placeholder 1個だけの場合）
+      if (!subSelect || subSelect.options.length <= 1) {
+        safeShowMessage("代打候補がありません（出席=○ の人がいません）", 2200);
+        return;
+      }
+
+      subTarget = {
+        roundNo: (card.dataset.roundNo || "").trim(),
+        courtNo: (card.dataset.courtNo || "").trim(),
+        team: (card.dataset.team || "").trim(),
+        slotIndex: (card.dataset.slotIndex || "").trim(),
+        oldEpId: (card.dataset.epId || "").trim(),
+      };
+
+      openSub();
+    });
+
+    // 適用
+    subOk?.addEventListener("click", async () => {
+      if (!subTarget) return;
+
+      const newEpId = (subSelect?.value || "").trim();
+      if (!newEpId) {
+        safeShowMessage("代打を選択してください", 2000);
+        return;
+      }
+
+      // 同一人物選択は何もしない（サーバ側でも弾いてるが、UX的に先に止める）
+      if (subTarget.oldEpId && String(subTarget.oldEpId) === String(newEpId)) {
+        safeShowMessage("同じ人が選択されています", 1800);
+        return;
+      }
+
+      const fd = new FormData();
+      fd.append("event_id", eventId);
+      fd.append("round_no", subTarget.roundNo);
+      fd.append("court_no", subTarget.courtNo);
+      fd.append("team", subTarget.team);
+      fd.append("slot_index", subTarget.slotIndex);
+      fd.append("new_ep_id", newEpId);
+
+      // 安全性向上（サーバで一致確認に使える）
+      if (subTarget.oldEpId) fd.append("old_ep_id", subTarget.oldEpId);
+
+      try {
+        const r = await fetch(subUrl, {
+          method: "POST",
+          headers: { "X-CSRFToken": csrftoken },
+          body: fd,
+        });
+
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || !data.ok) {
+          console.error("substitute failed:", r.status, data);
+          safeShowMessage("代打の反映に失敗しました", 2600);
+          return;
+        }
+
+        // schedule 差し替え
+        const scheduleArea = document.getElementById("schedule-area");
+        if (scheduleArea && typeof data.schedule_html === "string") {
+          scheduleArea.innerHTML = data.schedule_html;
+        }
+
+        // 公開済み対戦表が変更された（幹事なら再公開導線へ）
+        if (isAdmin) markChangedIfPublishedExists();
+
+        safeShowMessage("代打を反映しました。（スコアは入れ直してください）", 2200);
+        closeSub();
+      } catch (e) {
+        console.error(e);
+        safeShowMessage("代打の反映に失敗しました（ネットワーク）", 2600);
+      }
+    });
+
 
     // init
     if (isAdmin) syncCourtsLimitByCurrentState();

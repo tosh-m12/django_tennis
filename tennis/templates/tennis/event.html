@@ -78,6 +78,7 @@
     data-add-guest-url="{% url 'tennis:add_guest_participant' %}"
     data-publish-url="{% url 'tennis:publish_schedule' %}"
     data-save-score-url="{% url 'tennis:save_match_score' %}"
+    data-substitute-url="{% url 'tennis:substitute_slot' %}"
   >
     <colgroup>
       <col style="width: 40px;">
@@ -104,8 +105,6 @@
     </thead>
 
     <tbody>
-
-
       {# ============= 固定メンバー（未登録行=ep_id空の可能性あり） ============= #}
       {% for row in fixed_rows %}
       <tr class="participant-row"
@@ -253,8 +252,17 @@
         </td>
       </tr>
       {% endfor %}
+
     </tbody>
+
   </table>
+
+  {{ sub_candidates|json_script:"sub-candidates-json" }}
+
+      {# ★固定もゲストも0件ならメッセージ表示 #}
+      {% if not fixed_rows and not guest_rows %}
+        <div class="participant-empty">名前がまだ登録されていません。</div>
+      {% endif %}
 
   <hr>
 

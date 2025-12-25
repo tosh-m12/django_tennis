@@ -37,7 +37,12 @@
 
                   <div class="tb-team">
                     {% for ep_id in m.team1 %}
-                      <div class="tb-player-card">
+                      <div class="tb-player-card js-sub-slot"
+                          data-round-no="{{ r_no }}"
+                          data-court-no="{{ c_no }}"
+                          data-team="1"
+                          data-slot-index="{{ forloop.counter0 }}"
+                          data-ep-id="{{ ep_id }}">
                         {% with nm=ep_name_map|get_item:ep_id %}
                           {% if nm %}{{ nm }}{% else %}{{ ep_id }}{% endif %}
                         {% endwith %}
@@ -65,7 +70,12 @@
 
                   <div class="tb-team">
                     {% for ep_id in m.team2 %}
-                      <div class="tb-player-card">
+                      <div class="tb-player-card js-sub-slot"
+                          data-round-no="{{ r_no }}"
+                          data-court-no="{{ c_no }}"
+                          data-team="2"
+                          data-slot-index="{{ forloop.counter0 }}"
+                          data-ep-id="{{ ep_id }}">
                         {% with nm=ep_name_map|get_item:ep_id %}
                           {% if nm %}{{ nm }}{% else %}{{ ep_id }}{% endif %}
                         {% endwith %}

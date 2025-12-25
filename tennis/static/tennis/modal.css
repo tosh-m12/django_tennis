@@ -261,6 +261,11 @@
 .ui-confirm-body { margin: 12px 0 18px; color: #333; }
 .ui-confirm-actions { justify-content: flex-end; }
 
+#ui-message-modal.modal-backdrop,
+#ui-confirm-modal.modal-backdrop {
+  z-index: 3000; /* 1000 より上ならOK。念のため大きめ */
+}
+
 /* =========================================
    Event Modal (settings/club)
    - IMPORTANT: current "win" design = vertical time layout
@@ -558,4 +563,55 @@
 #club-event-submit-btn.pill-disabled::before,
 #club-event-submit-btn.pill-disabled::after {
   content: none !important;
+}
+
+/* =========================================
+   Substitute modal select (gray / borderless)
+   ========================================= */
+.modal-select-wrap {
+  position: relative;
+  width: 100%;
+  max-width: 520px;      /* 好みで */
+}
+
+.modal-select {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 15px;
+  line-height: 1.4;
+
+  background: #f3f4f6;   /* グレー背景 */
+  border: none;          /* 枠なし */
+  border-radius: 10px;
+
+  color: #111;
+  outline: none;
+  box-shadow: none;
+
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  cursor: pointer;
+}
+
+/* focus時もイベント作成モーダル寄せ */
+.modal-select:focus {
+  background: #eef0f3;
+}
+
+/* ▼ 擬似矢印 */
+.modal-select-wrap::after {
+  content: "▾";
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  color: #666;
+}
+
+#substitute-modal .modal-select-wrap {
+  width: 80%;
+  margin: 0 auto;   /* 中央寄せ */
 }

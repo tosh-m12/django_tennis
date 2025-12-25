@@ -67,5 +67,6 @@ urlpatterns = [
     path("api/club/add_member/", views.club_add_member, name="club_add_member"),
     path("api/club/rename_member/", views.club_rename_member, name="club_rename_member"),
     path("api/club/toggle_member_fixed/", views.club_toggle_member_fixed, name="club_toggle_member_fixed"),
+    path("api/substitute_slot/", views.substitute_slot, name="substitute_slot"),
 
 ]

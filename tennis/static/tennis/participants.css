@@ -326,3 +326,71 @@
 }
 
 
+/* ============================
+   settings：メンバー管理テーブル
+   ============================ */
+
+/* テーブル自体は左詰め */
+#members-table {
+  margin-left: 0;
+  margin-right: auto;
+}
+
+/* ヘッダ・セル内は中央寄せ */
+#members-table th,
+#members-table td {
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* 名前セル内の span も中央に */
+#members-table .member-name {
+  display: inline-block;
+  text-align: center;
+}
+
+/* 固定トグルの見た目安定 */
+#members-table .check-btn {
+  margin: 0 auto;
+}
+
+/* ============================
+   settings：メンバー管理テーブルは左詰め
+   （共通 .participants-table の margin:0 auto を上書き）
+   ============================ */
+#members-table.participants-table {
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
+
+/* セル内は中央寄せでOK */
+#members-table.participants-table th,
+#members-table.participants-table td {
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* settings: メンバー管理は左詰め（テーブル自体を縮める） */
+.members-admin-area{
+  text-align: left; /* inline-table を左に寄せる */
+}
+
+#members-table.participants-table{
+  width: fit-content !important;   /* ← これが効く */
+  max-width: 100%;
+  display: inline-table;          /* ← text-align に従って左に寄る */
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
+
+/* カラム内は中央寄せでOK */
+#members-table.participants-table th,
+#members-table.participants-table td{
+  text-align: center;
+  vertical-align: middle;
+}
+
+/* settings：メンバー管理 名前カラムだけ左寄せ（ヘッダー除外） */
+#members-table tbody td:nth-child(2) {
+  text-align: left;
+}
