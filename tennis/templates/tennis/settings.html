@@ -57,8 +57,8 @@
   <table class="participants-table" id="members-table">
     <colgroup>
       <col style="width:50px;">
-      <col style="width:200px;">
-      <col style="width:120px;">
+      <col style="width:160px;">
+      <col style="width:100px;">
     </colgroup>
     <thead>
       <tr>
@@ -89,6 +89,7 @@
       {% endfor %}
     </tbody>
   </table>
+
 </div>
 
 {% if not members %}
@@ -98,6 +99,8 @@
 <hr>
 
 <h3>出席表フォーマット設定</h3>
+
+
 
 <div class="flag-add-area">
   <button type="button"
@@ -126,76 +129,79 @@
   </small>
 </div>
 
-<table id="participants-table"
-       class="participants-table"
-       data-mode="club_settings_dummy"
-       data-club-id="{{ club.id }}"
-       data-admin-token="{{ club.admin_token }}"
-       data-rename-flag-url="{% url 'tennis:club_rename_flag' %}">
+<div class="participants-wrap">
 
-  <colgroup>
-    <col style="width: 40px;">     {# 連番 #}
-    <col style="width: 150px;">    {# 名前 #}
-    <col style="width: 70px;">     {# 出欠 #}
-    <col>                          {# 試合参加 #}
-    {% for flag in flags %}
-      <col>                        {# フラグ #}
-    {% endfor %}
-    <col style="width: 150px;">    {# コメント（名前と同じ固定幅） #}
-  </colgroup>
+  <table id="participants-table"
+        class="participants-table"
+        data-mode="club_settings_dummy"
+        data-club-id="{{ club.id }}"
+        data-admin-token="{{ club.admin_token }}"
+        data-rename-flag-url="{% url 'tennis:club_rename_flag' %}">
 
-  <thead>
-    <tr>
-      <th></th>
-      <th>名前</th>
-      <th>出欠</th>
-      <th>試合参加</th>
+    <colgroup>
+      <col style="width: 40px;">     {# 連番 #}
+      <col style="width: 150px;">    {# 名前 #}
+      <col style="width: 70px;">     {# 出欠 #}
+      <col>                          {# 試合参加 #}
       {% for flag in flags %}
-        <th class="flag-header" data-flag-id="{{ flag.id }}">
-          <span class="flag-name">{{ flag.name }}</span>
-        </th>
+        <col>                        {# フラグ #}
       {% endfor %}
-      <th>コメント</th>
-    </tr>
-  </thead>
+      <col style="width: 150px;">    {# コメント（名前と同じ固定幅） #}
+    </colgroup>
 
-  <tbody>
-    {% for i in "1234" %}
-    <tr>
-      <td class="participant-index">{{ forloop.counter }}</td>
+    <thead>
+      <tr>
+        <th></th>
+        <th>名前</th>
+        <th>出欠</th>
+        <th>試合参加</th>
+        {% for flag in flags %}
+          <th class="flag-header" data-flag-id="{{ flag.id }}">
+            <span class="flag-name">{{ flag.name }}</span>
+          </th>
+        {% endfor %}
+        <th>コメント</th>
+      </tr>
+    </thead>
 
-      <td><div class="tb-player-card-sm">&nbsp;</div></td>
+    <tbody>
+      {% for i in "1234" %}
+      <tr>
+        <td class="participant-index">{{ forloop.counter }}</td>
 
-      {# ★ 出欠：クリックでモーダル（〇×？） #}
-      <td class="attendance-cell">
-        <button type="button" class="attendance-btn" data-attendance="yes" aria-label="出欠">
-          <span class="attendance-icon attendance-yes">✓</span>
-        </button>
-      </td>
+        <td><div class="tb-player-card-sm">&nbsp;</div></td>
 
-      {# ★ 試合参加：ダミー操作OK／デフォルトON #}
-      <td class="check-cell">
-        <button type="button" class="check-btn toggle-check" data-default="on">
-          <span class="check-icon check-on">✓</span>
-        </button>
-      </td>
-
-      {# ★ フラグ：ダミー操作OK #}
-      {% for flag in flags %}
-        <td class="check-cell">
-          <button type="button" class="check-btn toggle-check">
-            <span class="check-icon check-off">✓</span>
+        {# ★ 出欠：クリックでモーダル（〇×？） #}
+        <td class="attendance-cell">
+          <button type="button" class="attendance-btn" data-attendance="yes" aria-label="出欠">
+            <span class="attendance-icon attendance-yes">✓</span>
           </button>
         </td>
-      {% endfor %}
 
-      {# ★ コメント：枠なしのインライン編集（ダミー入力） #}
-      <td class="comment-cell">
-        <div class="comment-editable" contenteditable="true"></div>
-      </td>
-    </tr>
-    {% endfor %}
-  </tbody>
-</table>
+        {# ★ 試合参加：ダミー操作OK／デフォルトON #}
+        <td class="check-cell">
+          <button type="button" class="check-btn toggle-check" data-default="on">
+            <span class="check-icon check-on">✓</span>
+          </button>
+        </td>
+
+        {# ★ フラグ：ダミー操作OK #}
+        {% for flag in flags %}
+          <td class="check-cell">
+            <button type="button" class="check-btn toggle-check">
+              <span class="check-icon check-off">✓</span>
+            </button>
+          </td>
+        {% endfor %}
+
+        {# ★ コメント：枠なしのインライン編集（ダミー入力） #}
+        <td class="comment-cell">
+          <div class="comment-editable" contenteditable="true"></div>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
 
 {% endblock %}

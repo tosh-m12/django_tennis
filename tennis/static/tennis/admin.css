@@ -124,34 +124,7 @@
     color: #333;
 }
 
-/* ラウンド内のコート群 */
-.tb-round-body {
-    padding: 4px 16px;
-    border-top: 1px solid #eee;     /* 上の線 */
-    border-bottom: 1px solid #eee;
-}
 
-.tb-court-row {
-    display: flex;
-    align-items: center;
-    padding: 8px 0;
-    border-top: 1px solid #eee;     /* コート間の線 */
-}
-
-.tb-court-row:first-child {
-    border-top: none;
-}
-
-.tb-court-row:last-child {
-    border-bottom: none;
-}
-
-/* 「Aコート」「Bコート」 */
-.tb-court-name {
-    width: 72px;
-    font-size: 0.9rem;
-    color: #555;
-}
 
 /* 4枚の名前カード＋中央vs */
 .tb-match-flex {
@@ -296,20 +269,7 @@
     text-align: center;
 }
 
-/* 対戦表の名前カードのミニ版 */
-.tb-player-card-sm {
-    display: inline-block;
-    width: 130px;      /* 対戦表より少し小さめ */
-    padding: 6px 10px;
-    border-radius: 6px;
-    border: 1px solid #555;
-    background: #fff;
-    text-align: center;
-    font-size: 0.9rem;
-    font-weight: 600;
-    box-sizing: border-box;
-    white-space: nowrap;
-}
+
 
 /* 行ホバー時の薄いハイライト */
 #participants-table tbody tr:hover td {

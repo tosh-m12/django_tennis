@@ -1,0 +1,253 @@
+/* =========================================================
+   Mobile-first fixes (Step 1)
+   ========================================================= */
+
+/* tennis/static/tennis/responsive.css */
+
+@media (max-width: 480px) {
+
+    /* .container{
+        padding: 0 8px;
+    } */
+
+  /* ===============================
+     [0] Event header
+     =============================== */
+
+  .event-head{
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .event-meta-bar{
+    margin-left: 0;
+    align-self: flex-start;
+    max-width: 100%;
+  }
+
+  .event-meta-text{
+    max-width: 100%;
+  }
+
+  /* ===============================
+     [0.5] Match settings bar
+     =============================== */
+
+  .match-settings-bar{
+    display: block;
+    margin: 10px 0 12px;
+  }
+
+  .match-pill-group{
+    display: flex;
+    flex-wrap: wrap;
+    gap: clamp(4px, 1.2vw, 8px);
+    align-items: center;
+    justify-content: flex-start;
+  }
+
+  .match-pill-group .settings-pill{
+    flex: 0 0 auto !important;
+    width: auto !important;
+    min-width: 0 !important;
+
+    font-size: clamp(0.92rem, 3.3vw, 1.05rem);
+    padding-block: clamp(4px, 1.2vw, 6px);
+    padding-inline: clamp(10px, 2.6vw, 14px);
+    line-height: 1.2;
+
+    box-shadow: 0 2px 0 #1f8e4a;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .publish-pill{
+    display: inline-flex;
+    margin-top: 20px;
+    margin-left: 0 !important;
+
+    font-size: clamp(0.92rem, 3.3vw, 1.05rem);
+    padding-block: clamp(4px, 1.2vw, 6px);
+    padding-inline: clamp(10px, 2.6vw, 14px);
+    line-height: 1.2;
+
+    box-shadow: 0 2px 0 #1f8e4a;
+  }
+
+  /* ===============================
+     [A] URL textbox
+     - Web版レイアウトは維持
+     - テキストボックス内だけ「折り返し禁止」
+     =============================== */
+
+  .url-textbox {
+    white-space: nowrap !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+
+    /* 以前の折り返し系を確実に無効化 */
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+  }
+
+  /* ===============================
+     [B] Participants / Members table
+     - Event participants: ALWAYS horizontal scroll on mobile
+     =============================== */
+
+  .event-page,
+  .container {
+    overflow-x: hidden;
+  }
+
+  /* スクロール面（event側 + settings側） */
+  .participants-area,
+  .participants-wrap,
+  .participants-section,
+  #participants-area,
+  #participants-wrap,
+  .members-admin-area {
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    text-align: left;
+    padding-bottom: 6px; /* スクロールバーが要素に被らない */
+  }
+
+  /* ★イベントページ：出席者リストは「中身幅を保持」して横スクロールさせる */
+  #participants-table {
+    display: inline-table !important;
+    width: max-content !important;  /* ← fit-content だと収まる時にスクロールにならない */
+    max-width: none !important;     /* ← 画面に押し込まない */
+    margin-left: 0 !important;
+    margin-right: auto !important;
+  }
+
+  /* ★設定ページ：メンバー管理表は中身幅で止める（必要なら横スクロール） */
+  #members-table {
+    display: inline-table !important;
+    width: fit-content !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: auto !important;
+  }
+
+  /* ===============================
+     [C] Schedule (対戦表)
+     =============================== */
+
+  .tb-round-body {
+    padding: 0;
+  }
+
+  /* 行全体を縦並び */
+  .tb-court-row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+    padding: 8px 0;
+  }
+
+  /* ★ 1コート / 2コート：横幅いっぱいのグレー帯 */
+  .tb-court-name {
+    width: 100%;
+    text-align: center;
+    margin: 0;
+
+    background: #f2f3f5;
+    padding: 4px 0;
+
+    font-weight: 700;
+    font-size: 0.8rem;
+    color: #333;
+  }
+
+  /* 試合本体 */
+  .tb-match-flex {
+    display: flex;
+    align-items: flex-start;   /* チームは上揃え */
+    justify-content: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    width: 100%;
+  }
+
+  /* 同チーム縦積み */
+  .tb-team {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 6px;
+  }
+
+  /* 名前カード：出欠リストと同等 */
+  .tb-player-card {
+    width: 110px !important;
+    padding: 6px 4px !important;
+    font-size: 0.9rem !important;
+    font-weight: 600;
+
+    white-space: normal !important;
+    word-break: break-word;
+    overflow-wrap: anywhere;
+  }
+
+  /* ★ - vs - を「上下中央」にする */
+  .tb-score-area {
+    min-width: 72px;
+    gap: 6px;
+
+    align-self: center;
+    margin-top: auto;
+    margin-bottom: auto;
+
+    padding-top: 0;
+  }
+
+  .tb-score {
+    width: 28px;
+  }
+
+  /* ===============================
+    Club home: ranking table (mobile) - truly minimal width
+    =============================== */
+
+  .rank-table-wrap{
+    max-width: 100%;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-bottom: 6px;
+  }
+
+  /* テーブルは「中身幅」 */
+  .rank-table{
+    display: inline-table;
+    width: max-content;
+    border-collapse: collapse;
+  }
+
+  /* ★インライン style="width:90px" 等を無効化して最小化 */
+  .rank-table th,
+  .rank-table td{
+    width: auto !important;      /* ← ここが本命 */
+    min-width: 0 !important;
+    max-width: none !important;
+
+    padding: 2px 4px;            /* さらに詰める */
+    /* font-size: 0.68rem; */
+    line-height: 1.2;
+    white-space: nowrap;         /* 折り返さず “必要幅” を安定させる */
+  }
+
+  /* 名前列だけ少し読みやすく（詰めすぎ防止） */
+  .rank-table th:nth-child(2),
+  .rank-table td:nth-child(2){
+    padding-left: 6px;
+    padding-right: 6px;
+    font-size: 0.72rem;
+  }
+
+}

@@ -137,6 +137,8 @@
 <h3>当月戦績</h3>
 <small style="color:#666;">※当月3試合以上が対象</small>
 
+
+
 {# ===== 表示可否判定 ===== #}
 {% with has_doubles=ranking_doubles.ranked|length has_singles=ranking_singles.ranked|length %}
 
@@ -145,79 +147,83 @@
     {# ===== doubles ===== #}
     {% if has_doubles %}
       <h4>ダブルス</h4>
-      <table>
-        <thead>
-          <tr>
-            <th style="width:60px;">順位</th>
-            <th style="text-align:left;">名前</th>
-            <th style="width:70px;">試合</th>
-            <th style="width:60px;">勝</th>
-            <th style="width:60px;">負</th>
-            <th style="width:60px;">分</th>
-            <th style="width:90px;">勝率</th>
-            <th style="width:90px;">GF</th>
-            <th style="width:90px;">GA</th>
-            <th style="width:90px;">ゲーム率</th>
-            <th style="width:90px;">得失点</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in ranking_doubles.ranked %}
+      <div class="rank-table-wrap">
+        <table class="rank-table">
+          <thead>
             <tr>
-              <td>{{ row.rank }}</td>
-              <td style="text-align:left;">{{ row.name }}</td>
-              <td>{{ row.matches }}</td>
-              <td>{{ row.wins }}</td>
-              <td>{{ row.losses }}</td>
-              <td>{{ row.draws }}</td>
-              <td>{{ row.win_pct }}%</td>
-              <td>{{ row.gf }}</td>
-              <td>{{ row.ga }}</td>
-              <td>{{ row.gp_pct }}%</td>
-              <td>{{ row.diff }}</td>
+              <th style="width:60px;">順位</th>
+              <th>名前</th>
+              <th style="width:70px;">試合</th>
+              <th style="width:60px;">勝</th>
+              <th style="width:60px;">負</th>
+              <th style="width:60px;">分</th>
+              <th style="width:90px;">勝率</th>
+              <th style="width:90px;">GF</th>
+              <th style="width:90px;">GA</th>
+              <th style="width:90px;">ゲーム率</th>
+              <th style="width:90px;">得失点</th>
             </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {% for row in ranking_doubles.ranked %}
+              <tr>
+                <td>{{ row.rank }}</td>
+                <td style="text-align:left;">{{ row.name }}</td>
+                <td>{{ row.matches }}</td>
+                <td>{{ row.wins }}</td>
+                <td>{{ row.losses }}</td>
+                <td>{{ row.draws }}</td>
+                <td>{{ row.win_pct }}%</td>
+                <td>{{ row.gf }}</td>
+                <td>{{ row.ga }}</td>
+                <td>{{ row.gp_pct }}%</td>
+                <td>{{ row.diff }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     {% endif %}
 
     {# ===== singles ===== #}
     {% if has_singles %}
       <h4 {% if has_doubles %}style="margin-top:18px;"{% endif %}>シングルス</h4>
-      <table>
-        <thead>
-          <tr>
-            <th style="width:50px;">順位</th>
-            <th style="text-align:left;">名前</th>
-            <th style="width:70px;">試合</th>
-            <th style="width:60px;">勝</th>
-            <th style="width:60px;">負</th>
-            <th style="width:60px;">分</th>
-            <th style="width:90px;">勝率</th>
-            <th style="width:90px;">GF</th>
-            <th style="width:90px;">GA</th>
-            <th style="width:90px;">ゲーム率</th>
-            <th style="width:90px;">得失点</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for row in ranking_singles.ranked %}
+      <div class="rank-table-wrap">
+        <table class="rank-table">
+          <thead>
             <tr>
-              <td>{{ row.rank }}</td>
-              <td style="text-align:left;">{{ row.name }}</td>
-              <td>{{ row.matches }}</td>
-              <td>{{ row.wins }}</td>
-              <td>{{ row.losses }}</td>
-              <td>{{ row.draws }}</td>
-              <td>{{ row.win_pct }}%</td>
-              <td>{{ row.gf }}</td>
-              <td>{{ row.ga }}</td>
-              <td>{{ row.gp_pct }}%</td>
-              <td>{{ row.diff }}</td>
+              <th style="width:50px;">順位</th>
+              <th>名前</th>
+              <th style="width:70px;">試合</th>
+              <th style="width:60px;">勝</th>
+              <th style="width:60px;">負</th>
+              <th style="width:60px;">分</th>
+              <th style="width:90px;">勝率</th>
+              <th style="width:90px;">GF</th>
+              <th style="width:90px;">GA</th>
+              <th style="width:90px;">ゲーム率</th>
+              <th style="width:90px;">得失点</th>
             </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+          </thead>
+          <tbody>
+            {% for row in ranking_singles.ranked %}
+              <tr>
+                <td>{{ row.rank }}</td>
+                <td style="text-align:left;">{{ row.name }}</td>
+                <td>{{ row.matches }}</td>
+                <td>{{ row.wins }}</td>
+                <td>{{ row.losses }}</td>
+                <td>{{ row.draws }}</td>
+                <td>{{ row.win_pct }}%</td>
+                <td>{{ row.gf }}</td>
+                <td>{{ row.ga }}</td>
+                <td>{{ row.gp_pct }}%</td>
+                <td>{{ row.diff }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     {% endif %}
 
   {% else %}

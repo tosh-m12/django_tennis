@@ -1,3 +1,5 @@
+/* tennis/static/tennis/participants.css */
+
 /* =========================================
    参加者一覧（カードレイアウト）
    ========================================= */
@@ -26,20 +28,23 @@
     vertical-align: middle;
 }
 
-/* 連番セル：中身を上下中央 */
+/* 連番セル：幅を詰める（★修正） */
 #participants-table td.participant-index{
-  padding: 4px 8px;         /* 他tdと揃える（必要なら） */
+  width: 22px;           /* ★列幅を固定で小さく */
+  padding: 0 4px;        /* ★左右paddingを削って左に詰める */
 }
 
-/* ラッパーで確実に中央寄せ */
+/* ラッパー：右寄せにする（★修正） */
 #participants-table td.participant-index .idx{
   display: inline-flex;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-end;  /* ★中央→右寄せ */
 
-  height: 100%;             /* tdの高さに追従 */
-  min-height: 34px;         /* 行の最小高さを確保（他セルと釣る） */
+  height: 100%;
+  min-height: 34px;
+  width: 100%;               /* ★右寄せを確実に効かせる */
 }
+
 
 
 
@@ -51,7 +56,7 @@
 /* 対戦表の名前カードのミニ版 */
 .tb-player-card-sm {
     display: inline-block;
-    width: 130px;      /* 対戦表より少し小さめ */
+    width: 116px;      /* 対戦表より少し小さめ */
     padding: 6px 10px;
     border-radius: 6px;
     border: 1px solid #555;
@@ -394,3 +399,5 @@
 #members-table tbody td:nth-child(2) {
   text-align: left;
 }
+
+

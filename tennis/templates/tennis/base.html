@@ -4,6 +4,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}テニスサークル{% endblock %}</title>
 
   <link rel="stylesheet" href="{% static 'tennis/style.css' %}">
@@ -15,7 +16,7 @@
   <link rel="stylesheet" href="{% static 'tennis/schedule.css' %}">
   <link rel="stylesheet" href="{% static 'tennis/modal.css' %}">
   <link rel="stylesheet" href="{% static 'tennis/participants.css' %}">
-
+  <link rel="stylesheet" href="{% static 'tennis/responsive.css' %}">
   <script src="{% static 'tennis/ui_modal.js' %}" defer></script>
 
   {% block extra_head %}{% endblock %}

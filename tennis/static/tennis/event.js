@@ -1764,7 +1764,7 @@
         // 公開済み対戦表が変更された（幹事なら再公開導線へ）
         if (isAdmin) markChangedIfPublishedExists();
 
-        safeShowMessage("代打を反映しました。（スコアは入れ直してください）", 2200);
+        safeShowMessage("代打を反映しました。（スコア入力済みの場合は入れ直してください）", 2200);
         closeSub();
       } catch (e) {
         console.error(e);
