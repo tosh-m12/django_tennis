@@ -1017,32 +1017,39 @@
 
     // ============================================================
     // [COMMON] スコア inline edit（round_no/court_no/side）
+    //  - iOS 対策：click ではなく pointerup/touchend を優先して
+    //    “1タップでテンキー” を出す
     // ============================================================
     if (urls.saveScore) {
-      document.addEventListener("click", (e) => {
+      const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent);
+
+      const handler = (e) => {
         const scheduleArea = document.getElementById("schedule-area");
         if (!scheduleArea || !scheduleArea.contains(e.target)) return;
 
         const canEditScore = (scheduleArea.dataset.canEditScore || "0") === "1";
-        if (!canEditScore) {
-          if (e.target.closest(".tb-score")) {
-            e.preventDefault();
-            e.stopPropagation();
-            safeShowMessage("未公開の対戦表ではスコアを入力できません", 2200);
-          }
-          return;
-        }
-
-        if (e.target.closest(".tb-score-input")) return;
-
         const scoreSpan = e.target.closest(".tb-score");
         if (!scoreSpan) return;
 
-        e.preventDefault();
-        e.stopPropagation();
+        if (!canEditScore) {
+          e.preventDefault();
+          e.stopPropagation();
+          safeShowMessage("未公開の対戦表ではスコアを入力できません", 2200);
+          return;
+        }
 
+        // 既に input 上なら何もしない
+        if (e.target.closest(".tb-score-input")) return;
+
+        // 2重起動防止
         if (scoreSpan.dataset.editing === "1") return;
         scoreSpan.dataset.editing = "1";
+
+        // ★ここ重要：iOS で “ユーザー操作” として扱わせるため、
+        // なるべくこのハンドラの同期処理内で input を作って focus する
+        // （ただし scroll を邪魔しない範囲で）
+        e.preventDefault();
+        e.stopPropagation();
 
         const currentText = (scoreSpan.textContent || "").trim();
         const currentValue = currentText === "-" ? "" : currentText;
@@ -1065,27 +1072,44 @@
         }
 
         const input = document.createElement("input");
-        input.type = "number";
+        // ★iOSテンキー最優先：number より tel が安定
+        input.type = isIOS ? "tel" : "number";
         input.inputMode = "numeric";
+        input.pattern = "[0-9]*";
+        input.autocomplete = "off";
         input.className = "tb-score-input";
         input.value = currentValue;
 
+        // 親ハンドラに吸われないように
+        input.addEventListener("pointerdown", (ev) => ev.stopPropagation());
+        input.addEventListener("pointerup", (ev) => ev.stopPropagation());
         input.addEventListener("mousedown", (ev) => ev.stopPropagation());
         input.addEventListener("click", (ev) => ev.stopPropagation());
+        input.addEventListener("touchstart", (ev) => ev.stopPropagation(), { passive: true });
+        input.addEventListener("touchend", (ev) => ev.stopPropagation(), { passive: true });
 
         scoreSpan.textContent = "";
         scoreSpan.appendChild(input);
 
+        // ★iOSは “今すぐ focus” が通りやすい
+        // ただし通らない端末があるので 0ms で保険もかける
+        try {
+          input.focus({ preventScroll: true });
+          input.select?.();
+        } catch {}
+
         setTimeout(() => {
-          input.focus();
-          input.select();
+          try {
+            input.focus({ preventScroll: true });
+            input.select?.();
+          } catch {}
         }, 0);
 
         const renderSpan = (v) => {
-          const s = (v === null || v === undefined) ? "" : String(v).trim();
-          scoreSpan.textContent = (s === "") ? "-" : s;
+          const s = v === null || v === undefined ? "" : String(v).trim();
+          scoreSpan.textContent = s === "" ? "-" : s;
         };
-        
+
         const finishEdit = async (cancel = false) => {
           const nextVal = cancel ? currentValue : (input.value || "").trim();
 
@@ -1110,7 +1134,6 @@
             fd.append("value", nextVal);
             fd.append("score", nextVal);
             fd.append("score_value", nextVal);
-
             fd.append("team_no", side === "a" ? "1" : "2");
 
             const r = await fetch(saveUrl, {
@@ -1146,8 +1169,14 @@
             finishEdit(true);
           }
         });
-      });
+      };
+
+      // ★iOS は click より touchend が安定（1タップでテンキー）
+      // ただし iPadOS なども含め pointerup を優先し、touchend を保険に。
+      document.addEventListener("pointerup", handler, true);
+      document.addEventListener("touchend", handler, { capture: true, passive: false });
     }
+
 
     // ============================================================
     // [ADMIN] 公開（global）
