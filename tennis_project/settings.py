@@ -12,10 +12,25 @@ https://docs.djangoproject.com/en/6.0/ref/settings/
 
 import os
 from pathlib import Path
+
 import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
+
+
+# ============================================================
+# Helpers
+# ============================================================
+
+def env_str(name: str, default: str = "") -> str:
+    return (os.getenv(name) or default).strip()
+
+def env_bool(name: str, default: bool = False) -> bool:
+    v = (os.getenv(name) or "").strip().lower()
+    if v == "":
+        return default
+    return v in ("1", "true", "t", "yes", "y", "on")
 
 
 # ============================================================
@@ -24,37 +39,22 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 
 # 本番は必ず環境変数優先（Railwayで安全に運用するため）
 # ローカル開発では未設定でも動くようにデフォルト値も用意
-SECRET_KEY = os.getenv(
+SECRET_KEY = env_str(
     "DJANGO_SECRET_KEY",
-    "django-insecure-c@@+13zbt$x!abfun-8w+oiq1$lqnzrjzk(#cxn@&cu4*)$sdv"
+    "django-insecure-c@@+13zbt$x!abfun-8w+oiq1$lqnzrjzk(#cxn@&cu4*)$sdv",
 )
 
-# Railway本番は DEBUG を切る（ローカルでは True にしたければ env で DEBUG=1）
-DEBUG = os.getenv("DEBUG", "0") == "1"
+# Railway本番は DEBUG を切る（ローカルでは env で DEBUG=1 など）
+DEBUG = env_bool("DEBUG", default=False)
 
-
-LOGGING = {
-    "version": 1,
-    "disable_existing_loggers": False,
-    "handlers": {
-        "console": {"class": "logging.StreamHandler"},
-    },
-    "root": {"handlers": ["console"], "level": "INFO"},
-    "loggers": {
-        "django.request": {
-            "handlers": ["console"],
-            "level": "ERROR",
-            "propagate": False,
-        },
-    },
-}
+# 例: "INFO" / "DEBUG"
+LOGGING_LEVEL = env_str("LOGGING_LEVEL", "DEBUG" if DEBUG else "INFO")
 
 
 # ============================================================
 # Hosts / CSRF
 # ============================================================
 
-# あなたの現行ドメインは残す
 ALLOWED_HOSTS = [
     "djangotennis-production.up.railway.app",
     "localhost",
@@ -63,9 +63,17 @@ ALLOWED_HOSTS = [
 
 # Railway のドメインが変わる/増える可能性があるので env から追加できるようにする
 # 例: RAILWAY_PUBLIC_DOMAIN=djangotennis-production.up.railway.app
-RAILWAY_PUBLIC_DOMAIN = (os.getenv("RAILWAY_PUBLIC_DOMAIN") or "").strip()
+RAILWAY_PUBLIC_DOMAIN = env_str("RAILWAY_PUBLIC_DOMAIN", "")
 if RAILWAY_PUBLIC_DOMAIN and RAILWAY_PUBLIC_DOMAIN not in ALLOWED_HOSTS:
     ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
+
+# カンマ区切りで追加可能（任意）
+# 例: ALLOWED_HOSTS_EXTRA=foo.example.com,bar.example.com
+ALLOWED_HOSTS_EXTRA = env_str("ALLOWED_HOSTS_EXTRA", "")
+if ALLOWED_HOSTS_EXTRA:
+    for host in [h.strip() for h in ALLOWED_HOSTS_EXTRA.split(",") if h.strip()]:
+        if host not in ALLOWED_HOSTS:
+            ALLOWED_HOSTS.append(host)
 
 CSRF_TRUSTED_ORIGINS = [
     "https://djangotennis-production.up.railway.app",
@@ -75,6 +83,18 @@ if RAILWAY_PUBLIC_DOMAIN:
     origin = f"https://{RAILWAY_PUBLIC_DOMAIN}"
     if origin not in CSRF_TRUSTED_ORIGINS:
         CSRF_TRUSTED_ORIGINS.append(origin)
+
+# 追加したい場合（任意）
+# 例: CSRF_TRUSTED_ORIGINS=https://foo.example.com,https://bar.example.com
+EXTRA_CSRF = env_str("CSRF_TRUSTED_ORIGINS", "")
+if EXTRA_CSRF:
+    for o in [x.strip() for x in EXTRA_CSRF.split(",") if x.strip()]:
+        if o not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(o)
+
+# Reverse proxy 配下（Railway）で https 判定を正しくする
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+
 
 # ============================================================
 # Application definition
@@ -92,7 +112,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
-    "whitenoise.middleware.WhiteNoiseMiddleware",  # ← あなたの既存を維持
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # static 配信
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
@@ -135,6 +155,7 @@ DATABASES = {
     )
 }
 
+
 # ============================================================
 # Password validation
 # ============================================================
@@ -152,26 +173,68 @@ AUTH_PASSWORD_VALIDATORS = [
 # ============================================================
 
 LANGUAGE_CODE = "en-us"
-TIME_ZONE = "UTC"
+TIME_ZONE = env_str("TIME_ZONE", "Asia/Tokyo")  # 日本運用なら Tokyo 推奨
 USE_I18N = True
 USE_TZ = True
-
 
 
 # ============================================================
 # Static files (CSS, JavaScript, Images)
 # ============================================================
 
-# ★重要：先頭スラッシュを付ける（本番で崩れにくい）
 STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-# WhiteNoiseの推奨
+# WhiteNoise 推奨（manifest 必須の本番運用）
 STORAGES = {
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
 
-# collectstatic 実行時に起こりがちな “Missing staticfiles manifest entry” の回避策を入れたい場合は
-# WhiteNoiseのドキュメントに沿って DEBUG=False 前提で運用するのが本筋。
-# どうしても一時回避したい場合のみ下を検討（基本は入れない方が良い）
-# WHITENOISE_MANIFEST_STRICT = False
+# どうしても manifest 不整合を一時回避したい場合だけ True にする（基本は触らない）
+# WHITENOISE_MANIFEST_STRICT = env_bool("WHITENOISE_MANIFEST_STRICT", default=True)
+
+
+# ============================================================
+# Default primary key field type
+# ============================================================
+
+DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+
+# ============================================================
+# Logging
+# ============================================================
+
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {"class": "logging.StreamHandler"},
+    },
+    "root": {"handlers": ["console"], "level": LOGGING_LEVEL},
+    "loggers": {
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
+
+
+# ============================================================
+# Production security toggles
+# ============================================================
+
+if not DEBUG:
+    # Cookie を HTTPS 専用に
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+
+    # https へ強制（proxy下で https 判定できる前提）
+    SECURE_SSL_REDIRECT = True
+
+    # 推奨ヘッダ（必要なら有効化）
+    # SECURE_HSTS_SECONDS = int(env_str("SECURE_HSTS_SECONDS", "0"))
+    # SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", default=False)
+    # SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", default=False)
