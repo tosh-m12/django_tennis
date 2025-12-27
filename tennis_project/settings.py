@@ -10,117 +10,150 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/6.0/ref/settings/
 """
 
+import os
 from pathlib import Path
+import dj_database_url
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 
-# Quick-start development settings - unsuitable for production
-# See https://docs.djangoproject.com/en/6.0/howto/deployment/checklist/
+# ============================================================
+# Core
+# ============================================================
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-c@@+13zbt$x!abfun-8w+oiq1$lqnzrjzk(#cxn@&cu4*)$sdv'
+# 本番は必ず環境変数優先（Railwayで安全に運用するため）
+# ローカル開発では未設定でも動くようにデフォルト値も用意
+SECRET_KEY = os.getenv(
+    "DJANGO_SECRET_KEY",
+    "django-insecure-c@@+13zbt$x!abfun-8w+oiq1$lqnzrjzk(#cxn@&cu4*)$sdv"
+)
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+# Railway本番は DEBUG を切る（ローカルでは True にしたければ env で DEBUG=1）
+DEBUG = os.getenv("DEBUG", "0") == "1"
 
-ALLOWED_HOSTS = ["djangotennis-production.up.railway.app", "localhost", "127.0.0.1"]
+# ============================================================
+# Hosts / CSRF
+# ============================================================
 
-CSRF_TRUSTED_ORIGINS = ["https://djangotennis-production.up.railway.app"]
+# あなたの現行ドメインは残す
+ALLOWED_HOSTS = [
+    "djangotennis-production.up.railway.app",
+    "localhost",
+    "127.0.0.1",
+]
 
+# Railway のドメインが変わる/増える可能性があるので env から追加できるようにする
+# 例: RAILWAY_PUBLIC_DOMAIN=djangotennis-production.up.railway.app
+RAILWAY_PUBLIC_DOMAIN = (os.getenv("RAILWAY_PUBLIC_DOMAIN") or "").strip()
+if RAILWAY_PUBLIC_DOMAIN and RAILWAY_PUBLIC_DOMAIN not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://djangotennis-production.up.railway.app",
+]
+
+if RAILWAY_PUBLIC_DOMAIN:
+    origin = f"https://{RAILWAY_PUBLIC_DOMAIN}"
+    if origin not in CSRF_TRUSTED_ORIGINS:
+        CSRF_TRUSTED_ORIGINS.append(origin)
+
+# ============================================================
 # Application definition
+# ============================================================
 
 INSTALLED_APPS = [
-    'django.contrib.admin',
-    'django.contrib.auth',
-    'django.contrib.contenttypes',
-    'django.contrib.sessions',
-    'django.contrib.messages',
-    'django.contrib.staticfiles',
-    'tennis',
+    "django.contrib.admin",
+    "django.contrib.auth",
+    "django.contrib.contenttypes",
+    "django.contrib.sessions",
+    "django.contrib.messages",
+    "django.contrib.staticfiles",
+    "tennis",
 ]
 
 MIDDLEWARE = [
-    'django.middleware.security.SecurityMiddleware',
-    "whitenoise.middleware.WhiteNoiseMiddleware",
-    'django.contrib.sessions.middleware.SessionMiddleware',
-    'django.middleware.common.CommonMiddleware',
-    'django.middleware.csrf.CsrfViewMiddleware',
-    'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'django.contrib.messages.middleware.MessageMiddleware',
-    'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    "django.middleware.security.SecurityMiddleware",
+    "whitenoise.middleware.WhiteNoiseMiddleware",  # ← あなたの既存を維持
+    "django.contrib.sessions.middleware.SessionMiddleware",
+    "django.middleware.common.CommonMiddleware",
+    "django.middleware.csrf.CsrfViewMiddleware",
+    "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "django.contrib.messages.middleware.MessageMiddleware",
+    "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
 
-ROOT_URLCONF = 'tennis_project.urls'
+ROOT_URLCONF = "tennis_project.urls"
 
 TEMPLATES = [
     {
-        'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
-        'APP_DIRS': True,
-        'OPTIONS': {
-            'context_processors': [
-                'django.template.context_processors.request',
-                'django.contrib.auth.context_processors.auth',
-                'django.contrib.messages.context_processors.messages',
+        "BACKEND": "django.template.backends.django.DjangoTemplates",
+        "DIRS": [],
+        "APP_DIRS": True,
+        "OPTIONS": {
+            "context_processors": [
+                "django.template.context_processors.request",
+                "django.contrib.auth.context_processors.auth",
+                "django.contrib.messages.context_processors.messages",
             ],
         },
     },
 ]
 
-WSGI_APPLICATION = 'tennis_project.wsgi.application'
+WSGI_APPLICATION = "tennis_project.wsgi.application"
 
 
+# ============================================================
 # Database
-# https://docs.djangoproject.com/en/6.0/ref/settings/#databases
+# ============================================================
 
+# Railway では DATABASE_URL を使う（Postgres）
+# ローカルでは DATABASE_URL が無いので SQLite で動く
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    "default": dj_database_url.config(
+        default=f"sqlite:///{(BASE_DIR / 'db.sqlite3').as_posix()}",
+        conn_max_age=600,
+        ssl_require=False,  # railway.internal なら通常不要。外部公開でSSL必須なら True にする
+    )
 }
 
-
+# ============================================================
 # Password validation
-# https://docs.djangoproject.com/en/6.0/ref/settings/#auth-password-validators
+# ============================================================
 
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
+    {"NAME": "django.contrib.auth.password_validation.MinimumLengthValidator"},
+    {"NAME": "django.contrib.auth.password_validation.CommonPasswordValidator"},
+    {"NAME": "django.contrib.auth.password_validation.NumericPasswordValidator"},
 ]
 
 
+# ============================================================
 # Internationalization
-# https://docs.djangoproject.com/en/6.0/topics/i18n/
+# ============================================================
 
-LANGUAGE_CODE = 'en-us'
-
-TIME_ZONE = 'UTC'
-
+LANGUAGE_CODE = "en-us"
+TIME_ZONE = "UTC"
 USE_I18N = True
-
 USE_TZ = True
 
 
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/6.0/howto/static-files/
 
-STATIC_URL = 'static/'
+# ============================================================
+# Static files (CSS, JavaScript, Images)
+# ============================================================
+
+# ★重要：先頭スラッシュを付ける（本番で崩れにくい）
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
+# WhiteNoiseの推奨
 STORAGES = {
     "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
 }
+
+# collectstatic 実行時に起こりがちな “Missing staticfiles manifest entry” の回避策を入れたい場合は
+# WhiteNoiseのドキュメントに沿って DEBUG=False 前提で運用するのが本筋。
+# どうしても一時回避したい場合のみ下を検討（基本は入れない方が良い）
+# WHITENOISE_MANIFEST_STRICT = False
