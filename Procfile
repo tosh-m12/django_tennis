@@ -1,1 +1,1 @@
-release: python manage.py migrate && python manage.py reset_admin_password
+web: gunicorn config.wsgi:application --bind 0.0.0.0:$PORT
