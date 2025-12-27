@@ -32,6 +32,7 @@ SECRET_KEY = os.getenv(
 # Railway本番は DEBUG を切る（ローカルでは True にしたければ env で DEBUG=1）
 DEBUG = os.getenv("DEBUG", "0") == "1"
 
+
 # ============================================================
 # Hosts / CSRF
 # ============================================================
@@ -111,9 +112,9 @@ WSGI_APPLICATION = "tennis_project.wsgi.application"
 # ローカルでは DATABASE_URL が無いので SQLite で動く
 DATABASES = {
     "default": dj_database_url.config(
-        default=f"sqlite:///{(BASE_DIR / 'db.sqlite3').as_posix()}",
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
         conn_max_age=600,
-        ssl_require=False,  # railway.internal なら通常不要。外部公開でSSL必須なら True にする
+        ssl_require=False,
     )
 }
 
