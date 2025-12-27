@@ -33,6 +33,23 @@ SECRET_KEY = os.getenv(
 DEBUG = os.getenv("DEBUG", "0") == "1"
 
 
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {"class": "logging.StreamHandler"},
+    },
+    "root": {"handlers": ["console"], "level": "INFO"},
+    "loggers": {
+        "django.request": {
+            "handlers": ["console"],
+            "level": "ERROR",
+            "propagate": False,
+        },
+    },
+}
+
+
 # ============================================================
 # Hosts / CSRF
 # ============================================================
