@@ -368,3 +368,6 @@ event：参加者操作は event.jsだけが動く
 イベント作成APIが admin_url付きで返す
 
 event系APIが 全部 {ok:true} を返す形で揃う
+
+
+bash -lc "./.venv/bin/python manage.py collectstatic --noinput && exec ./.venv/bin/gunicorn tennis_project.wsgi:application --bind 0.0.0.0:$PORT --workers 1 --log-level info --access-logfile - --error-logfile -"

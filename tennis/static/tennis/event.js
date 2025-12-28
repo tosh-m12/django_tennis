@@ -195,7 +195,7 @@
 
       if (!isAdmin) {
         safeShowMessage(
-          "終了したイベントに対する出席者変更は幹事モードで行ってください。",
+          "終了したイベントに対する出席者変更は幹事へ申請してください",
           2600
         );
         return false;
@@ -354,6 +354,58 @@
         return false;
       }
     }
+
+    // ============================================================
+    // [UI] 出欠で行を並び替え（✓ → ? → ×）
+    //  - yes: ✓
+    //  - maybe/""(未回答): ?
+    //  - no: ×
+    //  - 同一グループ内は元の順番を維持（安定）
+    //  - 左端の連番も振り直す
+    // ============================================================
+    function sortParticipantsByAttendance() {
+      const tbody = participantsTable.querySelector("tbody");
+      if (!tbody) return;
+
+      const rows = Array.from(tbody.querySelectorAll("tr.participant-row"));
+      if (!rows.length) return;
+
+      const order = { yes: 0, maybe: 1, "": 1, no: 2 };
+
+      function getAttendance(tr) {
+        const btn = tr.querySelector(".attendance-btn");
+        const v = (btn?.dataset?.attendance || "").trim();
+        if (v === "yes" || v === "maybe" || v === "no") return v;
+        return ""; // 未回答は "?" 扱い
+      }
+
+      // 安定ソート用：初期indexを保存（同グループ内の順序を崩さない）
+      rows.forEach((tr, i) => {
+        if (!tr.dataset.origIndex) tr.dataset.origIndex = String(i);
+      });
+
+      rows.sort((a, b) => {
+        const ao = order[getAttendance(a)] ?? 1;
+        const bo = order[getAttendance(b)] ?? 1;
+        if (ao !== bo) return ao - bo;
+
+        const ai = parseInt(a.dataset.origIndex || "0", 10);
+        const bi = parseInt(b.dataset.origIndex || "0", 10);
+        return ai - bi;
+      });
+
+      const frag = document.createDocumentFragment();
+      rows.forEach((tr, i) => {
+        const idxEl = tr.querySelector(".participant-index .idx");
+        if (idxEl) idxEl.textContent = String(i + 1);
+        frag.appendChild(tr);
+      });
+      tbody.appendChild(frag);
+    }
+
+    // ★初期表示でも一度並び替え
+    sortParticipantsByAttendance();
+
 
     // ============================================================
     // [COMMON] コメント保存（blur + debounce）
@@ -621,6 +673,8 @@
                 html = `<span class="attendance-icon attendance-maybe">?</span>`;
               currentBtn.innerHTML = html;
               currentBtn.dataset.attendance = attendance;
+
+              // sortParticipantsByAttendance();
 
               const willShowMatch = attendance === "yes";
               setMatchVisible(row, willShowMatch);

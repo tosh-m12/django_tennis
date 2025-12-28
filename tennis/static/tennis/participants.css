@@ -401,6 +401,24 @@
 }
 
 
+/* =====================================
+   Event page: Flag (digit) input style
+   ===================================== */
+
 .flag-digit-input {
-  border: 1px solid #d0d0d0;
+  border: none;                 /* 枠線を消す */
+  background: #f2f3f5;          /* 薄いグレーで塗りつぶし */
+  box-shadow: none;             /* 念のため影も消す */
+
+  border-radius: 4px;           /* 角はほんのり（不要なら0でもOK） */
+  text-align: center;
+
+  padding: 4px 6px;
+}
+
+/* フォーカス時も枠を出さない */
+.flag-digit-input:focus {
+  outline: none;
+  border: none;
+  background: #e9ebee;          /* フォーカス時だけ少し濃く（任意） */
 }

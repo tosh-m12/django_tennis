@@ -9,6 +9,13 @@
 {% endblock %}
 
 {% block content %}
+
+<div id="page-hooks"
+     data-page="settings"
+     data-club-token="{{ club.public_token }}"
+     data-is-admin="{% if is_admin %}1{% else %}0{% endif %}">
+</div>
+
 <h2>クラブ設定画面</h2>
 
 <hr>

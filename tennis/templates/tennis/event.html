@@ -12,6 +12,12 @@
 
 {% block content %}
 
+<div id="page-hooks"
+     data-page="event"
+     data-club-token="{{ club.public_token }}"
+     data-is-admin="{% if is_admin %}1{% else %}0{% endif %}">
+</div>
+
 {# ★キャンセル済み：画面全体トーンダウン（CSS: .event-page.is-cancelled） #}
 <div class="event-page {% if event.cancelled %}is-cancelled{% endif %}">
 

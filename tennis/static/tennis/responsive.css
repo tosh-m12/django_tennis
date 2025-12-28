@@ -250,4 +250,35 @@
     font-size: 0.72rem;
   }
 
+  /* ===============================
+   [Index] クラブ名入力欄（mobile only）
+   =============================== */
+
+  .club-name-input {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+    display: block;
+    margin: 0 auto;
+  }
+
+  /* =========================================
+   Mobile fit: モーダルが画面からはみ出さない
+   ========================================= */
+
+
+
+  .modal-content {
+    max-width: 100%;
+    width: 100%;
+    margin: 0;
+
+  }
+
+  /* iPhoneのセーフエリア対策（任意だが強い） */
+  .modal-content {
+    padding-bottom: calc(20px + env(safe-area-inset-bottom));
+  }
+
 }
+

@@ -17,8 +17,8 @@
   <link rel="stylesheet" href="{% static 'tennis/modal.css' %}">
   <link rel="stylesheet" href="{% static 'tennis/participants.css' %}">
   <link rel="stylesheet" href="{% static 'tennis/responsive.css' %}">
-  <script src="{% static 'tennis/ui_modal.js' %}" defer></script>
 
+  <script src="{% static 'tennis/ui_modal.js' %}" defer></script>
   {% block extra_head %}{% endblock %}
 </head>
 
@@ -39,33 +39,37 @@
           </div>
 
           <div class="topbar-actions">
+            {# club がある場合のみボタン群を出す #}
             {% if club %}
+
+              {# 「もどる」：club_home では JS が非表示にする（設定のみ残す） #}
               {% if is_admin %}
                 <a href="{% url 'tennis:club_home_admin' club.public_token club.admin_token %}"
-                  class="topbar-link">
+                   class="topbar-link"
+                   id="topbar-back-link"
+                   data-home-url="{% url 'tennis:club_home_admin' club.public_token club.admin_token %}">
                   ホーム
                 </a>
               {% else %}
                 <a href="{% url 'tennis:club_home' club.public_token %}"
-                  class="topbar-link">
+                   class="topbar-link"
+                   id="topbar-back-link"
+                   data-home-url="{% url 'tennis:club_home' club.public_token %}">
                   ホーム
                 </a>
               {% endif %}
+
             {% endif %}
 
-            {% if is_admin %}
-
-              {% if club %}
+            {# 幹事のみ「設定」 #}
+              {% if is_admin and club %}
                 <a href="{% url 'tennis:club_settings' club.public_token club.admin_token %}"
-                  class="topbar-link">
+                  class="topbar-link"
+                  id="topbar-settings-link">
                   設定
                 </a>
               {% endif %}
-            {% endif %}
-
           </div>
-
-
         </div>
       </div>
     {% endif %}
@@ -77,6 +81,10 @@
   </div>
 
   {% include "tennis/_ui_modals.html" %}
+
+  {# topbar の「もどる」URLを直前のカレンダー月に合わせる #}
+  <script src="{% static 'tennis/topbar_back.js' %}" defer></script>
+
   {% block extra_scripts %}{% endblock %}
 </body>
 </html>

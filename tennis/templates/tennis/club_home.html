@@ -52,6 +52,14 @@
   <hr>
 {% endif %}
 
+<div id="page-hooks"
+     data-page="club_home"
+     data-year="{{ year }}"
+     data-month="{{ month }}"
+     data-club-token="{{ club.public_token }}"
+     data-is-admin="{% if is_admin %}1{% else %}0{% endif %}">
+</div>
+
 <h3>イベントスケジュール</h3>
 
 <div class="calendar-nav cal-header">

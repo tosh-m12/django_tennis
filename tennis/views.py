@@ -1010,7 +1010,7 @@ def _guard_participant_change(request, event, *, require_admin_when_published: b
         return _json_forbidden("公開後は幹事のみ変更できます。", code="published_locked")
 
     if _is_event_ended(event) and not is_admin:
-        return _json_forbidden("終了したイベントに対する出席者変更は幹事モードで行ってください。", code="ended_locked")
+        return _json_forbidden("終了したイベントに対する出席者変更は幹事へ申請してください", code="ended_locked")
 
     return None
 
