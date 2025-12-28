@@ -110,10 +110,15 @@ document.addEventListener("DOMContentLoaded", () => {
     const addCloseBtn = document.getElementById("close-flag-add-modal");
     const addForm = document.getElementById("flag-add-form");
     const addInput = document.getElementById("flag-add-input");
+    const addMode = document.getElementById("flag-add-input-mode"); // ★1回だけ取得
 
     function openAddModal() {
       if (!addModal || !addInput) return;
+
+      // ★初期値に戻す（事故防止）
       addInput.value = "";
+      if (addMode) addMode.value = "check";
+
       addModal.classList.add("is-open");
       addModal.setAttribute("aria-hidden", "false");
       setTimeout(() => addInput.focus(), 0);
@@ -172,10 +177,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const adminToken = getAdminTokenFromEl(addBtn);
         if (!clubId || !url) return;
 
+        const inputMode = (addMode?.value || "check").trim(); // ★check / digit
+
         const fd = new FormData();
         fd.append("club_id", clubId);
         fd.append("admin_token", adminToken);
         fd.append("name", name);
+        fd.append("input_mode", inputMode); // ★追加
 
         try {
           const r = await fetch(url, {
@@ -297,7 +305,7 @@ document.addEventListener("DOMContentLoaded", () => {
         }
       });
     })();
-  })(); // ★ここ重要：initFlagsAddDelete を必ず閉じる
+  })();
 
 
   // ============================================================
@@ -346,6 +354,10 @@ document.addEventListener("DOMContentLoaded", () => {
     // ヘッダークリックで開く
     table.querySelectorAll(".flag-header[data-flag-id]").forEach((th) => {
       th.addEventListener("click", () => {
+
+        const isAdmin = (table.dataset.isAdmin || "0") === "1";
+        if (!isAdmin) return;
+
         const flagId = (th.dataset.flagId || "").trim();
         if (!flagId) return;
 

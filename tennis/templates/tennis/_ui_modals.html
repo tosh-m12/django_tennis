@@ -417,17 +417,27 @@ settings でだけ注意文を出したい場合：
       <div class="field-group">
         <label for="flag-add-input">フラグ名</label>
         <input type="text"
-               id="flag-add-input"
-               class="event-title-input"
-               maxlength="80"
-               autocomplete="off"
-               placeholder="例：かご / ボール">
+              id="flag-add-input"
+              class="event-title-input"
+              maxlength="80"
+              autocomplete="off"
+              placeholder="例：かご / ボール">
+      </div>
+
+      <!-- ★追加：入力形式 -->
+      <div class="field-group">
+        <label for="flag-add-input-mode">入力形式</label>
+        <select id="flag-add-input-mode" class="modal-select" style="width:80%;">
+          <option value="check" selected>チェック</option>
+          <option value="digit">数字（1桁）</option>
+        </select>
       </div>
 
       <div class="modal-actions">
         <button type="submit" class="btn btn-pill btn-primary">追加</button>
       </div>
     </form>
+
   </div>
 </div>
 {% endif %}

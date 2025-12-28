@@ -45,7 +45,7 @@ SECRET_KEY = env_str(
 )
 
 # Railway本番は DEBUG を切る（ローカルでは env で DEBUG=1 など）
-DEBUG = env_bool("DEBUG", default=False)
+DEBUG = env_bool("DEBUG", default=True)
 
 # 例: "INFO" / "DEBUG"
 LOGGING_LEVEL = env_str("LOGGING_LEVEL", "DEBUG" if DEBUG else "INFO")

@@ -1,4 +1,4 @@
-# tennis/views.pydt
+# tennis/views.py
 import calendar
 import json
 import datetime as dt
@@ -645,11 +645,17 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
     pf_qs = ParticipantFlag.objects.filter(
         event_participant__event=event,
         flag_definition__club=club,
-    ).values("event_participant_id", "flag_definition_id", "is_on")
+    ).values("event_participant_id", "flag_definition_id", "is_on", "value")
 
-    flag_states = defaultdict(dict)
+    flag_states_on = defaultdict(dict)
+    flag_states_val = defaultdict(dict)
+
     for pf in pf_qs:
-        flag_states[pf["event_participant_id"]][pf["flag_definition_id"]] = bool(pf["is_on"])
+        ep_id = pf["event_participant_id"]
+        fd_id = pf["flag_definition_id"]
+        flag_states_on[ep_id][fd_id] = bool(pf["is_on"])
+        flag_states_val[ep_id][fd_id] = pf["value"]  # None or int
+
 
     # ------------------------------------------------------------
     # 公開済み対戦表
@@ -751,7 +757,10 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         "event": event,
         "is_admin": is_admin,
         "flags": flags,
-        "flag_states": {k: dict(v) for k, v in flag_states.items()},
+        "flag_input_mode": getattr(club, "flag_input_mode", "check"),
+        "flag_states_on": {k: dict(v) for k, v in flag_states_on.items()},
+        "flag_states_val": {k: dict(v) for k, v in flag_states_val.items()},
+
         "fixed_rows": fixed_rows,
         "guest_rows": guest_rows,
         "max_flags": MAX_FLAGS,
@@ -794,10 +803,15 @@ def club_add_flag(request):
     if not name or len(name) > 80:
         return JsonResponse({"error": "bad_name"}, status=400)
 
-    # （任意）認可：admin_token を必須にするならここでチェック
+    # 認可：admin_token チェック
     admin_token = (request.POST.get("admin_token") or "").strip()
     if not admin_token or admin_token != (club.admin_token or ""):
         return JsonResponse({"error": "forbidden"}, status=403)
+
+    # ★追加：input_mode を受け取る（check / digit）
+    input_mode = (request.POST.get("input_mode") or "check").strip()
+    if input_mode not in ("check", "digit"):
+        return JsonResponse({"error": "bad_input_mode"}, status=400)
 
     # 重複名チェック
     if ClubFlagDefinition.objects.filter(club=club, is_active=True, name=name).exists():
@@ -813,14 +827,22 @@ def club_add_flag(request):
         or 0
     ) + 1
 
+    # ★変更：input_mode を保存する
     flag = ClubFlagDefinition.objects.create(
         club=club,
         name=name,
         display_order=next_order,
+        input_mode=input_mode,   # ★ここが肝
         is_active=True,
     )
 
-    return JsonResponse({"ok": True, "id": flag.id, "name": flag.name, "display_order": flag.display_order})
+    return JsonResponse({
+        "ok": True,
+        "id": flag.id,
+        "name": flag.name,
+        "display_order": flag.display_order,
+        "input_mode": flag.input_mode,  # （返したいなら）
+    })
 
 
 @require_POST
@@ -858,14 +880,25 @@ def club_delete_flag(request):
 
 @require_POST
 def club_rename_flag(request):
-    flag_id = request.POST.get("flag_id")
+    flag_id = (request.POST.get("flag_id") or "").strip()
     name = (request.POST.get("name") or "").strip()
+    admin_token = (request.POST.get("admin_token") or "").strip()
+
+    # 入力チェックを先に
     if not flag_id:
         return JsonResponse({"error": "flag_id required"}, status=400)
     if not name:
         return JsonResponse({"error": "name required"}, status=400)
+    if not admin_token:
+        return JsonResponse({"error": "admin_token required"}, status=400)
 
-    flag = get_object_or_404(ClubFlagDefinition, id=flag_id)
+    # 対象取得
+    flag = get_object_or_404(ClubFlagDefinition, id=int(flag_id), is_active=True)
+
+    # 認可（幹事トークン）
+    if (flag.club.admin_token or "").strip() != admin_token:
+        return JsonResponse({"error": "forbidden"}, status=403)
+
     flag.name = name
     flag.save(update_fields=["name", "updated_at"])
     return JsonResponse({"ok": True, "name": flag.name})
@@ -874,7 +907,7 @@ def club_rename_flag(request):
 @require_POST
 def club_rename_club(request):
     club_id = request.POST.get("club_id")
-    name = (request.POST.get("name") or "").strip()
+    mode = (request.POST.get("flag_input_mode") or "").strip()
     if not club_id:
         return JsonResponse({"ok": False, "error": "club_id required"}, status=400)
     if not name:
@@ -1136,7 +1169,80 @@ def toggle_participant_flag(request):
         ClubFlagDefinition, id=int(flag_id), club=event.club, is_active=True
     )
 
-    # ★他のAPI同様、公開後は一般を弾く（不要なら消してOK）
+    # digit 型は別 API
+    if flagdef.input_mode == "digit":
+        return JsonResponse(
+            {"ok": False, "error": "digit_flag_use_value_api"},
+            status=400
+        )
+
+    ep_id = ((request.POST.get("ep_id") or "").strip()
+             or (request.POST.get("participant_id") or "").strip())
+    member_id = (request.POST.get("member_id") or "").strip()
+
+    if ep_id:
+        ep = get_object_or_404(EventParticipant, id=int(ep_id), event=event)
+    elif member_id:
+        member = get_object_or_404(Member, id=int(member_id), club=event.club)
+        ep = _get_or_create_ep(event, member, member.display_name)
+    else:
+        return JsonResponse({"ok": False, "error": "missing_target"}, status=400)
+
+    obj, _ = ParticipantFlag.objects.get_or_create(
+        event_participant=ep,
+        flag_definition=flagdef,
+    )
+
+    # ★必ず反映
+    if obj.is_on != is_on:
+        obj.is_on = is_on
+        try:
+            obj.save(update_fields=["is_on", "updated_at"])
+        except Exception:
+            obj.save()
+
+    return JsonResponse({
+        "ok": True,
+        "ep_id": ep.id,
+        "flag_id": flagdef.id,
+        "checked": bool(obj.is_on),
+    })
+
+
+@require_POST
+def club_set_flag_input_mode(request):
+    club_id = request.POST.get("club_id")
+    admin_token = (request.POST.get("admin_token") or "").strip()
+    mode = (request.POST.get("flag_input_mode") or "").strip()
+
+    if not club_id:
+        return JsonResponse({"ok": False, "error": "missing_club_id"}, status=400)
+    if mode not in ("check", "digit"):
+        return JsonResponse({"ok": False, "error": "bad_mode"}, status=400)
+
+    club = get_object_or_404(Club, id=int(club_id), is_active=True)
+    if (club.admin_token or "").strip() != admin_token:
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+
+    club.flag_input_mode = mode
+    club.save(update_fields=["flag_input_mode"])
+    return JsonResponse({"ok": True, "mode": club.flag_input_mode})
+
+
+@require_POST
+def set_participant_flag_value(request):
+    event_id = (request.POST.get("event_id") or "").strip()
+    flag_id = (request.POST.get("flag_id") or "").strip()
+    value_raw = (request.POST.get("value") or "").strip()  # "" でクリア
+
+    if not event_id or not flag_id:
+        return JsonResponse({"ok": False, "error": "bad_request"}, status=400)
+
+    event = get_object_or_404(Event, id=int(event_id))
+    flagdef = get_object_or_404(
+        ClubFlagDefinition, id=int(flag_id), club=event.club, is_active=True
+    )
+
     blocked = _guard_participant_change(request, event, require_admin_when_published=True)
     if blocked:
         return blocked
@@ -1153,28 +1259,36 @@ def toggle_participant_flag(request):
     else:
         return JsonResponse({"ok": False, "error": "missing_target"}, status=400)
 
+    # ---- value の解釈：空欄はクリア、数字1桁のみ許可 ----
+    if value_raw == "":
+        next_val = None
+    else:
+        if not value_raw.isdigit() or len(value_raw) != 1:
+            return JsonResponse({"ok": False, "error": "bad_value"}, status=400)
+        next_val = int(value_raw)
+        # 0を許可しないならここを 1-9 にする
+        if next_val < 0 or next_val > 9:
+            return JsonResponse({"ok": False, "error": "bad_value"}, status=400)
+
     obj, _created = ParticipantFlag.objects.get_or_create(
         event_participant=ep,
         flag_definition=flagdef,
     )
 
-    # ★ここが肝：created/既存に関係なく「必ず」反映して保存
-    if obj.is_on != is_on:
-        obj.is_on = is_on
-        # updated_at が auto_now なら update_fields でもOK
-        # auto_now じゃない/存在しないなら update_fields を外して obj.save() にする
-        try:
-            obj.save(update_fields=["is_on", "updated_at"])
-        except Exception:
-            obj.save()
-
-    print("[toggle_flag]", event.id, ep.id, flagdef.id, "=>", obj.is_on)
+    # ★digitモードは value を保存。is_on も“連動”させておくと後が楽
+    obj.value = next_val
+    obj.is_on = (next_val is not None)  # ←「数字が入っていればON扱い」
+    try:
+        obj.save(update_fields=["value", "is_on", "updated_at"])
+    except Exception:
+        obj.save()
 
     return JsonResponse({
         "ok": True,
         "ep_id": ep.id,
         "flag_id": flagdef.id,
-        "checked": bool(obj.is_on),
+        "value": obj.value,                 # None or int
+        "checked": bool(obj.is_on),         # 互換用
     })
 
 
@@ -1940,3 +2054,4 @@ def substitute_slot(request):
 
     schedule_html = render_to_string("tennis/_schedule_block.html", ctx, request=request)
     return JsonResponse({"ok": True, "schedule_html": schedule_html})
+

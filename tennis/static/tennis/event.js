@@ -27,24 +27,9 @@
   function safeConfirm(message, opts = {}) {
     const ui = window.UI;
 
-    // 1) UI.confirm が Promise を返すならそれを使う
     try {
       if (ui?.confirm) {
-        const ret = ui.confirm(message, {
-          title: opts.title || "確認",
-          okText: opts.okText || "OK",
-          cancelText: opts.cancelText || "キャンセル",
-          onOk: opts.onOk,
-          onCancel: opts.onCancel,
-          onClose: opts.onClose,
-        });
-
-        if (ret && typeof ret.then === "function") {
-          // Promise<boolean> を期待
-          return ret.then((v) => !!v).catch(() => false);
-        }
-
-        // 2) コールバック式の場合に備えて Promise ラップ
+        // ★二重呼び出し防止：常に Promise ラップで 1 回だけ呼ぶ
         return new Promise((resolve) => {
           ui.confirm(message, {
             title: opts.title || "確認",
@@ -60,7 +45,6 @@
       console.warn("UI.confirm failed, fallback to window.confirm", e);
     }
 
-    // 3) fallback
     return Promise.resolve(window.confirm(message));
   }
 
@@ -233,11 +217,13 @@
       updateAttendance: participantsTable.dataset.updateAttendanceUrl,
       updateComment: participantsTable.dataset.updateCommentUrl,
       toggleFlag: participantsTable.dataset.toggleFlagUrl,
+      setFlagValue: participantsTable.dataset.setFlagValueUrl,
       setParticipatesMatch: participantsTable.dataset.setParticipatesMatchUrl,
       addGuest: participantsTable.dataset.addGuestUrl,
       publish: participantsTable.dataset.publishUrl,
       saveScore: participantsTable.dataset.saveScoreUrl,
     };
+
 
     // ============================================================
     // [HELPERS] publish pill state
@@ -275,6 +261,15 @@
         btn.classList.add("pill-disabled");
         return;
       }
+
+      if (state === "ready") {
+        btn.textContent = "📢 対戦表を公開";
+        btn.disabled = false;
+        btn.classList.remove("pill-disabled");
+        return;
+      }
+
+
       if (state === "published") {
         btn.textContent = "公開済み";
         btn.disabled = true;
@@ -338,7 +333,7 @@
       const fd = new FormData();
       fd.append("event_id", eventId);
       appendParticipant(fd, ids, row);
-      fd.append("checked", checked ? "true" : "false");
+      fd.append("checked", checked ? "1" : "0");
 
       try {
         const r = await fetch(urls.setParticipatesMatch, {
@@ -415,6 +410,10 @@
         const btn = e.target.closest(".toggle-check");
         if (!btn) return;
 
+        if (btn.closest("td")?.querySelector('[data-input-mode="digit"]')) {
+          return;
+        }
+
         const flagId = (btn.dataset.flagId || "").trim();
         if (!flagId) return;
 
@@ -438,6 +437,9 @@
         fd.append("flag_id", flagId);
         fd.append("checked", willOn ? "1" : "0");
 
+        const adminToken = participantsTable.dataset.adminToken;
+        if (adminToken) fd.append("admin_token", adminToken);
+
         try {
           const r = await fetch(urls.toggleFlag, {
             method: "POST",
@@ -457,6 +459,74 @@
         }
       });
     }
+
+    if (urls.setFlagValue) {
+      qsa('.flag-digit-input[data-input-mode="digit"]', participantsTable)
+        .forEach((input) => {
+        let lastSent = null;
+
+        const normalize = (v) => {
+          const s = String(v || "").trim();
+          if (s === "") return "";
+          if (!/^\d$/.test(s)) return "";
+          return s;
+        };
+
+        const post = async () => {
+          const row = getRowFromEl(input);
+          const ids = getIdsFromEl(input);
+          const flagId = (input.dataset.flagId || "").trim();
+          if (!flagId) return;
+
+          const v = normalize(input.value);
+          input.value = v;
+
+          const key = `${ids.epId || ids.memberId}:${flagId}:${v}`;
+          if (key === lastSent) return;
+          lastSent = key;
+
+          const fd = new FormData();
+          fd.append("event_id", eventId);
+          appendParticipant(fd, ids, row);
+          fd.append("flag_id", flagId);
+          fd.append("value", v); // "" = クリア
+
+          const adminToken = participantsTable.dataset.adminToken;
+          if (adminToken) fd.append("admin_token", adminToken);
+
+          try {
+            const r = await fetch(urls.setFlagValue, {
+              method: "POST",
+              headers: { "X-CSRFToken": csrftoken },
+              body: fd,
+            });
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok || !data.ok) throw new Error("not ok");
+            if (data.ep_id) applyEpIdToRow(row, data.ep_id);
+          } catch (e) {
+            console.error(e);
+            lastSent = null;
+            safeShowMessage("フラグ更新に失敗しました", 2600);
+          }
+        };
+
+        input.addEventListener("input", () => {
+          input.value = normalize(input.value).slice(0, 1);
+        });
+        input.addEventListener("blur", post);
+        input.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter") {
+            ev.preventDefault();
+            input.blur();
+          } else if (ev.key === "Escape") {
+            ev.preventDefault();
+            input.value = "";
+            input.blur();
+          }
+        });
+      });
+    }
+
 
     // ============================================================
     // [COMMON] 出欠モーダル + 保存（admin/public 共通）

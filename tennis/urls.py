@@ -50,6 +50,7 @@ urlpatterns = [
     path("api/event/toggle_flag/", views.toggle_participant_flag, name="toggle_participant_flag"),
     path("api/event/set_participates_match/", views.set_participates_match, name="set_participates_match"),
     path("api/event/add_guest/", views.add_guest_participant, name="add_guest_participant"),
+    path("api/event/set_flag_value/", views.set_participant_flag_value, name="set_participant_flag_value"),
 
     # schedule
     path(
@@ -67,6 +68,11 @@ urlpatterns = [
     path("api/club/add_member/", views.club_add_member, name="club_add_member"),
     path("api/club/rename_member/", views.club_rename_member, name="club_rename_member"),
     path("api/club/toggle_member_fixed/", views.club_toggle_member_fixed, name="club_toggle_member_fixed"),
+        path(
+        "clubs/flag-input-mode/",
+        views.club_set_flag_input_mode,
+        name="club_set_flag_input_mode",
+    ),
     path("api/substitute_slot/", views.substitute_slot, name="substitute_slot"),
 
 ]

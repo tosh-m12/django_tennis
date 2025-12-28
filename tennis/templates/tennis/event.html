@@ -72,10 +72,13 @@
       id="participants-table"
       data-is-admin="{% if is_admin %}1{% else %}0{% endif %}"
       data-event-id="{{ event.id }}"
+      {% if is_admin %}data-admin-token="{{ club.admin_token }}"{% endif %}
       data-publish-state="{{ publish_state }}"
       data-update-attendance-url="{% url 'tennis:update_attendance' %}"
       data-update-comment-url="{% url 'tennis:update_comment' %}"
       data-toggle-flag-url="{% url 'tennis:toggle_participant_flag' %}"
+      data-flag-input-mode="{{ flag_input_mode }}"
+      data-set-flag-value-url="{% url 'tennis:set_participant_flag_value' %}"
       data-set-participates-match-url="{% url 'tennis:set_participates_match' %}"
       data-add-guest-url="{% url 'tennis:add_guest_participant' %}"
       data-publish-url="{% url 'tennis:publish_schedule' %}"
@@ -151,29 +154,38 @@
 
           {# ===== flags ===== #}
           {% for flag in flags %}
-          <td class="check-cell">
-            {% if row.ep_id %}
-              {% with ep_flags=flag_states|get_item:row.ep_id %}
-                {% with on=ep_flags|get_item:flag.id %}
-                  <button type="button"
-                          class="check-btn toggle-check {% if on %}is-on{% endif %}"
+            <td class="check-cell">
+              {% if flag.input_mode == "digit" %}
+                {# ✅ digit：flag_states_val を参照 #}
+                {% with ep_flags=flag_states_val|get_item:row.ep_id %}
+                  {% with val=ep_flags|get_item:flag.id %}
+                    <input type="text"
+                          inputmode="numeric"
+                          pattern="[0-9]"
+                          maxlength="1"
+                          class="tb-score-input flag-digit-input"
+                          data-input-mode="digit"
+                          value="{% if val != None %}{{ val }}{% endif %}"
                           data-member-id="{{ row.member_id }}"
-                          data-ep-id="{{ row.ep_id }}"
+                          data-ep-id="{{ row.ep_id|default_if_none:'' }}"
                           data-flag-id="{{ flag.id }}">
-                    <span class="check-icon {% if on %}check-on{% else %}check-off{% endif %}">✓</span>
-                  </button>
+                  {% endwith %}
                 {% endwith %}
-              {% endwith %}
-            {% else %}
-              <button type="button"
-                      class="check-btn toggle-check"
-                      data-member-id="{{ row.member_id }}"
-                      data-ep-id=""
-                      data-flag-id="{{ flag.id }}">
-                <span class="check-icon check-off">✓</span>
-              </button>
-            {% endif %}
-          </td>
+              {% else %}
+                {# ✅ check：flag_states_on を参照 #}
+                {% with ep_flags=flag_states_on|get_item:row.ep_id %}
+                  {% with on=ep_flags|get_item:flag.id %}
+                    <button type="button"
+                            class="check-btn toggle-check {% if on %}is-on{% endif %}"
+                            data-member-id="{{ row.member_id }}"
+                            data-ep-id="{{ row.ep_id|default_if_none:'' }}"
+                            data-flag-id="{{ flag.id }}">
+                      <span class="check-icon {% if on %}check-on{% else %}check-off{% endif %}">✓</span>
+                    </button>
+                  {% endwith %}
+                {% endwith %}
+              {% endif %}
+            </td>
           {% endfor %}
 
           <td class="comment-cell">
@@ -231,19 +243,38 @@
 
           {# ===== flags ===== #}
           {% for flag in flags %}
-          <td class="check-cell">
-            {% with ep_flags=flag_states|get_item:row.ep_id %}
-              {% with on=ep_flags|get_item:flag.id %}
-                <button type="button"
-                        class="check-btn toggle-check {% if on %}is-on{% endif %}"
-                        data-member-id="{{ row.member_id|default_if_none:'' }}"
-                        data-ep-id="{{ row.ep_id }}"
-                        data-flag-id="{{ flag.id }}">
-                  <span class="check-icon {% if on %}check-on{% else %}check-off{% endif %}">✓</span>
-                </button>
-              {% endwith %}
-            {% endwith %}
-          </td>
+            <td class="check-cell">
+              {% if flag.input_mode == "digit" %}
+                {# ✅ digit：flag_states_val を参照 #}
+                {% with ep_flags=flag_states_val|get_item:row.ep_id %}
+                  {% with val=ep_flags|get_item:flag.id %}
+                    <input type="text"
+                          inputmode="numeric"
+                          pattern="[0-9]"
+                          maxlength="1"
+                          class="tb-score-input flag-digit-input"
+                          data-input-mode="digit"
+                          value="{% if val != None %}{{ val }}{% endif %}"
+                          data-member-id="{{ row.member_id|default_if_none:'' }}"
+                          data-ep-id="{{ row.ep_id }}"
+                          data-flag-id="{{ flag.id }}">
+                  {% endwith %}
+                {% endwith %}
+              {% else %}
+                {# ✅ check：flag_states_on を参照（ここが一番間違えやすい） #}
+                {% with ep_flags=flag_states_on|get_item:row.ep_id %}
+                  {% with on=ep_flags|get_item:flag.id %}
+                    <button type="button"
+                            class="check-btn toggle-check {% if on %}is-on{% endif %}"
+                            data-member-id="{{ row.member_id|default_if_none:'' }}"
+                            data-ep-id="{{ row.ep_id }}"
+                            data-flag-id="{{ flag.id }}">
+                      <span class="check-icon {% if on %}check-on{% else %}check-off{% endif %}">✓</span>
+                    </button>
+                  {% endwith %}
+                {% endwith %}
+              {% endif %}
+            </td>
           {% endfor %}
 
           <td class="comment-cell">
@@ -263,10 +294,10 @@
 
   {{ sub_candidates|json_script:"sub-candidates-json" }}
 
-      {# ★固定もゲストも0件ならメッセージ表示 #}
-      {% if not fixed_rows and not guest_rows %}
-        <div class="participant-empty">名前がまだ登録されていません。</div>
-      {% endif %}
+  {# ★固定もゲストも0件ならメッセージ表示 #}
+  {% if not fixed_rows and not guest_rows %}
+    <div class="participant-empty">名前がまだ登録されていません。</div>
+  {% endif %}
 
   <hr>
 

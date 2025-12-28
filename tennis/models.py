@@ -22,6 +22,16 @@ class Club(models.Model):
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
+    FLAG_INPUT_MODE_CHOICES = (
+        ("check", "チェックボックス"),
+        ("digit", "数字(1桁)"),
+    )
+    flag_input_mode = models.CharField(
+        max_length=10,
+        choices=FLAG_INPUT_MODE_CHOICES,
+        default="check",
+    )
+
     def save(self, *args, **kwargs):
         if not self.public_token:
             self.public_token = uuid.uuid4().hex
@@ -154,7 +164,20 @@ class ClubFlagDefinition(models.Model):
         Club, on_delete=models.CASCADE, related_name="flag_definitions"
     )
     name = models.CharField(max_length=100)
-    display_order = models.PositiveIntegerField(default=1)
+    display_order = models.PositiveIntegerField()
+
+    INPUT_MODE_CHECK = "check"
+    INPUT_MODE_DIGIT = "digit"
+    INPUT_MODE_CHOICES = [
+        (INPUT_MODE_CHECK, "チェック"),
+        (INPUT_MODE_DIGIT, "数字(1桁)"),
+    ]
+    input_mode = models.CharField(
+        max_length=10,
+        choices=INPUT_MODE_CHOICES,
+        default=INPUT_MODE_CHECK,
+    )
+
     is_active = models.BooleanField(default=True)
 
     created_at = models.DateTimeField(auto_now_add=True)
@@ -189,6 +212,8 @@ class ParticipantFlag(models.Model):
         ClubFlagDefinition, on_delete=models.CASCADE, related_name="participant_flags"
     )
     is_on = models.BooleanField(default=False)
+
+    value = models.SmallIntegerField(null=True, blank=True)
 
     updated_at = models.DateTimeField(auto_now=True)
 

@@ -5,3 +5,80 @@ http://127.0.0.1:8000/c/360c11579be44dd78396a6c0d9f137a1/admin/106cc1dd77d848808
 TennisAdmin-2025!
 
 admin
+
+
+
+了解。**フラグ仕様改修で「次に手を入れる必要があるファイル」**を、**ファイル名単位**で一本道に並べます（上から順にやる）。
+
+---
+
+## 1) サーバ側（APIの土台を固める）
+
+1. **`tennis/views.py`**
+
+   * `club_add_flag`（input_mode 受け取り＆保存）
+   * `club_set_flag_input_mode`（POSTキー整合・Clubのデフォルト保存）
+   * `toggle_participant_flag`（check用：is_on更新）※未実装なら追加
+   * `set_participant_flag_value`（digit用：value更新＋is_on連動）
+
+2. **`tennis/urls.py`**
+
+   * 上のAPIエンドポイントのURL定義（既存があれば整合、なければ追加）
+
+---
+
+## 2) モデル側（すでに概ねOKだが確定させる）
+
+3. **`tennis/models.py`**
+
+   * `ClubFlagDefinition.input_mode`（個別モードの正）
+   * `Club.flag_input_mode`（新規フラグ追加時のデフォルト）
+   * `ParticipantFlag.value` の運用（digit用）
+     ※あなたが指摘した **`updated_at` 重複**があるならここで削除（※今貼った版では重複は無い）
+
+4. **`tennis/migrations/000x_*.py`（自動生成）**
+
+   * models変更が入ったら生成される（手修正は原則しない）
+
+---
+
+## 3) テンプレ側（input_mode をJSに渡す）
+
+5. **`tennis/templates/tennis/event.html`**（または参加者表を出している部分テンプレ）
+
+   * フラグ列（th/td）に `data-flag-id` と **`data-input-mode`** を出す
+
+6. **`tennis/templates/tennis/club_settings.html`**（設定画面）
+
+   * 追加モーダルの `select(name=input_mode)`
+   * ラジオ（Clubのデフォルトモード）と hooks の data属性（URL/club_id/admin_token）
+
+7. **`tennis/templates/tennis/_ui_modals.html`**（モーダル共通）
+
+   * `flag-add-modal` / `flag-delete-modal` / `flag-rename-modal` のDOM要素・id整合
+
+---
+
+## 4) フロントJS（分岐の実装）
+
+8. **`tennis/static/tennis/event.js`**
+
+   * `data-input-mode` を見て
+
+     * check列 → toggle API
+     * digit列 → value API
+   * digit入力のUI反映（blur/changeで送信）
+
+9. **`tennis/static/tennis/club_settings.js`**
+
+   * 追加モーダル：`input_mode` を `club_add_flag` に送る（もうやってる）
+   * Clubデフォルト変更：`mode`/`flag_input_mode` のPOSTキーを views と揃える
+
+---
+
+### 最短で「次に触るべき1ファイル」
+
+**次は `tennis/views.py`**（POSTキー不整合とAPI責務の固定が最優先）。
+ここが固まらないと、JS/テンプレを直してもまた迷走する。
+
+必要なら、この順番のまま **「views.pyのどの関数をどう直すか」**を“差分だけ”で出す。
