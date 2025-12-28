@@ -280,5 +280,15 @@
     padding-bottom: calc(20px + env(safe-area-inset-bottom));
   }
 
+    /* iOS Safari zoom対策：入力系は必ず16px以上 */
+  #club-event-modal input,
+  #club-event-modal select,
+  #club-event-modal textarea,
+  #club-event-modal button,
+  #club-event-modal .time-label,
+  #club-event-modal .toggle-btn {
+    font-size: 16px !important;
+  }
+
 }
 
