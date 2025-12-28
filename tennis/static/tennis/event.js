@@ -676,18 +676,17 @@
 
               // sortParticipantsByAttendance();
 
-              const willShowMatch = attendance === "yes";
-              setMatchVisible(row, willShowMatch);
-
-              if (willShowMatch) {
-                await setParticipatesMatchForRow(row, true);
-              } else {
-                await setParticipatesMatchForRow(row, false);
-              }
-
               if (isAdmin) {
+                const willShowMatch = attendance === "yes";
+                setMatchVisible(row, willShowMatch);
+
+                const ok = await setParticipatesMatchForRow(row, willShowMatch);
+                if (!ok) {
+                  safeShowMessage("試合参加の更新に失敗しました（再試行してください）", 2600);
+                }
+
                 markChangedIfPublishedExists();
-                updateSettingsPillsLive();   // ★ピルだけ更新（対戦表は更新しない）
+                updateSettingsPillsLive();
               }
 
               close();

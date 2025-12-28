@@ -95,7 +95,9 @@
         <col style="width: 40px;">
         <col style="width: 130px;">
         <col style="width: 50px;">   {# 出欠 #}
-        <col style="width: 80px;">   {# 試合参加 #}
+        {% if is_admin %}
+          <col style="width: 80px;">   {# 試合参加 #}
+        {% endif %}
         {% for flag in flags %}<col>{% endfor %}
         <col style="width: 180px;">
       </colgroup>
@@ -105,7 +107,9 @@
           <th></th>
           <th>名前</th>
           <th>出欠</th>
-          <th>試合参加</th>
+          {% if is_admin %}
+            <th>試合参加</th>
+          {% endif %}
           {% for flag in flags %}
             <th class="flag-header" data-flag-id="{{ flag.id }}">
               <span class="flag-name">{{ flag.name }}</span>
@@ -146,17 +150,19 @@
           </td>
 
           {# ★試合参加（両方操作可）＋連動のため識別class付与（attendance!=yes は初期非表示） #}
-          <td class="check-cell match-cell">
-            <button type="button"
-                    class="check-btn toggle-check match-toggle
-                          {% if row.participates_match %}is-on{% endif %}
-                          {% if row.attendance != 'yes' %}is-hidden{% endif %}"
-                    data-kind="match"
-                    data-member-id="{{ row.member_id }}"
-                    data-ep-id="{{ row.ep_id|default_if_none:'' }}">
-              <span class="check-icon {% if row.participates_match %}check-on{% else %}check-off{% endif %}">✓</span>
-            </button>
-          </td>
+          {% if is_admin %}
+            <td class="check-cell match-cell">
+              <button type="button"
+                      class="check-btn toggle-check match-toggle
+                            {% if row.participates_match %}is-on{% endif %}
+                            {% if row.attendance != 'yes' %}is-hidden{% endif %}"
+                      data-kind="match"
+                      data-member-id="{{ row.member_id }}"
+                      data-ep-id="{{ row.ep_id|default_if_none:'' }}">
+                <span class="check-icon {% if row.participates_match %}check-on{% else %}check-off{% endif %}">✓</span>
+              </button>
+            </td>
+          {% endif %}
 
           {# ===== flags ===== #}
           {% for flag in flags %}
@@ -216,6 +222,7 @@
           <td><div class="tb-player-card-sm">{{ row.display_name }}</div></td>
 
           {# ★出欠（常に操作可） #}
+
           <td class="attendance-cell">
             <button type="button"
                     class="attendance-btn"
@@ -235,17 +242,20 @@
           </td>
 
           {# ★試合参加（常に操作可）＋連動のため識別class付与（attendance!=yes は初期非表示） #}
-          <td class="check-cell match-cell">
-            <button type="button"
-                    class="check-btn toggle-check match-toggle
-                          {% if row.participates_match %}is-on{% endif %}
-                          {% if row.attendance != 'yes' %}is-hidden{% endif %}"
-                    data-kind="match"
-                    data-member-id="{{ row.member_id|default_if_none:'' }}"
-                    data-ep-id="{{ row.ep_id }}">
-              <span class="check-icon {% if row.participates_match %}check-on{% else %}check-off{% endif %}">✓</span>
-            </button>
-          </td>
+          {% if is_admin %}
+            <td class="check-cell match-cell">
+              <button type="button"
+                      class="check-btn toggle-check match-toggle
+                            {% if row.participates_match %}is-on{% endif %}
+                            {% if row.attendance != 'yes' %}is-hidden{% endif %}"
+                      data-kind="match"
+                      data-member-id="{{ row.member_id|default_if_none:'' }}"
+                      data-ep-id="{{ row.ep_id }}">
+                <span class="check-icon {% if row.participates_match %}check-on{% else %}check-off{% endif %}">✓</span>
+              </button>
+            </td>
+          {% endif %}
+
 
           {# ===== flags ===== #}
           {% for flag in flags %}
