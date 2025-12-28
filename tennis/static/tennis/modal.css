@@ -107,7 +107,7 @@
 .modal-form label {
   display: block;
   font-weight: 600;
-  /* font-size: 0.95rem; */
+  font-size: 0.95rem;
   margin-bottom: 6px;
   text-align: center;
   width: 100%;
@@ -204,7 +204,7 @@
   border-radius: 999px;
   border: none;
   background: transparent;
-  /* font-size: 0.95rem; */
+  font-size: 0.95rem;
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
@@ -294,7 +294,7 @@
   outline: none;
 
   background: #f3f6ff;
-  /* font-size: 0.95rem; */
+  font-size: 0.95rem;
   font-weight: 600;
 }
 
@@ -349,7 +349,7 @@
   border: none;
   background: transparent;
 
-  /* font-size: 0.95rem; */
+  font-size: 0.95rem;
   font-weight: 600;
   outline: none;
   cursor: pointer;
@@ -509,7 +509,7 @@
   border: 2px solid #ff4d4d;     /* 赤枠 */
 
   font-weight: 700;
-  /* font-size: 0.95rem; */
+  font-size: 0.95rem;
   letter-spacing: 0.04em;
 
   cursor: pointer;
