@@ -132,7 +132,7 @@ document.addEventListener("DOMContentLoaded", () => {
     modal.classList.add("is-open");
     modal.setAttribute("aria-hidden", "false");
 
-    if (titleInput) titleInput.focus();
+    // if (titleInput) titleInput.focus();
   }
 
   function closeModal() {
