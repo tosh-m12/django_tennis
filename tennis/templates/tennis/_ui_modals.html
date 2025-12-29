@@ -114,7 +114,7 @@ settings でだけ注意文を出したい場合：
           type="text"
           id="guest-name-input"
           class="event-title-input"
-          placeholder="例：山田（ゲスト）"
+          placeholder="例：ニック・キリオス"
           autocomplete="name"
         >
       </div>
@@ -421,15 +421,15 @@ settings でだけ注意文を出したい場合：
               class="event-title-input"
               maxlength="80"
               autocomplete="off"
-              placeholder="例：かご / ボール">
+              placeholder="例：ケース / ボール">
       </div>
 
       <!-- ★追加：入力形式 -->
       <div class="field-group">
         <label for="flag-add-input-mode">入力形式</label>
-        <select id="flag-add-input-mode" class="modal-select" style="width:80%;">
+        <select id="flag-add-input-mode" class="modal-select flag-input-mode-select">
           <option value="check" selected>チェック</option>
-          <option value="digit">数字（1桁）</option>
+          <option value="digit">0 ~ 9</option>
         </select>
       </div>
 

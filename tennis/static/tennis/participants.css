@@ -100,10 +100,24 @@
 .attendance-btn:active{ transform: translateY(1px); }
 
 .attendance-icon{
-  display: inline-block;
-  font-size: 22px;
+  display: inline-flex;           /* ★ inline-block → inline-flex */
+  align-items: center;            /* ★縦中央 */
+  justify-content: center;        /* ★横中央 */
+
+  width: 26px;
+  height: 26px;
+  box-sizing: border-box;         /* ★枠込みで26pxに固定 */
+
+  border: 1.5px solid #d1d5db;
+  border-radius: 4px;
+
+  font-size: 20px;                /* ★check-icon と揃える（今 22px なのでズレやすい） */
   font-weight: 900;
-  line-height: 1;
+  line-height: 1;                 /* これはOK */
+}
+
+.attendance-none {
+  /* 表示なし（空） */
 }
 
 /* 色イメージ（調整さん風） */

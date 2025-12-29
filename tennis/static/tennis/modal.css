@@ -615,3 +615,49 @@
   width: 80%;
   margin: 0 auto;   /* 中央寄せ */
 }
+
+/* flag-add-modal の「入力形式」だけ、フラグ名inputと完全に同じ幅・見た目にする */
+#flag-add-modal .event-title-input,
+#flag-add-modal #flag-add-input-mode.flag-input-mode-select{
+  width: 180px;            /* ★ここを完全固定にする（見た目ズレ防止） */
+  max-width: none;         /* ★max-width運用をやめる */
+  box-sizing: border-box;
+
+  padding: 10px 12px;      /* ★ input と統一 */
+  border: none;
+  border-radius: 10px;
+  outline: none;
+
+  background: #f3f6ff;     /* ★ input と統一 */
+  font-size: 0.95rem;
+  font-weight: 600;
+
+  display: block;          /* ★ selectの微妙な縮み対策 */
+}
+
+/* focus も input に寄せる */
+#flag-add-modal .event-title-input:focus,
+#flag-add-modal #flag-add-input-mode.flag-input-mode-select:focus{
+  background: #eaf0ff;
+}
+
+/* select 固有（見た目安定） */
+#flag-add-modal #flag-add-input-mode.flag-input-mode-select{
+  height: auto;            /* 念のため */
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+/* =========================================
+   Attendance modal – 二重枠の完全排除（最終勝ち）
+   ========================================= */
+#attendance-modal .attendance-choice{
+  border: 1px solid #e5e7eb;   /* 外枠は残す */
+}
+
+#attendance-modal .attendance-choice .attendance-icon{
+  border: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}

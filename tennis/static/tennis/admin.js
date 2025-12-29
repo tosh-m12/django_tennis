@@ -728,7 +728,7 @@ window.publishSchedule = function () {
       if (r.status === 409 && data && data.error === "score_exists") {
         UI.confirm(data.message || "スコアが存在します。上書き公開しますか？", {
           okText: "上書き公開",
-          cancelText: "やめる",
+          cancelText: "中止",
           onOk: async () => {
             try {
               const res2 = await postPublish(true);

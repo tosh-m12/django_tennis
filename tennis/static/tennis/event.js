@@ -125,13 +125,13 @@
 
       const msg =
         "この対戦表は公開済みです。\n" +
-        "ここで出欠/試合参加を変更すると、公開内容とズレが発生します。\n" +
-        "変更後は「再公開」が必要です。続行しますか？";
+        "出欠/試合参加を変更すると対戦表とズレが生じるため\n" +
+        "「再公開」が必要です。続行しますか？";
 
       const ok = await safeConfirm(msg, {
         title: "確認",
-        okText: "続行する",
-        cancelText: "やめる",
+        okText: "続行",
+        cancelText: "中止",
       });
 
       if (ok) adminConfirmedAfterPublish = true;
@@ -139,7 +139,7 @@
     }
 
     function blockPublicEdit(msg) {
-      safeShowMessage(msg || "公開後は幹事のみ変更できます", 2200);
+      safeShowMessage(msg || "対戦表確定後の出欠変更は幹事へ申請してください", 2200);
     }
 
     // ============================================================
@@ -205,8 +205,8 @@
 
       const ok = await safeConfirm("終了したイベントです。\n出席者変更しますか？", {
         title: "確認",
-        okText: "変更する",
-        cancelText: "やめる",
+        okText: "変更",
+        cancelText: "中止",
       });
 
       if (ok) adminConfirmedForEndedEvent = true;
@@ -370,7 +370,7 @@
       const rows = Array.from(tbody.querySelectorAll("tr.participant-row"));
       if (!rows.length) return;
 
-      const order = { yes: 0, maybe: 1, "": 1, no: 2 };
+      const order = { yes: 0, maybe: 1, no: 2, "": 3 };
 
       function getAttendance(tr) {
         const btn = tr.querySelector(".attendance-btn");
@@ -620,7 +620,7 @@
           if (lockPublicEdits) {
             ev.preventDefault();
             ev.stopPropagation();
-            return blockPublicEdit("公開後は出欠を変更できません（幹事のみ）");
+            return blockPublicEdit("対戦表確定後の出欠変更は幹事へ申請してください");
           }
 
           // ★ここから await
@@ -664,17 +664,16 @@
 
               if (data.ep_id) applyEpIdToRow(row, data.ep_id);
 
-              let html = `<span class="attendance-icon attendance-maybe">?</span>`;
+              let html = `<span class="attendance-icon attendance-none">&nbsp;</span>`;
               if (attendance === "yes")
                 html = `<span class="attendance-icon attendance-yes">✓</span>`;
-              if (attendance === "no")
+              else if (attendance === "no")
                 html = `<span class="attendance-icon attendance-no">×</span>`;
-              if (attendance === "maybe")
+              else if (attendance === "maybe")
                 html = `<span class="attendance-icon attendance-maybe">?</span>`;
-              currentBtn.innerHTML = html;
-              currentBtn.dataset.attendance = attendance;
 
-              // sortParticipantsByAttendance();
+              currentBtn.innerHTML = html;
+              currentBtn.dataset.attendance = attendance; // "" のままでもOK
 
               if (isAdmin) {
                 const willShowMatch = attendance === "yes";
@@ -725,7 +724,7 @@
 
         addBtn.addEventListener("click", async () => {
           if (lockPublicEdits)
-            return blockPublicEdit("公開後は出席者追加できません（幹事のみ）");
+            return blockPublicEdit("対戦表公開後の出欠変更は幹事へ申請してください");
 
           if (!(await warnIfAdminEditingPublished())) return;
           if (!(await guardParticipantChangeIfEnded())) return;
@@ -996,7 +995,7 @@
         if (lockPublicEdits) {
           e.preventDefault();
           e.stopPropagation();
-          return blockPublicEdit("公開後は試合参加を変更できません（幹事のみ）");
+          return blockPublicEdit("対戦表確定後の出欠変更は幹事へ申請してください");
         }
 
         if (!(await warnIfAdminEditingPublished())) {
@@ -1916,7 +1915,7 @@
         // 公開済み対戦表が変更された（幹事なら再公開導線へ）
         if (isAdmin) markChangedIfPublishedExists();
 
-        safeShowMessage("代打を反映しました。（スコア入力済みの場合は入れ直してください）", 2200);
+        safeShowMessage("代打を反映しました。（スコアは再入力してください）", 2200);
         closeSub();
       } catch (e) {
         console.error(e);
