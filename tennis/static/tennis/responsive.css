@@ -286,7 +286,10 @@
   #club-event-modal textarea,
   #club-event-modal button,
   #club-event-modal .time-label,
-  #club-event-modal .toggle-btn {
+  #club-event-modal .toggle-btn,
+  #add-guest-modal input,
+  #add-guest-modal select,
+  #add-guest-modal textarea {
     font-size: 16px !important;
   }
 
