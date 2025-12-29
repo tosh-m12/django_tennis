@@ -293,5 +293,11 @@
     font-size: 16px !important;
   }
 
+  .modal-content input,
+  .modal-content select,
+  .modal-content textarea {
+    font-size: 16px !important;
+  }
+
 }
 
