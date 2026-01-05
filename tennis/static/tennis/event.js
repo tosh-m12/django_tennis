@@ -7,12 +7,14 @@
 //          - click に preventDefault/stopPropagation を付与
 
 (function () {
+
   function getCookie(name) {
     const value = `; ${document.cookie}`;
     const parts = value.split(`; ${name}=`);
     if (parts.length === 2) return parts.pop().split(";").shift();
     return null;
   }
+
   function qsa(sel, root = document) {
     return Array.from(root.querySelectorAll(sel));
   }
@@ -89,7 +91,7 @@
 
 
   document.addEventListener("DOMContentLoaded", () => {
-    const csrftoken = getCookie("csrftoken");
+    csrftoken = getCookie("csrftoken") || "";
     const participantsTable = document.getElementById("participants-table");
     if (!participantsTable) return;
 
@@ -338,6 +340,7 @@
       try {
         const r = await fetch(urls.setParticipatesMatch, {
           method: "POST",
+          credentials: "same-origin",
           headers: { "X-CSRFToken": csrftoken },
           body: fd,
         });
@@ -432,6 +435,7 @@
           try {
             const r = await fetch(urls.updateComment, {
               method: "POST",
+              credentials: "same-origin",
               headers: { "X-CSRFToken": csrftoken },
               body: fd,
             });
@@ -495,6 +499,7 @@
         try {
           const r = await fetch(urls.toggleFlag, {
             method: "POST",
+            credentials: "same-origin",
             headers: { "X-CSRFToken": csrftoken },
             body: fd,
           });
@@ -549,6 +554,7 @@
           try {
             const r = await fetch(urls.setFlagValue, {
               method: "POST",
+              credentials: "same-origin",
               headers: { "X-CSRFToken": csrftoken },
               body: fd,
             });
@@ -656,6 +662,7 @@
             try {
               const r = await fetch(urls.updateAttendance, {
                 method: "POST",
+                credentials: "same-origin",
                 headers: { "X-CSRFToken": csrftoken },
                 body: fd,
               });
@@ -762,6 +769,7 @@
           try {
             const r = await fetch(urls.addGuest, {
               method: "POST",
+              credentials: "same-origin",
               headers: { "X-CSRFToken": csrftoken },
               body: fd,
             });
@@ -915,6 +923,7 @@
       try {
         const r = await fetch(url, {
           method: "POST",
+          credentials: "same-origin",
           headers: { "X-CSRFToken": csrftoken },
           body: fd,
         });
@@ -1030,6 +1039,7 @@
         try {
           const r = await fetch(urls.setParticipatesMatch, {
             method: "POST",
+            credentials: "same-origin",
             headers: { "X-CSRFToken": csrftoken },
             body: fd,
           });
@@ -1260,6 +1270,7 @@
 
             const r = await fetch(saveUrl, {
               method: "POST",
+              credentials: "same-origin",
               headers: { "X-CSRFToken": csrftoken },
               body: fd,
             });
@@ -1336,6 +1347,7 @@
 
         const r = await fetch(publishUrl, {
           method: "POST",
+          credentials: "same-origin",
           headers: { "X-CSRFToken": csrftoken },
           body: fd,
         });
@@ -1656,6 +1668,7 @@
             try {
               const r = await fetch(updateUrl, {
                 method: "POST",
+                credentials: "same-origin",
                 headers: { "X-CSRFToken": csrftoken },
                 body: fd,
               });
@@ -1703,6 +1716,7 @@
           try {
             const r = await fetch(updateUrl, {
               method: "POST",
+              credentials: "same-origin",
               headers: { "X-CSRFToken": csrftoken },
               body: fd,
             });
@@ -1895,6 +1909,7 @@
       try {
         const r = await fetch(subUrl, {
           method: "POST",
+          credentials: "same-origin",
           headers: { "X-CSRFToken": csrftoken },
           body: fd,
         });
