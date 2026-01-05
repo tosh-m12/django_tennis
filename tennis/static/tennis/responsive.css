@@ -265,9 +265,6 @@
   /* =========================================
    Mobile fit: モーダルが画面からはみ出さない
    ========================================= */
-
-
-
   .modal-content {
     max-width: 100%;
     width: 100%;
@@ -279,8 +276,6 @@
   .modal-content {
     padding-bottom: calc(20px + env(safe-area-inset-bottom));
   }
-
-
 
   .modal-content input,
   .modal-content select,

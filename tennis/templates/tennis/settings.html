@@ -51,6 +51,15 @@
 <hr>
 <h3>メンバー管理</h3>
 
+<small style="color:#666; display:block; margin-bottom:10px;">
+  ※ 固定メンバーは、一度設定すると次回以降に新しく作成するイベントではデフォルトで名前が表示されます。<br>
+  新しくメンバーを追加した際、固定メンバーの場合は✓を入れてください。
+</small>
+<small style="color:#666; display:block; margin-bottom:10px;">
+  ※ チーム分けは、ここで設定したものがイベント新規作成時にデフォルトとして表示されます。<br>
+  各イベントページで設定したチーム分けはそのイベント固有の設定となり、クラブ全体の設定には影響しません。
+</small>
+
 <div id="member-hooks"
      data-club-id="{{ club.id }}"
      data-admin-token="{{ club.admin_token }}"
@@ -66,12 +75,14 @@
       <col style="width:50px;">
       <col style="width:160px;">
       <col style="width:100px;">
+      <col style="width:140px;">
     </colgroup>
     <thead>
       <tr>
-        <th>ID</th>
+        <th></th>
         <th>名前</th>
         <th>固定メンバー</th>
+        <th>チーム</th>
       </tr>
     </thead>
     <tbody>
@@ -92,6 +103,22 @@
               <span class="check-icon {% if m.is_fixed %}check-on{% else %}check-off{% endif %}">✓</span>
             </button>
           </td>
+          <td>
+            <select class="member-class-select"
+                    data-member-id="{{ m.id }}"
+                    style="width: 140px; padding: 6px 10px; border-radius: 10px;">
+              {# 空欄（未設定） #}
+              <option value="" {% if not m.member_class_id %}selected{% endif %}></option>
+
+              {# クラス定義がある場合だけ並べる #}
+              {% for c in classes %}
+                <option value="{{ c.id }}"
+                        {% if m.member_class_id == c.id %}selected{% endif %}>
+                  {{ c.name }}
+                </option>
+              {% endfor %}
+            </select>
+          </td>
         </tr>
       {% endfor %}
     </tbody>
@@ -104,8 +131,57 @@
 {% endif %}
 
 <hr>
+<h3>チーム分け設定</h3>
 
-<h3>出席表フォーマット設定</h3>
+<div id="class-hooks"
+     data-club-id="{{ club.id }}"
+     data-admin-token="{{ club.admin_token }}"
+     data-add-url="{% url 'tennis:club_add_class' %}"
+     data-rename-url="{% url 'tennis:club_rename_class' %}"
+     data-delete-url="{% url 'tennis:club_delete_class' %}"
+     data-set-member-url="{% url 'tennis:club_set_member_class' %}">
+</div>
+
+<div class="flag-add-area">
+  <button type="button" class="flag-add-btn" id="club-add-class-btn">チーム名追加</button>
+  <button type="button" class="flag-delete-btn" id="club-delete-class-btn" {% if classes|length == 0 %}disabled{% endif %}>チーム名削除</button>
+  <br>
+  <small class="flag-note">例：上級・中級・初級 など。名前は自由に追加できます。</small>
+</div>
+
+<div class="participants-wrap">
+  <table class="participants-table" id="classes-table">
+    <colgroup>
+      <col style="width:50px;">
+      <col style="width:220px;">
+    </colgroup>
+    <thead>
+      <tr>
+        <th></th>
+        <th>チーム名（クリックで編集）</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for c in classes %}
+      <tr data-class-id="{{ c.id }}">
+        <td>{{ forloop.counter }}</td>
+        <td>
+          <span class="class-name"
+                style="cursor:pointer; text-decoration:underline; font-weight:700;"
+                title="クリックして変更">{{ c.name }}</span>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+
+<hr>
+
+{# ===== フラグ設定（シンプル版：フラグ一覧） ===== #}
+
+<h3>フラグ設定</h3>
 
 <div class="flag-add-area">
   <button type="button"
@@ -134,89 +210,51 @@
   </small>
 </div>
 
+<div id="flag-hooks"
+     data-club-id="{{ club.id }}"
+     data-admin-token="{{ club.admin_token }}"
+     data-rename-flag-url="{% url 'tennis:club_rename_flag' %}">
+</div>
+
 <div class="participants-wrap">
-
-  <table id="participants-table"
-        class="participants-table"
-        data-mode="club_settings_dummy"
-        data-club-id="{{ club.id }}"
-        data-admin-token="{{ club.admin_token }}"
-        data-rename-flag-url="{% url 'tennis:club_rename_flag' %}">
-
+  <table class="participants-table" id="flags-table">
     <colgroup>
-      <col style="width: 40px;">     {# 連番 #}
-      <col style="width: 150px;">    {# 名前 #}
-      <col style="width: 70px;">     {# 出欠 #}
-      <col>                          {# 試合参加 #}
-      {% for flag in flags %}
-        <col>                        {# フラグ #}
-      {% endfor %}
-      <col style="width: 150px;">    {# コメント（名前と同じ固定幅） #}
+      <col style="width:50px;">
+      <col style="width:220px;">
+      <col style="width:120px;">
     </colgroup>
-
     <thead>
       <tr>
         <th></th>
-        <th>名前</th>
-        <th>出欠</th>
-        <th>試合参加</th>
-        {% for flag in flags %}
-          <th class="flag-header" data-flag-id="{{ flag.id }}">
-            <span class="flag-name">{{ flag.name }}</span>
-          </th>
-        {% endfor %}
-        <th>コメント</th>
+        <th>フラグ名（クリックで編集）</th>
+        <th>入力方式</th>
       </tr>
     </thead>
-
     <tbody>
-      {% for i in "1234" %}
-      <tr>
-        <td class="participant-index">{{ forloop.counter }}</td>
-
-        <td><div class="tb-player-card-sm">&nbsp;</div></td>
-
-        {# ★ 出欠：クリックでモーダル（〇×？） #}
-        <td class="attendance-cell">
-          <button type="button" class="attendance-btn" data-attendance="yes" aria-label="出欠">
-            <span class="attendance-icon attendance-yes">✓</span>
-          </button>
+      {% for f in flags %}
+      <tr data-flag-id="{{ f.id }}">
+        <td>{{ forloop.counter }}</td>
+        <td>
+          <span class="flag-name"
+                style="cursor:pointer; text-decoration:underline; font-weight:700;"
+                title="クリックして変更">{{ f.name }}</span>
         </td>
-
-        {# ★ 試合参加：ダミー操作OK／デフォルトON #}
-        <td class="check-cell">
-          <button type="button" class="check-btn toggle-check" data-default="on">
-            <span class="check-icon check-on">✓</span>
-          </button>
-        </td>
-
-        {# ★ フラグ：ダミー操作OK #}
-        {% for flag in flags %}
-          <td class="check-cell">
-            {% if club.flag_input_mode|default:"check" == "digit" %}
-              <input type="text"
-                    inputmode="numeric"
-                    pattern="[0-9]"
-                    maxlength="1"
-                    class="tb-score-input flag-digit-input"
-                    data-input-mode="digit"
-                    value="">
-            {% else %}
-              <button type="button" class="check-btn toggle-check">
-                <span class="check-icon check-off">✓</span>
-              </button>
-            {% endif %}
-          </td>
-        {% endfor %}
-
-        {# ★ コメント：枠なしのインライン編集（ダミー入力） #}
-        <td class="comment-cell">
-          <div class="comment-editable" contenteditable="true"></div>
+        <td>
+          {% if f.input_mode == "digit" %}
+            0 ~ 9
+          {% else %}
+            チェック
+          {% endif %}
         </td>
       </tr>
       {% endfor %}
     </tbody>
   </table>
 </div>
+
+{% if not flags %}
+  <div class="participant-empty">フラグがまだ登録されていません。</div>
+{% endif %}
+
 
 {% endblock %}

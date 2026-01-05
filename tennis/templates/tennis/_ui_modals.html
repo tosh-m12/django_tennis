@@ -71,17 +71,17 @@
       </div>
 
       {% comment %}
-settings 側はダミー運用で OK を置く／event 側は choice で即閉じでもOK。
-JS側で両対応できるよう OK ボタンは常設しておく。
-{% endcomment %}
+      settings 側はダミー運用で OK を置く／event 側は choice で即閉じでもOK。
+      JS側で両対応できるよう OK ボタンは常設しておく。
+      {% endcomment %}
       <!-- <div class="modal-actions" style="justify-content:center; margin-top:14px;">
         <button type="button" class="btn btn-pill btn-primary" id="attendance-modal-ok">OK</button>
       </div> -->
 
       {% comment %}
-settings でだけ注意文を出したい場合：
-ここは共通なので「非表示デフォルト」→ settings.js が必要なら表示しても良い。
-{% endcomment %}
+      settings でだけ注意文を出したい場合：
+      ここは共通なので「非表示デフォルト」→ settings.js が必要なら表示しても良い。
+      {% endcomment %}
       <p id="attendance-modal-note"
          style="display:none; margin-top:10px; color:#666; font-size:0.9rem; text-align:center;">
         ※ settingsページではダミーです（保存しません）
@@ -230,8 +230,8 @@ settings でだけ注意文を出したい場合：
       <input type="hidden" id="club-event-event-id" name="event_id" value="">
 
       {% comment %}
-日付：表示のみ（送信用 date は hidden に保持）
-{% endcomment %}
+      日付：表示のみ（送信用 date は hidden に保持）
+      {% endcomment %}
       <div class="field-group">
         <label>日付</label>
         <div class="event-date-display">
@@ -292,14 +292,18 @@ settings でだけ注意文を出したい場合：
       <input id="club-event-start-time" name="start_time" type="hidden" value="">
       <input id="club-event-end-time" name="end_time" type="hidden" value="">
 
-      <div class="club-event-actions">
+      <div class="club-event-primary-buttons">
+        <button type="button"
+                class="btn btn-pill btn-primary btn-display-settings js-open-display-settings">
+          表示設定
+        </button>
+
         <button type="submit"
                 id="club-event-submit-btn"
                 class="btn btn-pill btn-primary">
           イベント作成
         </button>
       </div>
-
       <div class="club-event-cancel-wrap">
         <button type="button"
                 id="club-event-cancel-toggle"
@@ -533,6 +537,208 @@ settings でだけ注意文を出したい場合：
 
       <div class="modal-actions">
         <button type="button" class="btn btn-pill btn-primary" id="flag-delete-ok-btn">削除</button>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+
+{# --- display-settings-modal（置換）--- #}
+<div id="display-settings-modal" class="modal-backdrop" aria-hidden="true">
+  <div id="event-flag-api-hooks"
+     data-add-event-flag-url="{% url 'tennis:add_event_flag' %}"
+     style="display:none;"></div>
+  <div class="modal-content event-modal modal-has-topbar"
+       role="dialog" aria-modal="true" aria-labelledby="display-settings-modal-title">
+
+    <div class="modal-topbar">
+      <div class="modal-topbar-title" id="display-settings-modal-title">表示設定</div>
+      <button type="button"
+              id="close-display-settings-modal"
+              class="modal-topbar-btn"
+              aria-label="閉じる">×</button>
+    </div>
+
+    <div class="modal-form">
+      <div class="field-group ds-list">
+
+        {# 共通フラグ #}
+        <div class="ds-row">
+          <button type="button" class="check-btn ds-toggle is-on"
+                  data-key="common_flags" aria-pressed="true">
+            <span class="check-icon check-on">✓</span>
+          </button>
+          <span class="ds-label">共通フラグ</span>
+        </div>
+
+        {# 固有フラグ（トグル＋設定モーダル起動） #}
+        <div class="ds-row">
+          <button type="button" class="check-btn ds-toggle is-on"
+                  data-key="event_flags" aria-pressed="true">
+            <span class="check-icon check-on">✓</span>
+          </button>
+
+          {# 「固有フラグ」クリックで設定モーダルを出す #}
+          <button type="button"
+                  class="ds-label-btn js-open-event-flag-settings"
+                  aria-label="固有フラグを設定">
+            固有フラグ
+          </button>
+
+          {# 任意：右端に小さな「設定」ボタンを付けたい場合（CSSは後でOK） #}
+          <button type="button"
+                  class="btn btn-pill btn-mini js-open-event-flag-settings"
+                  aria-label="固有フラグ設定を開く">
+            設定
+          </button>
+        </div>
+
+        <div class="ds-row">
+          <button type="button" class="check-btn ds-toggle is-on" data-key="class" aria-pressed="true">
+            <span class="check-icon check-on">✓</span>
+          </button>
+          <span class="ds-label">チーム</span>
+        </div>
+
+        <div class="ds-row">
+          <button type="button" class="check-btn ds-toggle is-on" data-key="schedule" aria-pressed="true">
+            <span class="check-icon check-on">✓</span>
+          </button>
+          <span class="ds-label">対戦表</span>
+        </div>
+
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-pill btn-primary" id="display-settings-ok">
+          保存
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+{# --- event-flag-settings-modal（最大2 / 1回1個追加）--- #}
+<div id="event-flag-settings-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content event-modal modal-has-topbar"
+       role="dialog" aria-modal="true" aria-labelledby="event-flag-settings-modal-title">
+
+    <div class="modal-topbar">
+      <div class="modal-topbar-title" id="event-flag-settings-modal-title">固有フラグを追加</div>
+      <button type="button"
+              id="close-event-flag-settings-modal"
+              class="modal-topbar-btn"
+              aria-label="閉じる">×</button>
+    </div>
+
+    <div class="modal-form">
+      <div class="field-group">
+        <label for="event-flag-name-input">フラグ名</label>
+
+        <input type="text"
+               class="event-flag-name-input"
+               id="event-flag-name-input"
+               maxlength="20"
+               placeholder="例：初参加">
+
+        <div class="hint" id="event-flag-hint"
+             style="margin-top:8px; font-size:12px; opacity:.8;">
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-pill" id="event-flag-settings-cancel">
+          閉じる
+        </button>
+        <button type="button" class="btn btn-pill btn-primary" id="event-flag-settings-add">
+          追加
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+
+
+<!-- [NEW] Class create/rename modal -->
+<div id="class-rename-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content event-modal modal-has-topbar" role="dialog" aria-modal="true">
+    <div class="modal-topbar">
+      <div class="modal-topbar-title">クラス名</div>
+      <button type="button" id="class-rename-modal-close" class="modal-topbar-btn" aria-label="閉じる">×</button>
+    </div>
+
+    <form id="class-rename-modal-form" class="modal-form">
+      <input type="hidden" id="class-rename-mode" value="create">  <!-- create|rename -->
+      <input type="hidden" id="class-rename-class-id" value="">
+      <div class="field-group">
+        <label for="class-rename-input">クラス名</label>
+        <input id="class-rename-input"
+              type="text"
+              class="event-title-input"
+              maxlength="40"
+              required
+              placeholder="例：上級">
+      </div>
+
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-pill btn-primary">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- [NEW] Member class picker modal -->
+<div id="member-class-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content event-modal modal-has-topbar" role="dialog" aria-modal="true">
+    <div class="modal-topbar">
+      <div class="modal-topbar-title">メンバーのクラス</div>
+      <button type="button" id="member-class-modal-close" class="modal-topbar-btn" aria-label="閉じる">×</button>
+    </div>
+
+    <div class="modal-form">
+      <input type="hidden" id="member-class-member-id" value="">
+
+      <div class="field-group ds-list" id="member-class-list">
+        <!-- JS でクラスボタンを描画 -->
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-pill" id="member-class-clear">未設定にする</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- [NEW] Class delete modal (dropdown) -->
+<div id="class-delete-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content event-modal modal-has-topbar"
+       role="dialog" aria-modal="true" aria-labelledby="class-delete-modal-title">
+
+    <div class="modal-topbar">
+      <div class="modal-topbar-title" id="class-delete-modal-title">削除するチーム名を選択</div>
+      <button type="button"
+              id="close-class-delete-modal"
+              class="modal-topbar-btn"
+              aria-label="閉じる">×</button>
+    </div>
+
+    <div class="modal-form">
+
+      <div class="field-group">
+        <select id="class-delete-select" class="modal-select" style="width:80%;">
+          <option value="">-- 選択 --</option>
+          {% for c in classes %}
+            <option value="{{ c.id }}">{{ c.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-pill btn-primary" id="class-delete-ok-btn">削除</button>
       </div>
 
     </div>

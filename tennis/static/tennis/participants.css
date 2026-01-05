@@ -132,7 +132,7 @@
   min-height: 34px;
   padding: 8px 10px;
 
-  border: 1px solid #e2e5ea;
+
   border-radius: 10px;
   background: #f2f3f5;
 
@@ -435,4 +435,34 @@
   outline: none;
   border: none;
   background: #e9ebee;          /* フォーカス時だけ少し濃く（任意） */
+}
+
+/* ============================
+   settings：チーム分け/フラグもメンバー管理と同じ見栄えに揃える
+   - テーブル自体：縮めて左寄せ（inline-table + text-align:left）
+   - カラム内：中央寄せ
+   ============================ */
+
+/* wrappers を左寄せ基準にする */
+.participants-wrap{
+  text-align: left; /* inline-table を左に寄せる */
+}
+
+/* classes / flags table をメンバー管理と同じ挙動に */
+#classes-table.participants-table,
+#flags-table.participants-table{
+  width: fit-content !important;   /* 中身幅に縮める */
+  max-width: 100%;
+  display: inline-table;           /* wrapper の text-align に従う */
+  margin-left: 0 !important;
+  margin-right: auto !important;
+}
+
+/* セル内は中央寄せ */
+#classes-table.participants-table th,
+#classes-table.participants-table td,
+#flags-table.participants-table th,
+#flags-table.participants-table td{
+  text-align: center;
+  vertical-align: middle;
 }

@@ -62,6 +62,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const createUrl = (hooks?.dataset.createUrl || "").trim();
   const clubId = (hooks?.dataset.clubId || "").trim();
+  const adminToken = (hooks?.dataset.adminToken || "").trim();
 
   // club_home（幹事）以外/部品不足では何もしない
   if (!modal || !form || !dateInput) return;
@@ -178,6 +179,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const fd = new FormData(form);
     fd.set("club_id", clubId);
+    fd.set("admin_token", adminToken);
 
     const submitBtn = form.querySelector('button[type="submit"]');
     const prevDisabled = submitBtn?.disabled;

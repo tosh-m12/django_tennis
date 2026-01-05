@@ -2,8 +2,9 @@ from django.contrib import admin
 from django.urls import reverse
 from django.utils.html import format_html
 
-from .models import Club, Event, Member, EventParticipant, ClubFlagDefinition, ParticipantFlag, \
+from .models import Club, Event, Member, EventParticipant, ClubFlagDefinition, EventFlagDefinition, ParticipantFlag, \
     MatchSchedule, MatchScheduleDraft, MatchScore, Substitution, AuditLog
+
 
 # ============================================================
 # Club
@@ -143,6 +144,26 @@ class ClubFlagDefinitionAdmin(admin.ModelAdmin):
 
 
 # ============================================================
+# EventFlagDefinition
+# ============================================================
+
+@admin.register(EventFlagDefinition)
+class EventFlagDefinitionAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "event",
+        "name",
+        "display_order",
+        "is_active",
+        "input_mode",
+    )
+    list_filter = ("event", "is_active", "input_mode")
+    search_fields = ("name",)
+    autocomplete_fields = ("event",)
+    readonly_fields = ("created_at", "updated_at")
+
+
+# ============================================================
 # ParticipantFlag
 # ============================================================
 
@@ -151,12 +172,14 @@ class ParticipantFlagAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "event_participant",
-        "flag_definition",
+        "club_flag_definition",
+        "event_flag_definition",
         "is_on",
+        "value",
         "updated_at",
     )
-    list_filter = ("flag_definition", "is_on")
-    autocomplete_fields = ("event_participant", "flag_definition")
+    list_filter = ("club_flag_definition", "event_flag_definition", "is_on")
+    autocomplete_fields = ("event_participant", "club_flag_definition", "event_flag_definition")
     readonly_fields = ("updated_at",)
 
 

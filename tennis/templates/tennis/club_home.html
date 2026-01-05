@@ -13,8 +13,10 @@
 {% if is_admin %}
   <hr>
   <div id="club-calendar-hooks"
-       data-create-url="{% url 'tennis:club_create_event' %}"
-       data-club-id="{{ club.id }}">
+      data-create-url="{% url 'tennis:club_create_event' %}"
+      data-club-id="{{ club.id }}"
+      data-admin-token="{{ admin_token }}"
+      data-save-display-settings-url="{% url 'tennis:save_event_display_setting' %}">
   </div>
 
   <div class="theme-box url-box">

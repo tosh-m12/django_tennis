@@ -96,3 +96,87 @@
   line-height: 1.1;
   white-space: nowrap;
 }
+
+/* =========================================
+   Event page: Member class select (inherit modal-select look)
+   ========================================= */
+
+.member-class-cell {
+  /* テーブル内での縦位置がズレやすいので保険 */
+  vertical-align: middle;
+}
+
+.member-class-select {
+  /* 既存 modal-select の見た目を継承 */
+  width: 100%;
+  max-width: 140px; /* colgroup 140px に合わせる */
+  box-sizing: border-box;
+
+  padding: 8px 34px 8px 12px;  /* 右側は矢印分を確保 */
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 600;
+
+  background: #f3f4f6;
+  border: none;
+  border-radius: 10px;
+
+  color: #111;
+  outline: none;
+  box-shadow: none;
+
+  cursor: pointer;
+
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+
+  /* ▼ 擬似矢印（wrap不要版：SVGを背景として描画） */
+  background-image: url("data:image/svg+xml;utf8,\
+<svg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23666' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'>\
+<polyline points='6 9 12 15 18 9'/>\
+</svg>");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  background-size: 16px 16px;
+}
+
+/* focus時もモーダル寄せ */
+.member-class-select:focus {
+  background: #eef0f3;
+}
+
+/* disabled（guestで member_id なしのとき） */
+.member-class-select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* =========================================
+   Event page: Class (public mode) gray pill like comment
+   ========================================= */
+
+/* 一般モード：クラスは span なので背景を付ける */
+.member-class-text{
+  display: inline-block;
+  width: 100%;
+  max-width: 140px;          /* colgroupに合わせる。必要なら180pxへ */
+  box-sizing: border-box;
+
+  padding: 8px 12px;
+  font-size: 14px;
+  line-height: 1.4;
+  font-weight: 600;
+
+  background: #f3f4f6;       /* modal-selectと同じグレー */
+  border-radius: 10px;
+  color: #111;
+
+  /* 空欄でも高さを確保して見栄えを揃える */
+  min-height: 34px;
+}
+
+/* 空欄のときは薄く（コメント欄の :empty 表示と同じ思想） */
+.member-class-text:empty::before{
+  content: " ";
+}

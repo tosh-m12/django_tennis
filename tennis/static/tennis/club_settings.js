@@ -99,7 +99,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // ============================================================
   // [B] フラグ追加 / 削除（保存あり）
   //  - 追加は「先に名前を決める」モーダル経由
-  //  - 削除は「選択モーダル」方式（ドロップダウンで対象選択）
+  //  - 削除は「選択モーダル」方式
   // ============================================================
   (function initFlagsAddDelete() {
     const addBtn = document.getElementById("club-add-flag-btn");
@@ -110,12 +110,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const addCloseBtn = document.getElementById("close-flag-add-modal");
     const addForm = document.getElementById("flag-add-form");
     const addInput = document.getElementById("flag-add-input");
-    const addMode = document.getElementById("flag-add-input-mode"); // ★1回だけ取得
+    const addMode = document.getElementById("flag-add-input-mode"); // check / digit
 
     function openAddModal() {
       if (!addModal || !addInput) return;
 
-      // ★初期値に戻す（事故防止）
       addInput.value = "";
       if (addMode) addMode.value = "check";
 
@@ -130,9 +129,6 @@ document.addEventListener("DOMContentLoaded", () => {
       addModal.setAttribute("aria-hidden", "true");
     }
 
-    // ------------------------
-    // 追加ボタン → モーダルを開く
-    // ------------------------
     if (addBtn) {
       addBtn.addEventListener("click", (e) => {
         e.preventDefault();
@@ -142,7 +138,6 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    // × / 背景 / ESC で閉じる（追加）
     addCloseBtn?.addEventListener("click", (e) => {
       e.preventDefault();
       e.stopPropagation();
@@ -159,9 +154,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     });
 
-    // ------------------------
-    // 追加モーダル submit → API
-    // ------------------------
     if (addForm && addBtn) {
       addForm.addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -177,13 +169,13 @@ document.addEventListener("DOMContentLoaded", () => {
         const adminToken = getAdminTokenFromEl(addBtn);
         if (!clubId || !url) return;
 
-        const inputMode = (addMode?.value || "check").trim(); // ★check / digit
+        const inputMode = (addMode?.value || "check").trim();
 
         const fd = new FormData();
         fd.append("club_id", clubId);
         fd.append("admin_token", adminToken);
         fd.append("name", name);
-        fd.append("input_mode", inputMode); // ★追加
+        fd.append("input_mode", inputMode);
 
         try {
           const r = await fetch(url, {
@@ -226,7 +218,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
       function openDelModal() {
         if (delBtn.disabled) return;
-
         delSelect.value = "";
         delModal.classList.add("is-open");
         delModal.setAttribute("aria-hidden", "false");
@@ -239,31 +230,26 @@ document.addEventListener("DOMContentLoaded", () => {
         delSelect.value = "";
       }
 
-      // ボタン → 開く
       delBtn.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
         openDelModal();
       });
 
-      // ×
       delCloseBtn?.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
         closeDelModal();
       });
 
-      // 背景
       delModal.addEventListener("click", (e) => {
         if (e.target === delModal) closeDelModal();
       });
 
-      // ESC
       document.addEventListener("keydown", (e) => {
         if (e.key === "Escape" && delModal.classList.contains("is-open")) closeDelModal();
       });
 
-      // 削除実行
       delOkBtn.addEventListener("click", async (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -307,16 +293,22 @@ document.addEventListener("DOMContentLoaded", () => {
     })();
   })();
 
-
   // ============================================================
-  // [C] フラグ名称変更（保存あり）: eventの参加登録モーダルに揃える
+  // [C] フラグ名称変更（保存あり）
+  //  - ダミーの participants-table は廃止
+  //  - flags-table の「フラグ名（span.flag-name）」をクリックで編集
   // ============================================================
   (function initFlagRenameModal() {
-    const table = document.getElementById("participants-table");
+    const table = document.getElementById("flags-table");
     if (!table) return;
 
-    const renameUrl = table.dataset.renameFlagUrl;
-    if (!renameUrl) return;
+    const hooks = document.getElementById("flag-hooks");
+    if (!hooks) return;
+
+    const renameUrl = (hooks.dataset.renameFlagUrl || "").trim();
+    const clubId = (hooks.dataset.clubId || "").trim();
+    const adminToken = (hooks.dataset.adminToken || "").trim();
+    if (!renameUrl || !clubId || !adminToken) return;
 
     const modal = document.getElementById("flag-rename-modal");
     const closeBtn = document.getElementById("close-flag-rename-modal");
@@ -344,28 +336,36 @@ document.addEventListener("DOMContentLoaded", () => {
       currentSpan = null;
     }
 
-    closeBtn.addEventListener("click", closeModal);
+    closeBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      closeModal();
+    });
 
-    // 背景クリックで閉じる（event側と同じ）
     modal.addEventListener("click", (e) => {
       if (e.target === modal) closeModal();
     });
 
-    // ヘッダークリックで開く
-    table.querySelectorAll(".flag-header[data-flag-id]").forEach((th) => {
-      th.addEventListener("click", () => {
+    document.addEventListener("keydown", (e) => {
+      if (e.key === "Escape" && modal.classList.contains("is-open")) closeModal();
+    });
 
-        const isAdmin = (table.dataset.isAdmin || "0") === "1";
-        if (!isAdmin) return;
+    // フラグ名クリックで開く
+    table.addEventListener("click", (e) => {
+      const nameEl = e.target.closest(".flag-name");
+      if (!nameEl) return;
 
-        const flagId = (th.dataset.flagId || "").trim();
-        if (!flagId) return;
+      const tr = nameEl.closest("tr[data-flag-id]");
+      if (!tr) return;
 
-        const span = th.querySelector(".flag-name");
-        const currentName = span ? span.textContent.trim() : "";
+      e.preventDefault();
+      e.stopPropagation();
 
-        openModal(flagId, currentName, span);
-      });
+      const flagId = (tr.dataset.flagId || "").trim();
+      if (!flagId) return;
+
+      const currentName = (nameEl.textContent || "").trim();
+      openModal(flagId, currentName, nameEl);
     });
 
     // 保存
@@ -380,9 +380,6 @@ document.addEventListener("DOMContentLoaded", () => {
         UI.showMessage("フラグ名を入力してください。", 2400);
         return;
       }
-
-      const adminToken = (table.dataset.adminToken || "").trim();
-      const clubId = (table.dataset.clubId || "").trim();
 
       const fd = new FormData();
       fd.append("club_id", clubId);
@@ -411,112 +408,6 @@ document.addEventListener("DOMContentLoaded", () => {
         console.error(err);
         UI.showMessage("フラグ名の変更に失敗しました（ネットワーク）。", 2600);
       }
-    });
-  })();
-
-
-  // ============================================================
-  // [D] settings(ダミー): 出欠モーダル（保存しない / choiceで即閉じ）
-  // ============================================================
-  (function initAttendanceModalDummy() {
-    const table = document.getElementById("participants-table");
-    if (!table) return;
-    if (table.dataset.mode !== "club_settings_dummy") return;
-
-    const modal = document.getElementById("attendance-modal");
-    if (!modal) return;
-
-    const closeBtn = document.getElementById("close-attendance-modal");
-
-    let currentBtn = null;
-
-    function openModal(targetBtn) {
-      currentBtn = targetBtn;
-      // settings側は注意文を出す（必要なら）
-      const note = document.getElementById("attendance-modal-note");
-      if (note) note.style.display = "block";
-
-      modal.classList.add("is-open");
-      modal.setAttribute("aria-hidden", "false");
-    }
-
-    function closeModal() {
-      modal.classList.remove("is-open");
-      modal.setAttribute("aria-hidden", "true");
-      currentBtn = null;
-
-      const note = document.getElementById("attendance-modal-note");
-      if (note) note.style.display = "none";
-    }
-
-    // 開く（ダミーの出欠ボタン）
-    table.addEventListener("click", (e) => {
-      const btn = e.target.closest(".attendance-btn");
-      if (!btn) return;
-      e.preventDefault();
-      e.stopPropagation();
-      openModal(btn);
-    });
-
-    // ×で閉じる
-    closeBtn?.addEventListener("click", (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      closeModal();
-    });
-
-    // 背景クリックで閉じる
-    modal.addEventListener("click", (e) => {
-      if (e.target === modal) closeModal();
-    });
-
-    // Escで閉じる
-    document.addEventListener("keydown", (e) => {
-      if (e.key === "Escape" && modal.classList.contains("is-open")) closeModal();
-    });
-
-    // choice を押したら「即反映」→「即閉じる」
-    modal.addEventListener("click", (e) => {
-      const choice = e.target.closest(".attendance-choice");
-      if (!choice || !currentBtn) return;
-
-      e.preventDefault();
-      e.stopPropagation();
-
-      const attendance = (choice.dataset.attendance || "").trim() || "maybe";
-      currentBtn.dataset.attendance = attendance;
-
-      // ボタン表示を更新（event.js と同じ見た目）
-      let html = `<span class="attendance-icon attendance-maybe">?</span>`;
-      if (attendance === "yes") html = `<span class="attendance-icon attendance-yes">✓</span>`;
-      if (attendance === "no") html = `<span class="attendance-icon attendance-no">×</span>`;
-      if (attendance === "maybe") html = `<span class="attendance-icon attendance-maybe">?</span>`;
-      currentBtn.innerHTML = html;
-
-      closeModal();
-    });
-  })();
-
-
-  // ============================================================
-  // [E] settings(ダミー): チェックON/OFF（保存しない）
-  // ============================================================
-  (function initDummyChecks() {
-    const table = document.getElementById("participants-table");
-    if (!table) return;
-    if (table.dataset.mode !== "club_settings_dummy") return;
-
-    table.addEventListener("click", (e) => {
-      const btn = e.target.closest(".toggle-check");
-      if (!btn) return;
-
-      const icon = btn.querySelector(".check-icon");
-      if (!icon) return;
-
-      const willOn = icon.classList.contains("check-off");
-      icon.classList.toggle("check-on", willOn);
-      icon.classList.toggle("check-off", !willOn);
-      if (willOn) icon.textContent = "✓";
     });
   })();
 
@@ -611,7 +502,6 @@ document.addEventListener("DOMContentLoaded", () => {
         if (e.key === "Escape" && modal.classList.contains("is-open")) closeModal();
       });
 
-      // 「名前セル」クリックで開く
       table.addEventListener("click", (e) => {
         const nameEl = e.target.closest(".member-name");
         if (!nameEl) return;
@@ -629,7 +519,6 @@ document.addEventListener("DOMContentLoaded", () => {
         openModal(memberId, cur, nameEl);
       });
 
-      // 保存
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
 
@@ -666,7 +555,6 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     })();
 
-
     // fixed トグルのみ
     table.addEventListener("click", async (e) => {
       const btn = e.target.closest(".member-fixed-toggle");
@@ -691,7 +579,6 @@ document.addEventListener("DOMContentLoaded", () => {
         return;
       }
 
-      // UI反映
       btn.classList.toggle("is-on", next);
       const icon = btn.querySelector(".check-icon");
       if (icon) {
@@ -701,5 +588,337 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   })();
 
+  // ============================================================
+  // [NEW] Class management + member class assignment (dropdown)
+  // ============================================================
+  (function initClasses() {
+    const hooks = document.getElementById("class-hooks");
+    if (!hooks) return;
 
+    const clubId = hooks.dataset.clubId;
+    const adminToken = hooks.dataset.adminToken;
+    const urlAdd = hooks.dataset.addUrl;
+    const urlRename = hooks.dataset.renameUrl;
+    const urlDelete = hooks.dataset.deleteUrl;
+    const urlSetMember = hooks.dataset.setMemberUrl;
+    const csrftoken = getCookie("csrftoken");
+
+    const classesTable = document.getElementById("classes-table");
+    const membersTable = document.getElementById("members-table");
+
+    const renameModal = document.getElementById("class-rename-modal");
+    const renameClose = document.getElementById("class-rename-modal-close");
+    const renameForm = document.getElementById("class-rename-modal-form");
+    const renameMode = document.getElementById("class-rename-mode");
+    const renameClassId = document.getElementById("class-rename-class-id");
+    const renameInput = document.getElementById("class-rename-input");
+
+    function openModal(modal) {
+      if (!modal) return;
+      modal.classList.add("is-open");
+      modal.setAttribute("aria-hidden", "false");
+      modal.style.zIndex = "3500";
+    }
+    function closeModal(modal) {
+      if (!modal) return;
+      modal.classList.remove("is-open");
+      modal.setAttribute("aria-hidden", "true");
+      modal.style.zIndex = "";
+    }
+    renameClose?.addEventListener("click", (e) => {
+      e.preventDefault();
+      closeModal(renameModal);
+    });
+
+    function postForm(url, fd) {
+      return fetch(url, {
+        method: "POST",
+        headers: { "X-CSRFToken": csrftoken || "" },
+        body: fd,
+      }).then(async (r) => {
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok || !data.ok) throw new Error(data.error || "not_ok");
+        return data;
+      });
+    }
+
+    function collectClassesFromTable() {
+      const rows = Array.from(classesTable?.querySelectorAll("tbody tr") || []);
+      return rows
+        .map((tr) => ({
+          id: (tr.dataset.classId || "").trim(),
+          name: (tr.querySelector(".class-name")?.textContent || "").trim(),
+        }))
+        .filter((x) => x.id && x.name);
+    }
+
+    function syncMemberSelectOptions() {
+      if (!membersTable) return;
+
+      const classes = collectClassesFromTable();
+      const selects = Array.from(membersTable.querySelectorAll("select.member-class-select"));
+
+      selects.forEach((sel) => {
+        const current = (sel.value || "").trim();
+        const prev = (sel.dataset.prev || "").trim();
+
+        sel.innerHTML = "";
+
+        const emptyOpt = document.createElement("option");
+        emptyOpt.value = "";
+        emptyOpt.textContent = "";
+        sel.appendChild(emptyOpt);
+
+        classes.forEach((c) => {
+          const opt = document.createElement("option");
+          opt.value = String(c.id);
+          opt.textContent = c.name;
+          sel.appendChild(opt);
+        });
+
+        const exists = classes.some((c) => String(c.id) === String(current));
+        const nextVal = exists ? current : "";
+
+        sel.value = nextVal;
+        sel.dataset.prev = nextVal;
+
+        if (!exists && prev && prev === current) {
+          sel.dataset.prev = "";
+        }
+      });
+    }
+
+    const addBtn = document.getElementById("club-add-class-btn");
+    addBtn?.addEventListener("click", () => {
+      if (!renameMode || !renameClassId || !renameInput) return;
+
+      renameMode.value = "create";
+      renameClassId.value = "";
+      renameInput.value = "";
+      openModal(renameModal);
+      setTimeout(() => renameInput.focus(), 0);
+    });
+
+    classesTable?.addEventListener("click", (e) => {
+      const nameEl = e.target.closest(".class-name");
+      if (!nameEl) return;
+
+      const tr = nameEl.closest("tr");
+      const cid = (tr?.dataset?.classId || "").trim();
+      if (!cid) return;
+
+      if (!renameMode || !renameClassId || !renameInput) return;
+
+      renameMode.value = "rename";
+      renameClassId.value = cid;
+      renameInput.value = (nameEl.textContent || "").trim();
+      openModal(renameModal);
+      setTimeout(() => renameInput.focus(), 0);
+    });
+
+    renameForm?.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const mode = (renameMode?.value || "").trim();
+      const name = (renameInput?.value || "").trim();
+      if (!name) return;
+
+      const fd = new FormData();
+      fd.append("club_id", clubId);
+      fd.append("admin_token", adminToken);
+
+      try {
+        if (mode === "create") {
+          if (!urlAdd) throw new Error("missing_add_url");
+          fd.append("name", name);
+
+          const data = await postForm(urlAdd, fd);
+
+          const tbody = classesTable?.querySelector("tbody");
+          if (tbody && data?.class?.id && data?.class?.name) {
+            const tr = document.createElement("tr");
+            tr.dataset.classId = data.class.id;
+            tr.innerHTML = `
+              <td>${tbody.children.length + 1}</td>
+              <td>
+                <span class="class-name" style="cursor:pointer; text-decoration:underline; font-weight:700;"
+                      title="クリックして変更">${data.class.name}</span>
+              </td>`;
+            tbody.appendChild(tr);
+          }
+
+          syncMemberSelectOptions();
+          UI?.showMessage?.("クラスを追加しました", 1400);
+        } else {
+          if (!urlRename) throw new Error("missing_rename_url");
+          const cid = (renameClassId?.value || "").trim();
+          if (!cid) return;
+
+          fd.append("class_id", cid);
+          fd.append("name", name);
+          await postForm(urlRename, fd);
+
+          const tr = classesTable?.querySelector(`tr[data-class-id="${cid}"]`);
+          const el = tr?.querySelector(".class-name");
+          if (el) el.textContent = name;
+
+          syncMemberSelectOptions();
+          UI?.showMessage?.("クラス名を変更しました", 1400);
+        }
+
+        closeModal(renameModal);
+      } catch (err) {
+        console.error(err);
+        UI?.showMessage?.("保存に失敗しました", 2000);
+      }
+    });
+
+    // ------------------------
+    // クラス削除（選択モーダル方式）★NEW
+    // ------------------------
+    (function initClassDeleteModal() {
+      const delBtn = document.getElementById("club-delete-class-btn");
+      if (!delBtn) return;
+
+      const delModal = document.getElementById("class-delete-modal");
+      const delCloseBtn = document.getElementById("close-class-delete-modal");
+      const delSelect = document.getElementById("class-delete-select");
+      const delOkBtn = document.getElementById("class-delete-ok-btn");
+
+      if (!delModal || !delSelect || !delOkBtn) return;
+
+      function rebuildClassDeleteOptions() {
+        // classesTable の最新状態から select を作り直す（追加/名称変更にも追従）
+        const classes = collectClassesFromTable();
+
+        delSelect.innerHTML = "";
+        const head = document.createElement("option");
+        head.value = "";
+        head.textContent = "-- 選択 --";
+        delSelect.appendChild(head);
+
+        classes.forEach((c) => {
+          const opt = document.createElement("option");
+          opt.value = String(c.id);
+          opt.textContent = c.name;
+          delSelect.appendChild(opt);
+        });
+      }
+
+      function openDelModal() {
+        if (delBtn.disabled) return;
+        rebuildClassDeleteOptions();
+        delSelect.value = "";
+
+        delModal.classList.add("is-open");
+        delModal.setAttribute("aria-hidden", "false");
+        setTimeout(() => delSelect.focus(), 0);
+      }
+
+      function closeDelModal() {
+        delModal.classList.remove("is-open");
+        delModal.setAttribute("aria-hidden", "true");
+        delSelect.value = "";
+      }
+
+      delBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openDelModal();
+      });
+
+      delCloseBtn?.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        closeDelModal();
+      });
+
+      delModal.addEventListener("click", (e) => {
+        if (e.target === delModal) closeDelModal();
+      });
+
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && delModal.classList.contains("is-open")) closeDelModal();
+      });
+
+      delOkBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+
+        const cid = (delSelect.value || "").trim();
+        if (!cid) {
+          UI?.showMessage?.("削除するチーム名を選択してください。", 2200);
+          return;
+        }
+
+        if (!urlDelete) return;
+
+        const fd = new FormData();
+        fd.append("club_id", clubId);
+        fd.append("admin_token", adminToken);
+        fd.append("class_id", cid);
+
+        try {
+          await postForm(urlDelete, fd);
+
+          // classesTable から該当行を消す
+          const tr = classesTable?.querySelector(`tr[data-class-id="${cid}"]`);
+          tr?.remove();
+
+          // 連番を振り直す
+          Array.from(classesTable?.querySelectorAll("tbody tr") || []).forEach((row, i) => {
+            const td = row.querySelector("td");
+            if (td) td.textContent = String(i + 1);
+          });
+
+          // members 側の select も同期
+          syncMemberSelectOptions();
+
+          // 削除ボタンの disabled を再評価
+          const remain = (classesTable?.querySelectorAll("tbody tr") || []).length;
+          delBtn.disabled = remain === 0;
+
+          closeDelModal();
+          UI?.showMessage?.("削除しました。", 1800);
+        } catch (err) {
+          console.error(err);
+          UI?.showMessage?.("削除に失敗しました。", 2200);
+        }
+      });
+    })();
+
+    membersTable?.querySelectorAll("select.member-class-select").forEach((sel) => {
+      sel.dataset.prev = (sel.value || "").trim();
+    });
+
+    membersTable?.addEventListener("change", async (e) => {
+      const sel = e.target.closest("select.member-class-select");
+      if (!sel) return;
+
+      const memberId = (sel.dataset.memberId || "").trim();
+      const classId = (sel.value || "").trim();
+      if (!memberId) return;
+
+      const prev = (sel.dataset.prev || "").trim();
+
+      const fd = new FormData();
+      fd.append("club_id", clubId);
+      fd.append("admin_token", adminToken);
+      fd.append("member_id", memberId);
+      fd.append("class_id", classId);
+
+      try {
+        if (!urlSetMember) throw new Error("missing_set_member_url");
+        await postForm(urlSetMember, fd);
+
+        sel.dataset.prev = classId;
+        UI?.showMessage?.("クラスを更新しました", 1400);
+      } catch (err) {
+        console.error(err);
+        sel.value = prev;
+        UI?.showMessage?.("更新に失敗しました", 2000);
+      }
+    });
+
+    syncMemberSelectOptions();
+  })();
 });

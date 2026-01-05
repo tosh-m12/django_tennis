@@ -661,3 +661,182 @@
   background: transparent !important;
   box-shadow: none !important;
 }
+
+/* =========================================
+   club-event-modal: primary buttons block
+   ========================================= */
+
+/* ボタン2つを同じ幅で縦並びにする */
+#club-event-modal .club-event-primary-buttons{
+  width: 100%;
+  max-width: 180px;     /* ← input(=event-title-input)と同じ基準 */
+  margin: 0 auto;
+  display: grid;
+  gap: 10px;
+}
+
+/* 2つとも完全に同じ外寸にする（border分のズレを根絶） */
+#club-event-modal .club-event-primary-buttons .btn{
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* 主ボタン側にも透明borderを与えて、副ボタン(2px)と外寸を一致させる */
+#club-event-modal .club-event-primary-buttons .btn.btn-primary:not(.btn-display-settings){
+  border: 2px solid transparent;
+}
+
+/* 表示設定：副ボタン（白地＋緑枠） */
+#club-event-modal .btn-display-settings{
+  background: #fff !important;
+  color: #16a34a !important;
+
+  border: 2px solid #16a34a !important;
+  box-shadow: none !important;
+}
+#club-event-modal .btn-display-settings:hover{
+  background: rgba(22,163,74,0.08) !important;
+}
+
+/* （任意）編集モーダルの縦間隔を少し詰める */
+#club-event-modal .modal-form .field-group{
+  margin-bottom: 18px;
+}
+/* 中止/復活：幅は揃えたまま、少し下に落として「別グループ感」を作る */
+#club-event-modal .club-event-cancel-wrap{
+  width: 100%;
+  max-width: 196px;
+  margin: 26px auto 0;          /* ← ここを少し増やす（22〜30で好み） */
+  border-top: none;
+  border-bottom: none;
+  padding-top: 0;
+  padding-bottom: 0;
+
+
+  display: flex;
+  justify-content: center;
+}
+
+/* 中止ボタンが「表示されているときだけ」区切り線を出す */
+#club-event-modal
+  .club-event-cancel-wrap:has(#club-event-cancel-toggle:not([style*="display:none"])){
+  padding-top: 12px;
+  padding-bottom: 12px;
+  border-top: 1px solid #eee;
+  border-bottom: 1px solid #eee;
+}
+
+/* ============================
+   Cancel / Restore button (square danger)
+   ============================ */
+
+#club-event-modal #club-event-cancel-toggle{
+  width: 100%;
+  box-sizing: border-box;
+
+  /* 形状：ピルをやめる */
+  border-radius: 0px;          /* ← 四角寄り（6〜10で調整可） */
+
+  /* 色：黒地＋赤文字 */
+  background: #111;
+  color: #ff4d4d;
+
+  /* 枠は完全撤去 */
+  border: none;
+  box-shadow: none !important;
+
+  /* サイズ感：主ボタンと高さを揃える */
+  padding: 10px 0;
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.08s ease;
+}
+
+/* hover：赤を少しだけ強める */
+#club-event-modal #club-event-cancel-toggle:hover{
+  background: #1a1a1a;
+  color: #ff6b6b;
+  box-shadow: 0 8px 18px rgba(255,77,77,0.18);
+}
+
+/* active：軽く沈む */
+#club-event-modal #club-event-cancel-toggle:active{
+  transform: translateY(1px);
+}
+
+/* focus-visible：アクセシビリティ */
+#club-event-modal #club-event-cancel-toggle:focus-visible{
+  outline: none;
+}
+
+/* =========================================
+   Display Settings Modal - FIX (button toggle version)
+   ========================================= */
+
+/* このモーダルだけ field-group の中央寄せを無効化 */
+#display-settings-modal .modal-form .field-group{
+  align-items: stretch;
+  justify-content: flex-start;
+  text-align: left;
+}
+
+/* リスト全体：中央に置く */
+#display-settings-modal .ds-list{
+  width: 100%;
+  max-width: 260px;
+  margin: 0 auto;
+}
+
+/* 1行：チェックボタン + ラベル */
+#display-settings-modal .ds-row{
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+
+  padding: 8px 0;
+}
+
+/* ラベルが縦にならないように強制 */
+#display-settings-modal .ds-label{
+  white-space: nowrap;
+  writing-mode: horizontal-tb;
+  text-orientation: mixed;
+
+  font-size: 0.98rem;
+  font-weight: 700;
+  padding-left: 0;          /* ← 余計なズレを消す */
+}
+
+/* ★重要：display-settings-modal 内だけ check-btn をアイコンサイズに固定 */
+#display-settings-modal .check-btn.ds-toggle{
+  width: 34px !important;
+  height: 34px !important;
+  min-width: 34px !important;
+
+  padding: 0 !important;      /* ← padding-left:30px を殺す */
+  box-sizing: border-box;
+
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* check-icon の見え方が崩れるなら（保険） */
+#display-settings-modal .check-btn.ds-toggle .check-icon{
+  line-height: 1;
+}
+
+/* 行ごと押せる方が自然なら：ds-rowをクリックでトグルさせる（JS側で対応） */
+#display-settings-modal .ds-row{
+  cursor: pointer;
+}
+
+/* 表示設定モーダルは club-event-modal より必ず上に出す */
+#display-settings-modal.modal-backdrop{
+  z-index: 3500; /* ui-message(3000)より上でもOK。好みで 3200〜4000 */
+}

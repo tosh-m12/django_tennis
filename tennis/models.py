@@ -1,7 +1,8 @@
 # tennis/models.py
 import uuid
-from django.db import models, transaction
-from django.db.models import Q, Max
+
+from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 
 
@@ -48,9 +49,7 @@ class Event(models.Model):
     1回分の練習回（イベント）
     - V1：イベント単位トークンは持たない（廃止）
     """
-    club = models.ForeignKey(
-        Club, on_delete=models.CASCADE, related_name="events"
-    )
+    club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name="events")
 
     title = models.CharField(max_length=200, blank=True)  # 未入力ならUI側で「練習」等
     place = models.CharField(max_length=200, blank=True, default="")
@@ -64,14 +63,38 @@ class Event(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        indexes = [
-            models.Index(fields=["club", "date"]),
-        ]
+        indexes = [models.Index(fields=["club", "date"])]
         ordering = ["date", "id"]
 
     def __str__(self) -> str:
         t = self.title or "練習"
         return f"{self.date} {t}"
+
+
+# ============================================================
+# Club member class (optional grouping)
+# ============================================================
+
+class ClubMemberClass(models.Model):
+    club = models.ForeignKey("Club", on_delete=models.CASCADE, related_name="member_classes")
+
+    name = models.CharField(max_length=40)
+    display_order = models.IntegerField(default=0)
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["club", "is_active"]),
+            models.Index(fields=["club", "display_order"]),
+        ]
+        ordering = ["display_order", "id"]
+
+    def __str__(self):
+        return f"{self.club_id}:{self.name}"
+
 
 class Member(models.Model):
     club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name="members")
@@ -79,8 +102,16 @@ class Member(models.Model):
 
     is_fixed = models.BooleanField(default=False)
 
-    # ★まずは nullable で追加（既存行があるため）
-    member_no = models.PositiveIntegerField(blank=True)
+    # ★既存行互換：まず nullable で運用 → データが埋まったら NOT NULL に移行できる
+    member_no = models.PositiveIntegerField(null=True, blank=True)
+
+    member_class = models.ForeignKey(
+        "ClubMemberClass",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="members",
+    )
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -92,12 +123,15 @@ class Member(models.Model):
         ]
         ordering = ["-is_fixed", "display_name", "id"]
         constraints = [
-            # ★後でNOT NULLにしてから有効化でもOK（まずは付けても動くがNULLがある間は注意）
+            # NOTE:
+            # - member_no が NULL の間は UniqueConstraint の意味が薄い（DBによりNULLは重複許容）
+            # - いずれ member_no を NOT NULL にした段階で “厳密に効く”
             models.UniqueConstraint(fields=["club", "member_no"], name="uniq_member_no_per_club"),
         ]
 
     def __str__(self) -> str:
         return f"{self.club_id}:{self.display_name}"
+
 
 class Attendance(models.TextChoices):
     YES = "yes", "参加"
@@ -112,21 +146,31 @@ class EventParticipant(models.Model):
     - member_id は原則付与（ゲストも member を作って付与する運用）
     - 例外的に member=NULL の参加者は過去互換/移行データ等として許容
     """
-    event = models.ForeignKey(
-        Event, on_delete=models.CASCADE, related_name="event_participants"
-    )
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="event_participants")
 
     member = models.ForeignKey(
-        Member, on_delete=models.SET_NULL, null=True, blank=True, related_name="event_participants"
+        Member,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="event_participants",
     )
 
     # 当該イベントでの表示名（作成時は原則 member.display_name をコピー）
     display_name = models.CharField(max_length=100)
 
     # yes / no / maybe / NULL（未設定）
-    attendance = models.CharField(
-        max_length=10, choices=Attendance.choices, null=True, blank=True
+    attendance = models.CharField(max_length=10, choices=Attendance.choices, null=True, blank=True)
+
+    event_member_class = models.ForeignKey(
+        "ClubMemberClass",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="event_participants",
     )
+
+    class_name = models.CharField(max_length=40, blank=True, default="")
 
     participates_match = models.BooleanField(default=False)  # 幹事のみ操作
     comment = models.TextField(blank=True)
@@ -155,14 +199,78 @@ class EventParticipant(models.Model):
 
 
 # ============================================================
+# Event display setting (per-event)
+# ============================================================
+
+class EventDisplaySetting(models.Model):
+    event = models.OneToOneField("Event", on_delete=models.CASCADE, related_name="display_setting")
+
+    show_flags = models.BooleanField(default=True)
+    show_class = models.BooleanField(default=True)     # 今は未実装でもOK
+    show_schedule = models.BooleanField(default=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def as_dict(self):
+        return {
+            "flags": bool(self.show_flags),
+            "class": bool(self.show_class),
+            "schedule": bool(self.show_schedule),
+        }
+
+
+# ============================================================
+# Event-specific flag definitions (per-event)
+# ============================================================
+
+class EventFlagDefinition(models.Model):
+    event = models.ForeignKey(Event, on_delete=models.CASCADE, related_name="event_flag_definitions")
+
+    name = models.CharField(max_length=100)
+    display_order = models.PositiveIntegerField()
+
+    INPUT_MODE_CHECK = "check"
+    INPUT_MODE_DIGIT = "digit"
+    INPUT_MODE_CHOICES = [
+        (INPUT_MODE_CHECK, "チェック"),
+        (INPUT_MODE_DIGIT, "数字(1桁)"),
+    ]
+    input_mode = models.CharField(
+        max_length=10,
+        choices=INPUT_MODE_CHOICES,
+        default=INPUT_MODE_CHECK,
+    )
+
+    is_active = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["event", "is_active"]),
+            models.Index(fields=["event", "display_order"]),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["event", "display_order"],
+                name="uq_event_flag_definition_event_display_order",
+            ),
+        ]
+        ordering = ["display_order", "id"]
+
+    def __str__(self) -> str:
+        return f"{self.event_id}:{self.name}"
+
+
+# ============================================================
 # Club-wide flag definitions & per-participant flag ON/OFF
 # （V1：最大3個、クラブ共通）
 # ============================================================
 
 class ClubFlagDefinition(models.Model):
-    club = models.ForeignKey(
-        Club, on_delete=models.CASCADE, related_name="flag_definitions"
-    )
+    club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name="flag_definitions")
+
     name = models.CharField(max_length=100)
     display_order = models.PositiveIntegerField()
 
@@ -203,29 +311,66 @@ class ClubFlagDefinition(models.Model):
 class ParticipantFlag(models.Model):
     """
     イベント参加者に対するフラグON/OFF
-    - フラグ操作時、対象が「未登録行」なら先に EventParticipant を作ってから保存（view側）
+    - club_flag_definition / event_flag_definition のどちらか一方だけを持つ
     """
     event_participant = models.ForeignKey(
         EventParticipant, on_delete=models.CASCADE, related_name="flags"
     )
-    flag_definition = models.ForeignKey(
-        ClubFlagDefinition, on_delete=models.CASCADE, related_name="participant_flags"
+
+    # ★クラブ共通フラグ
+    club_flag_definition = models.ForeignKey(
+        ClubFlagDefinition,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="participant_flags",
     )
+
+    # ★イベント固有フラグ
+    event_flag_definition = models.ForeignKey(
+        EventFlagDefinition,
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="participant_flags",
+    )
+
     is_on = models.BooleanField(default=False)
 
+    # digit モードの場合の値
     value = models.SmallIntegerField(null=True, blank=True)
 
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
         constraints = [
+            # club と event の両方を同時に持つのはNG / 両方NULLもNG
+            models.CheckConstraint(
+                condition=(
+                    (models.Q(club_flag_definition__isnull=False) & models.Q(event_flag_definition__isnull=True)) |
+                    (models.Q(club_flag_definition__isnull=True) & models.Q(event_flag_definition__isnull=False))
+                ),
+                name="ck_participant_flag_exactly_one_definition",
+            ),
+
+
+            # clubフラグ：同一参加者×同一クラブフラグは1行
             models.UniqueConstraint(
-                fields=["event_participant", "flag_definition"],
-                name="uq_participant_flag_ep_flagdef",
+                fields=["event_participant", "club_flag_definition"],
+                condition=models.Q(club_flag_definition__isnull=False),
+                name="uq_participant_flag_ep_clubdef",
+            ),
+
+            # eventフラグ：同一参加者×同一イベントフラグは1行
+            models.UniqueConstraint(
+                fields=["event_participant", "event_flag_definition"],
+                condition=models.Q(event_flag_definition__isnull=False),
+                name="uq_participant_flag_ep_eventdef",
             ),
         ]
         indexes = [
-            models.Index(fields=["flag_definition", "is_on"]),
+            models.Index(fields=["club_flag_definition", "is_on"]),
+            models.Index(fields=["event_flag_definition", "is_on"]),
         ]
 
 
@@ -242,12 +387,10 @@ class GameType(models.TextChoices):
 class MatchSchedule(models.Model):
     """
     対戦表（公開版）
-    - イベントにつき1つ（unique(event)）
-    - locked は「スコアが1件でも入力されたら true」
+    - イベントにつき1つ（OneToOne）
+    - locked は「スコアが1件でも入力されたら true」運用
     """
-    event = models.OneToOneField(
-        Event, on_delete=models.CASCADE, related_name="match_schedule"
-    )
+    event = models.OneToOneField(Event, on_delete=models.CASCADE, related_name="match_schedule")
 
     schedule_json = models.JSONField()  # 対戦表本体（UI/集計の正）
     game_type = models.CharField(max_length=10, choices=GameType.choices)
@@ -274,9 +417,7 @@ class MatchScheduleDraft(models.Model):
     """
     生成中ドラフト（イベントにつき1つ）
     """
-    event = models.OneToOneField(
-        Event, on_delete=models.CASCADE, related_name="match_schedule_draft"
-    )
+    event = models.OneToOneField(Event, on_delete=models.CASCADE, related_name="match_schedule_draft")
 
     draft_json = models.JSONField(null=True, blank=True)
     params_json = models.JSONField(null=True, blank=True)  # game_type/court_count/round_count 等
@@ -317,7 +458,11 @@ class MatchScore(models.Model):
         ordering = ["round_no", "court_no", "id"]
 
     def __str__(self) -> str:
-        return f"sch={self.match_schedule_id} R{self.round_no} C{self.court_no} {self.side_a_score}-{self.side_b_score}"
+        return (
+            f"sch={self.match_schedule_id} "
+            f"R{self.round_no} C{self.court_no} "
+            f"{self.side_a_score}-{self.side_b_score}"
+        )
 
 
 class Substitution(models.Model):
@@ -351,7 +496,11 @@ class Substitution(models.Model):
         ]
 
     def __str__(self) -> str:
-        return f"sch={self.match_schedule_id} R{self.round_no} {self.original_participant_id}->{self.substitute_participant_id}"
+        return (
+            f"sch={self.match_schedule_id} "
+            f"R{self.round_no} "
+            f"{self.original_participant_id}->{self.substitute_participant_id}"
+        )
 
 
 # ============================================================
@@ -369,7 +518,13 @@ class AuditLog(models.Model):
     - 個人特定はしない（token種別のみ）
     """
     club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name="audit_logs")
-    event = models.ForeignKey(Event, on_delete=models.SET_NULL, null=True, blank=True, related_name="audit_logs")
+    event = models.ForeignKey(
+        Event,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="audit_logs",
+    )
 
     actor_token_kind = models.CharField(max_length=10, choices=ActorTokenKind.choices)
     action = models.CharField(max_length=100)
@@ -387,3 +542,4 @@ class AuditLog(models.Model):
 
     def __str__(self) -> str:
         return f"{self.created_at} {self.actor_token_kind} {self.action}"
+

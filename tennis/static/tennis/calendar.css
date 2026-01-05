@@ -273,3 +273,4 @@
 .cal-event.is-cancelled.is-public-lock {
   cursor: default !important;
   pointer-events: auto; /* JSで止めるのでautoのまま */
+} 
