@@ -12,6 +12,7 @@ from django.urls import reverse
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.utils import timezone
 from django.views.decorators.http import require_POST, require_http_methods
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.template.loader import render_to_string
 
 from .utils import generate_doubles_schedule, generate_singles_schedule
@@ -602,6 +603,8 @@ def club_home(request, club_public_token, club_admin_token=None):
 # Event (統合ビュー) : 完成版 event_view
 # ============================================================
 
+
+@ensure_csrf_cookie
 def event_view(request, club_public_token, event_id, club_admin_token=None):
     club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
     event = get_object_or_404(Event, id=int(event_id), club=club)
@@ -783,6 +786,7 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         "sub_candidates": sub_candidates,  # ✅ 追加（幹事のときだけ中身あり）
         "show_topbar": True,
     }
+
     return render(request, "tennis/event.html", ctx)
 
 
@@ -907,7 +911,7 @@ def club_rename_flag(request):
 @require_POST
 def club_rename_club(request):
     club_id = request.POST.get("club_id")
-    mode = (request.POST.get("flag_input_mode") or "").strip()
+    name = (request.POST.get("name") or "").strip()
     if not club_id:
         return JsonResponse({"ok": False, "error": "club_id required"}, status=400)
     if not name:

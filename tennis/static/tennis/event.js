@@ -8,11 +8,18 @@
 
 (function () {
 
+  let csrftoken = "";
+
   function getCookie(name) {
     const value = `; ${document.cookie}`;
     const parts = value.split(`; ${name}=`);
     if (parts.length === 2) return parts.pop().split(";").shift();
     return null;
+  }
+
+  function getCsrfTokenFromMeta() {
+    const meta = document.querySelector('meta[name="csrf-token"]');
+    return (meta?.getAttribute("content") || "").trim();
   }
 
   function qsa(sel, root = document) {
@@ -91,7 +98,9 @@
 
 
   document.addEventListener("DOMContentLoaded", () => {
-    csrftoken = getCookie("csrftoken") || "";
+    csrftoken = getCsrfTokenFromMeta();
+    // フォールバック（念のため残すなら）
+    if (!csrftoken) csrftoken = getCookie("csrftoken") || "";
     const participantsTable = document.getElementById("participants-table");
     if (!participantsTable) return;
 
@@ -340,7 +349,7 @@
       try {
         const r = await fetch(urls.setParticipatesMatch, {
           method: "POST",
-          credentials: "same-origin",
+          credentials: "include",
           headers: { "X-CSRFToken": csrftoken },
           body: fd,
         });
@@ -435,7 +444,7 @@
           try {
             const r = await fetch(urls.updateComment, {
               method: "POST",
-              credentials: "same-origin",
+              credentials: "include",
               headers: { "X-CSRFToken": csrftoken },
               body: fd,
             });
@@ -499,7 +508,7 @@
         try {
           const r = await fetch(urls.toggleFlag, {
             method: "POST",
-            credentials: "same-origin",
+            credentials: "include",
             headers: { "X-CSRFToken": csrftoken },
             body: fd,
           });
@@ -554,7 +563,7 @@
           try {
             const r = await fetch(urls.setFlagValue, {
               method: "POST",
-              credentials: "same-origin",
+              credentials: "include",
               headers: { "X-CSRFToken": csrftoken },
               body: fd,
             });
@@ -662,7 +671,7 @@
             try {
               const r = await fetch(urls.updateAttendance, {
                 method: "POST",
-                credentials: "same-origin",
+                credentials: "include",
                 headers: { "X-CSRFToken": csrftoken },
                 body: fd,
               });
@@ -769,7 +778,7 @@
           try {
             const r = await fetch(urls.addGuest, {
               method: "POST",
-              credentials: "same-origin",
+              credentials: "include",
               headers: { "X-CSRFToken": csrftoken },
               body: fd,
             });
@@ -923,7 +932,7 @@
       try {
         const r = await fetch(url, {
           method: "POST",
-          credentials: "same-origin",
+          credentials: "include",
           headers: { "X-CSRFToken": csrftoken },
           body: fd,
         });
@@ -1039,7 +1048,7 @@
         try {
           const r = await fetch(urls.setParticipatesMatch, {
             method: "POST",
-            credentials: "same-origin",
+            credentials: "include",
             headers: { "X-CSRFToken": csrftoken },
             body: fd,
           });
@@ -1270,7 +1279,7 @@
 
             const r = await fetch(saveUrl, {
               method: "POST",
-              credentials: "same-origin",
+              credentials: "include",
               headers: { "X-CSRFToken": csrftoken },
               body: fd,
             });
@@ -1347,7 +1356,7 @@
 
         const r = await fetch(publishUrl, {
           method: "POST",
-          credentials: "same-origin",
+          credentials: "include",
           headers: { "X-CSRFToken": csrftoken },
           body: fd,
         });
@@ -1365,31 +1374,37 @@
           let { r, data } = await postPublish(false);
 
           if (r.status === 409 && data && data.error === "score_exists") {
-            window.UI?.confirm?.(
+            const msg =
               data.message ||
-                "スコアが登録されています。再公開すると登録済みスコアがリセットされますが、よろしいでしょうか？",
-              {
-                okText: "スコアを破棄して再公開",
-                onOk: async () => {
-                  try {
-                    const res2 = await postPublish(true);
-                    if (!res2.r.ok || (res2.data && res2.data.error)) {
-                      safeShowMessage("公開に失敗しました。", 2600);
-                      console.error(res2.data);
-                      return;
-                    }
-                    applyPublishedUI();
-                    safeShowMessage("対戦表を公開しました。", 2200);
-                    setTimeout(() => window.location.reload(), 900);
-                  } catch (err2) {
-                    console.error(err2);
-                    safeShowMessage("公開に失敗しました（ネットワーク）。", 2600);
-                  }
-                },
+              "スコアが登録されています。再公開すると登録済みスコアがリセットされますが、よろしいでしょうか？";
+
+            const ok = await safeConfirm(msg, {
+              title: "確認",
+              okText: "スコアを破棄して再公開",
+              cancelText: "やめる",
+            });
+
+            if (!ok) return;
+
+            try {
+              const res2 = await postPublish(true);
+              if (!res2.r.ok || (res2.data && res2.data.error)) {
+                safeShowMessage("公開に失敗しました。", 2600);
+                console.error(res2.data);
+                return;
               }
-            );
+
+              applyPublishedUI();
+              safeShowMessage("対戦表を公開しました。", 2200);
+              setTimeout(() => window.location.reload(), 900);
+            } catch (err2) {
+              console.error(err2);
+              safeShowMessage("公開に失敗しました（ネットワーク）。", 2600);
+            }
+
             return;
           }
+
 
           if (!r.ok || (data && data.error)) {
             safeShowMessage("公開に失敗しました。", 2600);
@@ -1668,7 +1683,7 @@
             try {
               const r = await fetch(updateUrl, {
                 method: "POST",
-                credentials: "same-origin",
+                credentials: "include",
                 headers: { "X-CSRFToken": csrftoken },
                 body: fd,
               });
@@ -1716,7 +1731,7 @@
           try {
             const r = await fetch(updateUrl, {
               method: "POST",
-              credentials: "same-origin",
+              credentials: "include",
               headers: { "X-CSRFToken": csrftoken },
               body: fd,
             });
@@ -1909,7 +1924,7 @@
       try {
         const r = await fetch(subUrl, {
           method: "POST",
-          credentials: "same-origin",
+          credentials: "include",
           headers: { "X-CSRFToken": csrftoken },
           body: fd,
         });
