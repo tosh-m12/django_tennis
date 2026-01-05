@@ -227,13 +227,9 @@ LOGGING = {
 # ============================================================
 
 if not DEBUG:
-    # Cookie を HTTPS 専用に
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-
-    # ★ Safari 対策（これが無いのが今回の本丸）
-    SESSION_COOKIE_SAMESITE = "None"
-    CSRF_COOKIE_SAMESITE = "None"
-
-    # https へ強制（proxy下で https 判定できる前提）
+    # ここはデフォルト(Lax)に任せる or 明示的にLax
+    SESSION_COOKIE_SAMESITE = "Lax"
+    CSRF_COOKIE_SAMESITE = "Lax"
     SECURE_SSL_REDIRECT = True
