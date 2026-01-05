@@ -231,10 +231,9 @@ if not DEBUG:
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
 
+    # ★ Safari 対策（これが無いのが今回の本丸）
+    SESSION_COOKIE_SAMESITE = "None"
+    CSRF_COOKIE_SAMESITE = "None"
+
     # https へ強制（proxy下で https 判定できる前提）
     SECURE_SSL_REDIRECT = True
-
-    # 推奨ヘッダ（必要なら有効化）
-    # SECURE_HSTS_SECONDS = int(env_str("SECURE_HSTS_SECONDS", "0"))
-    # SECURE_HSTS_INCLUDE_SUBDOMAINS = env_bool("SECURE_HSTS_INCLUDE_SUBDOMAINS", default=False)
-    # SECURE_HSTS_PRELOAD = env_bool("SECURE_HSTS_PRELOAD", default=False)
