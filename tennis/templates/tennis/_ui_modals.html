@@ -548,6 +548,7 @@
 <div id="display-settings-modal" class="modal-backdrop" aria-hidden="true">
   <div id="event-flag-api-hooks"
      data-add-event-flag-url="{% url 'tennis:add_event_flag' %}"
+     data-delete-event-flag-url="{% url 'tennis:delete_event_flag' %}"
      style="display:none;"></div>
   <div class="modal-content event-modal modal-has-topbar"
        role="dialog" aria-modal="true" aria-labelledby="display-settings-modal-title">
@@ -572,25 +573,17 @@
           <span class="ds-label">共通フラグ</span>
         </div>
 
-        {# 固有フラグ（トグル＋設定モーダル起動） #}
+        {# 固有フラグ #}
         <div class="ds-row">
           <button type="button" class="check-btn ds-toggle is-on"
                   data-key="event_flags" aria-pressed="true">
             <span class="check-icon check-on">✓</span>
           </button>
-
-          {# 「固有フラグ」クリックで設定モーダルを出す #}
+          <span class="ds-label">固有フラグ</span>
           <button type="button"
-                  class="ds-label-btn js-open-event-flag-settings"
-                  aria-label="固有フラグを設定">
-            固有フラグ
-          </button>
-
-          {# 任意：右端に小さな「設定」ボタンを付けたい場合（CSSは後でOK） #}
-          <button type="button"
-                  class="btn btn-pill btn-mini js-open-event-flag-settings"
-                  aria-label="固有フラグ設定を開く">
-            設定
+                  class="pill-edit-event-flags js-open-event-flag-menu"
+                  aria-label="固有フラグを編集">
+            編集
           </button>
         </div>
 
@@ -641,7 +634,7 @@
                class="event-flag-name-input"
                id="event-flag-name-input"
                maxlength="20"
-               placeholder="例：初参加">
+               placeholder="例：アフター">
 
         <div class="hint" id="event-flag-hint"
              style="margin-top:8px; font-size:12px; opacity:.8;">
@@ -649,9 +642,6 @@
       </div>
 
       <div class="modal-actions">
-        <button type="button" class="btn btn-pill" id="event-flag-settings-cancel">
-          閉じる
-        </button>
         <button type="button" class="btn btn-pill btn-primary" id="event-flag-settings-add">
           追加
         </button>
@@ -661,6 +651,62 @@
 </div>
 
 
+{# --- event-flag-menu-modal（固有フラグ：追加/削除の選択）--- #}
+<div id="event-flag-menu-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content event-modal modal-has-topbar"
+       role="dialog" aria-modal="true" aria-labelledby="event-flag-menu-modal-title">
+
+    <div class="modal-topbar">
+      <div class="modal-topbar-title" id="event-flag-menu-modal-title">固有フラグ設定</div>
+      <button type="button"
+              id="close-event-flag-menu-modal"
+              class="modal-topbar-btn"
+              aria-label="閉じる">×</button>
+    </div>
+
+    <div class="modal-form">
+      <div class="modal-actions" style="justify-content:center; gap:14px;">
+        {# 設定ページと同じ「青/赤ピル」に寄せる（クラス名は既存に合わせて調整OK） #}
+        <button type="button" class="flag-add-btn" id="event-flag-menu-add-btn">
+          フラグ追加
+        </button>
+
+        <button type="button" class="flag-delete-btn" id="event-flag-menu-delete-btn">
+          フラグ削除
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# --- event-flag-delete-modal（イベント固有フラグ削除）--- #}
+<div id="event-flag-delete-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content event-modal modal-has-topbar"
+       role="dialog" aria-modal="true" aria-labelledby="event-flag-delete-modal-title">
+
+    <div class="modal-topbar">
+      <div class="modal-topbar-title" id="event-flag-delete-modal-title">固有フラグを削除</div>
+      <button type="button"
+              id="close-event-flag-delete-modal"
+              class="modal-topbar-btn"
+              aria-label="閉じる">×</button>
+    </div>
+
+    <div class="modal-form">
+      <div class="field-group">
+        <select id="event-flag-delete-select" class="modal-select" style="width:80%;">
+          <option value="">-- 選択 --</option>
+        </select>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-pill btn-primary" id="event-flag-delete-ok-btn">
+          削除
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
 
 
 <!-- [NEW] Class create/rename modal -->

@@ -840,3 +840,65 @@
 #display-settings-modal.modal-backdrop{
   z-index: 3500; /* ui-message(3000)より上でもOK。好みで 3200〜4000 */
 }
+
+.event-modal .event-flag-name-input {
+  width: 100%;
+  max-width: 180px;
+  padding: 10px 12px;
+
+  border: none;
+  border-radius: 10px;
+  outline: none;
+
+  background: #f3f6ff;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.event-modal .event-flag-name-input::placeholder {
+  color: #9ca3af;
+  font-weight: 500;
+}
+
+.event-modal .event-flag-name-input:focus {
+  background: #eaf0ff;
+}
+
+/* =========================================================
+   表示設定：固有フラグ「編集」ピル（白地＋緑枠＋緑文字）
+   ※ club-event-modal の btn-display-settings と同系色
+   ========================================================= */
+
+/* 固有フラグ行を「左：チェック / 右：編集」にする */
+#display-settings-modal .ds-item.ds-item-inline{
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+/* スリムなピル */
+#display-settings-modal .pill-edit-event-flags{
+  background: #fff !important;
+  color: #16a34a !important;
+
+  border: 2px solid #16a34a !important;
+  box-shadow: none !important;
+
+  padding: 4px 10px;
+  font-size: 12px;
+  line-height: 1.2;
+  border-radius: 999px;
+  min-height: 24px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+#display-settings-modal .pill-edit-event-flags:hover{
+  background: rgba(22,163,74,0.08) !important;
+}
+
+#display-settings-modal .pill-edit-event-flags:disabled{
+  opacity: 0.45;
+  cursor: not-allowed;
+}

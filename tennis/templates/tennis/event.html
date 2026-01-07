@@ -268,7 +268,7 @@
           {# ✅クラス（コメント左） #}
           <td class="member-class-cell" data-ds="class">
             {% if is_admin %}
-              <select class="member-class-select"
+              <select class="participant-class-select member-class-select"
                       data-member-id="{{ row.member_id }}"
                       data-ep-id="{{ row.ep_id|default_if_none:'' }}"
                       data-current-class-id="{{ row.member_class_id|default_if_none:'' }}">
@@ -283,6 +283,7 @@
               <span class="member-class-text">{{ row.member_class_name|default:"" }}</span>
             {% endif %}
           </td>
+
 
           <td class="comment-cell">
             <div class="comment-editable"
@@ -417,7 +418,7 @@
           <td class="member-class-cell" data-ds="class">
             {% if is_admin %}
               {# guestは member_id が空の可能性があるので、空なら disabled #}
-              <select class="member-class-select"
+              <select class="participant-class-select member-class-select"
                       data-member-id="{{ row.member_id|default_if_none:'' }}"
                       data-ep-id="{{ row.ep_id }}"
                       data-current-class-id="{{ row.member_class_id|default_if_none:'' }}"

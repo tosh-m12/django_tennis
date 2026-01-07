@@ -233,6 +233,7 @@
       addGuest: participantsTable.dataset.addGuestUrl,
       publish: participantsTable.dataset.publishUrl,
       saveScore: participantsTable.dataset.saveScoreUrl,
+      setMemberClass: participantsTable.dataset.setMemberClassUrl,
     };
 
 
@@ -501,6 +502,7 @@
         appendParticipant(fd, ids, row);
         fd.append("flag_id", flagId);
         fd.append("checked", willOn ? "1" : "0");
+        fd.append("flag_scope", (btn.dataset.flagScope || "club"));
 
         const adminToken = participantsTable.dataset.adminToken;
         if (adminToken) fd.append("admin_token", adminToken);
@@ -556,6 +558,7 @@
           appendParticipant(fd, ids, row);
           fd.append("flag_id", flagId);
           fd.append("value", v); // "" = クリア
+          fd.append("flag_scope", (input.dataset.flagScope || "club"));
 
           const adminToken = participantsTable.dataset.adminToken;
           if (adminToken) fd.append("admin_token", adminToken);
@@ -591,6 +594,74 @@
             input.blur();
           }
         });
+      });
+    }
+
+    // ============================================================
+    // [ADMIN] イベント側 チーム分け（クラス）保存
+    // ============================================================
+    if (isAdmin && urls.setMemberClass) {
+      // 初期値保持（失敗時に戻す）
+      qsa("select.participant-class-select", participantsTable).forEach((sel) => {
+        sel.dataset.prev = (sel.value || "").trim();
+      });
+
+      participantsTable.addEventListener("change", async (e) => {
+        const sel = e.target.closest("select.participant-class-select");
+        if (!sel) return;
+
+        if (lockPublicEdits) {
+          // 公開後の一般編集は禁止（幹事だけ想定なので保険）
+          sel.value = sel.dataset.prev || "";
+          return blockPublicEdit("公開後の編集は幹事へ申請してください");
+        }
+
+        if (!(await warnIfAdminEditingPublished())) {
+          sel.value = sel.dataset.prev || "";
+          return;
+        }
+
+        if (!(await guardParticipantChangeIfEnded())) {
+          sel.value = sel.dataset.prev || "";
+          return;
+        }
+
+        const row = getRowFromEl(sel);
+        const ids = getIdsFromEl(sel);
+
+        const classId = (sel.value || "").trim(); // "" も許可（未所属）
+        const prev = (sel.dataset.prev || "").trim();
+
+        const fd = new FormData();
+        fd.append("event_id", eventId);
+        appendParticipant(fd, ids, row);
+        fd.append("class_id", classId);
+
+        const adminToken = participantsTable.dataset.adminToken;
+        if (adminToken) fd.append("admin_token", adminToken);
+
+        try {
+          const r = await fetch(urls.setMemberClass, {
+            method: "POST",
+            credentials: "include",
+            headers: { "X-CSRFToken": csrftoken },
+            body: fd,
+          });
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok || !data.ok) throw new Error(data.error || "not ok");
+
+          if (data.ep_id) applyEpIdToRow(row, data.ep_id);
+
+          sel.dataset.prev = classId;
+          safeShowMessage("クラスを保存しました", 1400);
+
+          // 公開済みなら再公開導線
+          markChangedIfPublishedExists();
+        } catch (err) {
+          console.error(err);
+          sel.value = prev;
+          safeShowMessage("クラス保存に失敗しました", 2200);
+        }
       });
     }
 
@@ -1716,8 +1787,40 @@
           ev.preventDefault();
 
           syncHiddenTime();
-          if (!computeDirty()) {
+
+          // ★表示設定の変更も「変更あり」として扱う
+          const clubModalEl = form?.closest("#club-event-modal");
+          const dsDirty = (clubModalEl?.dataset?.displaySettingsDirty || "") === "1";
+
+          if (!computeDirty() && !dsDirty) {
             safeShowMessage("変更がありません", 1600);
+            return;
+          }
+
+          // ★表示設定だけ変更された場合：
+          //   - ここでページリロードする（要件）
+          //   - その前に必要なら即時反映もしてOK（見た目のズレ防止）
+          if (!computeDirty() && dsDirty) {
+            // dirty フラグを落とす（※リロードするので実害はないが、状態整合のため）
+            if (clubModalEl) clubModalEl.dataset.displaySettingsDirty = "0";
+
+            //（任意）保存済みの表示設定を event ページに即反映（リロード前の一瞬だけ）
+            try {
+              const eventId2 = String(eventId || "").trim();
+              if (eventId2 && window.TennisDisplaySettings?.loadByKey && window.TennisDisplaySettings?.applyAll) {
+                const key = `tennis:display_settings:event:${eventId2}`;
+                const s = window.TennisDisplaySettings.loadByKey(key);
+                window.TennisDisplaySettings.applyAll(s);
+              }
+            } catch {}
+
+            closeModal();
+            safeShowMessage("更新しました", 800);
+
+            // ★要件：更新ボタン押下後はリロード
+            setTimeout(() => {
+              window.location.reload();
+            }, 80);
             return;
           }
 
@@ -1735,6 +1838,7 @@
               headers: { "X-CSRFToken": csrftoken },
               body: fd,
             });
+
             const data = await r.json().catch(() => ({}));
             if (!r.ok || !data.ok) {
               console.error(data);
@@ -1743,6 +1847,7 @@
               return;
             }
 
+            // ---- 既存のメタ更新などはそのまま ----
             metaBar.dataset.date = data.event.date || "";
             metaBar.dataset.title = data.event.title || "";
             metaBar.dataset.place = data.event.place || "";
@@ -1769,8 +1874,16 @@
             isDirty = false;
             setSubmitState(true, false);
 
+            // ★表示設定 dirty もクリア（念のため）
+            if (clubModalEl) clubModalEl.dataset.displaySettingsDirty = "0";
+
             closeModal();
-            safeShowMessage("更新しました", 1600);
+            safeShowMessage("更新しました", 800);
+
+            // ★要件：更新ボタン押下後はリロード（API更新でも同じ挙動に統一）
+            setTimeout(() => {
+              window.location.reload();
+            }, 80);
 
             try {
               localStorage.setItem(

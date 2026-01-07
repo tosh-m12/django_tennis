@@ -12,6 +12,7 @@ from django.urls import reverse
 from django.http import JsonResponse, HttpResponseBadRequest
 from django.utils import timezone
 from django.views.decorators.http import require_POST, require_http_methods
+from django.views.decorators.csrf import ensure_csrf_cookie
 from django.template.loader import render_to_string
 
 from .utils import generate_doubles_schedule, generate_singles_schedule
@@ -628,6 +629,7 @@ def club_home(request, club_public_token, club_admin_token=None):
 # - event_member_class が NULL の行は「このイベントの初回表示」でスナップショット埋め
 # ============================================================
 
+@ensure_csrf_cookie
 def event_view(request, club_public_token, event_id, club_admin_token=None):
     club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
     event = get_object_or_404(Event, id=int(event_id), club=club)
@@ -668,7 +670,7 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
     # --- 固定メンバー（固定行）---
     members = list(
         Member.objects.filter(club=club, is_fixed=True)
-        .select_related("member_class")  # ✅ 追加：デフォルト表示用（EP無し時に参照）
+        .select_related("member_class")
         .order_by("member_no", "id")
     )
     member_ids = [m.id for m in members]
@@ -688,6 +690,7 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
     }
 
     # --- フラグ状態（参加者×フラグ）---
+    # [A] クラブ共通フラグ
     pf_qs = ParticipantFlag.objects.filter(
         event_participant__event=event,
         club_flag_definition__club=club,
@@ -701,6 +704,29 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         flag_states_on[ep_id][fd_id] = bool(pf["is_on"])
         flag_states_val[ep_id][fd_id] = pf["value"]
 
+    # ------------------------------------------------------------
+    # ✅ [B] イベント固有フラグ（ここが不足していたので追加）
+    # ------------------------------------------------------------
+    ep_ids_all = list(
+        EventParticipant.objects.filter(event=event).values_list("id", flat=True)
+    )
+    event_flag_ids = [f.id for f in event_flags]
+
+    event_flag_states_on = defaultdict(dict)
+    event_flag_states_val = defaultdict(dict)
+
+    if ep_ids_all and event_flag_ids:
+        epf_qs = ParticipantFlag.objects.filter(
+            event_participant_id__in=ep_ids_all,
+            event_flag_definition_id__in=event_flag_ids,
+        ).values("event_participant_id", "event_flag_definition_id", "is_on", "value")
+
+        for pf in epf_qs:
+            ep_id = pf["event_participant_id"]
+            fd_id = pf["event_flag_definition_id"]
+            event_flag_states_on[ep_id][fd_id] = bool(pf["is_on"])
+            event_flag_states_val[ep_id][fd_id] = pf["value"]
+
     # --- 公開済み対戦表 ---
     ms = MatchSchedule.objects.filter(event=event, published=True).first()
 
@@ -709,8 +735,6 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
 
     # ------------------------------------------------------------
     # 固定行
-    # - EPが無ければ（出欠/コメント等は空欄）だが、class は Member.member_class をフォールバック表示
-    # - EPがあれば class は EP.event_member_class（イベント固有FK）を表示
     # ------------------------------------------------------------
     fixed_rows = []
     for m in members:
@@ -722,9 +746,6 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
             else (ep.display_name if ep else (m.display_name or ""))
         )
 
-        # ✅ class 表示の優先順位：
-        #   1) EP.event_member_class（イベント固有）
-        #   2) Member.member_class（クラブ設定デフォルト） ※EP無しの新規イベント時
         if ep:
             mc = getattr(ep, "event_member_class", None)
             class_name_compat = (ep.class_name or "")
@@ -741,11 +762,9 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
             "comment": (ep.comment or "") if ep else "",
             "participates_match": bool(ep.participates_match) if ep else False,
 
-            # ★表示の正（FK）
             "member_class_id": mc.id if mc else None,
             "member_class_name": (mc.name or "") if mc else "",
 
-            # 互換・デバッグ用（残す）
             "class_name": class_name_compat,
         })
 
@@ -758,11 +777,6 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         .order_by("id")
     )
 
-    # ------------------------------------------------------------
-    # ゲスト行
-    # - ゲストは EP が必ずある（＝イベント参加として追加されるので）
-    # - class は EP.event_member_class を表示
-    # ------------------------------------------------------------
     guest_rows = []
     for ep in guest_eps:
         display_name = (
@@ -781,11 +795,9 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
             "comment": ep.comment or "",
             "participates_match": bool(ep.participates_match),
 
-            # ★表示の正（FK）
             "member_class_id": mc.id if mc else None,
             "member_class_name": (mc.name or "") if mc else "",
 
-            # 互換・デバッグ用
             "class_name": ep.class_name or "",
         })
 
@@ -840,7 +852,6 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         "display_settings_json": display_settings_json,
         "save_display_settings_url": reverse("tennis:save_event_display_setting"),
 
-        # クラブ側の定義（ドロップダウン表示用）
         "member_classes": member_classes,
 
         "flags": flags,
@@ -850,6 +861,10 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
 
         "event_flags": event_flags,
         "max_event_flags": 2,
+
+        # ✅追加：イベント固有フラグの状態（これが無いとリロードで消える）
+        "event_flag_states_on": {k: dict(v) for k, v in event_flag_states_on.items()},
+        "event_flag_states_val": {k: dict(v) for k, v in event_flag_states_val.items()},
 
         "fixed_rows": fixed_rows,
         "guest_rows": guest_rows,
@@ -1291,6 +1306,11 @@ def toggle_participant_flag(request):
     flag_id = (request.POST.get("flag_id") or "").strip()
     checked = (request.POST.get("checked") or "").strip().lower()
 
+    # ★追加：flag_scope（"club" or "event"）
+    flag_scope = (request.POST.get("flag_scope") or "club").strip().lower()
+    if flag_scope not in ("club", "event"):
+        flag_scope = "club"
+
     if not event_id or not flag_id:
         return JsonResponse({"ok": False, "error": "bad_request"}, status=400)
     if checked not in ("true", "false", "1", "0", "yes", "no", "on", "off"):
@@ -1299,14 +1319,32 @@ def toggle_participant_flag(request):
     is_on = checked in ("true", "1", "yes", "on")
 
     event = get_object_or_404(Event, id=int(event_id))
-    flagdef = get_object_or_404(
-        ClubFlagDefinition, id=int(flag_id), club=event.club, is_active=True
-    )
 
-    # digit 型は別 API
+    # ============================================================
+    # ① フラグ定義を scope で取得（club/event）
+    # ============================================================
+    if flag_scope == "event":
+        flagdef = get_object_or_404(
+            EventFlagDefinition,
+            id=int(flag_id),
+            event=event,
+            is_active=True,
+        )
+    else:
+        flagdef = get_object_or_404(
+            ClubFlagDefinition,
+            id=int(flag_id),
+            club=event.club,
+            is_active=True,
+        )
+
+    # digit 型は別 API（既存仕様維持）
     if flagdef.input_mode == "digit":
         return JsonResponse({"ok": False, "error": "digit_flag_use_value_api"}, status=400)
 
+    # ============================================================
+    # ② 対象参加者（ep）を取得/作成（既存仕様維持）
+    # ============================================================
     ep_id = ((request.POST.get("ep_id") or "").strip()
              or (request.POST.get("participant_id") or "").strip())
     member_id = (request.POST.get("member_id") or "").strip()
@@ -1319,15 +1357,32 @@ def toggle_participant_flag(request):
     else:
         return JsonResponse({"ok": False, "error": "missing_target"}, status=400)
 
-    obj, _ = ParticipantFlag.objects.get_or_create(
-        event_participant=ep,
-        club_flag_definition=flagdef,
-    )
+    # ============================================================
+    # ③ ParticipantFlag を scope で get_or_create
+    #    （あなたのモデル設計に完全一致）
+    # ============================================================
+    if flag_scope == "event":
+        obj, _ = ParticipantFlag.objects.get_or_create(
+            event_participant=ep,
+            event_flag_definition=flagdef,
+            defaults={"club_flag_definition": None},
+        )
+        # 安全策：過去データ等で両方入ってたら矯正
+        if obj.club_flag_definition_id is not None:
+            obj.club_flag_definition = None
+    else:
+        obj, _ = ParticipantFlag.objects.get_or_create(
+            event_participant=ep,
+            club_flag_definition=flagdef,
+            defaults={"event_flag_definition": None},
+        )
+        if obj.event_flag_definition_id is not None:
+            obj.event_flag_definition = None
 
     if obj.is_on != is_on:
         obj.is_on = is_on
         try:
-            obj.save(update_fields=["is_on", "updated_at"])
+            obj.save(update_fields=["is_on", "club_flag_definition", "event_flag_definition", "updated_at"])
         except Exception:
             obj.save()
 
@@ -1335,6 +1390,7 @@ def toggle_participant_flag(request):
         "ok": True,
         "ep_id": ep.id,
         "flag_id": flagdef.id,
+        "flag_scope": flag_scope,
         "checked": bool(obj.is_on),
     })
 
@@ -2420,3 +2476,41 @@ def add_event_flag(request):
         "count": existing_count + 1,
         "max": MAX_EVENT_FLAGS,
     })
+
+
+@require_POST
+def delete_event_flag(request):
+    """
+    body: { "event_id": <int>, "event_flag_id": <int> }
+    - イベント固有フラグを削除
+    - 紐づく参加者フラグ値も一緒に消す（CASCADE でもOK）
+    """
+    try:
+        payload = json.loads(request.body.decode("utf-8") or "{}")
+    except Exception:
+        payload = {}
+
+    event_id = str(payload.get("event_id") or "").strip()
+    event_flag_id = str(payload.get("event_flag_id") or "").strip()
+
+    if not event_id or not event_flag_id:
+        return JsonResponse({"ok": False, "error": "bad_request"}, status=400)
+
+    event = get_object_or_404(Event, id=int(event_id))
+    event_flag = get_object_or_404(EventFlagDefinition, id=int(event_flag_id), event=event)
+
+    # admin ガード（add と同じ思想で揃えるならここも）
+    if not _is_event_admin_session(request, event.id):
+        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+
+    with transaction.atomic():
+        # ★正：参加者側の値（ParticipantFlag）を削除
+        ParticipantFlag.objects.filter(
+            event_participant__event=event,
+            event_flag_definition=event_flag,
+        ).delete()
+
+        # 定義を削除（CASCADEでも上が消えるが、明示で安全）
+        event_flag.delete()
+
+    return JsonResponse({"ok": True})
