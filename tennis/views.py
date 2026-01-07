@@ -888,6 +888,7 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         "sub_candidates": sub_candidates,
         "show_topbar": True,
     }
+
     return render(request, "tennis/event.html", ctx)
 
 
