@@ -205,15 +205,22 @@ class EventParticipant(models.Model):
 class EventDisplaySetting(models.Model):
     event = models.OneToOneField("Event", on_delete=models.CASCADE, related_name="display_setting")
 
+    # 旧: flags → 新: common_flags
     show_flags = models.BooleanField(default=True)
-    show_class = models.BooleanField(default=True)     # 今は未実装でもOK
+
+    # ★追加：イベント固有フラグ列の表示
+    show_event_flags = models.BooleanField(default=False)
+
+    show_class = models.BooleanField(default=True)
     show_schedule = models.BooleanField(default=True)
 
     updated_at = models.DateTimeField(auto_now=True)
 
     def as_dict(self):
+        # ★サーバが返す形を「正」にする（JS側もこの形を前提にできる）
         return {
-            "flags": bool(self.show_flags),
+            "common_flags": bool(self.show_flags),
+            "event_flags": bool(self.show_event_flags),
             "class": bool(self.show_class),
             "schedule": bool(self.show_schedule),
         }

@@ -545,7 +545,7 @@
 
 
 {# --- display-settings-modal（置換）--- #}
-<div id="display-settings-modal" class="modal-backdrop" aria-hidden="true">
+<div id="display-settings-modal" class="modal-backdrop" aria-hidden="true" data-save-display-settings-url="{% url 'tennis:save_event_display_setting' %}">
   <div id="event-flag-api-hooks"
      data-add-event-flag-url="{% url 'tennis:add_event_flag' %}"
      data-delete-event-flag-url="{% url 'tennis:delete_event_flag' %}"
@@ -777,7 +777,7 @@
       <div class="field-group">
         <select id="class-delete-select" class="modal-select" style="width:80%;">
           <option value="">-- 選択 --</option>
-          {% for c in classes %}
+          {% for c in member_classes %}
             <option value="{{ c.id }}">{{ c.name }}</option>
           {% endfor %}
         </select>

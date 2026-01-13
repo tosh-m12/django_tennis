@@ -6,7 +6,7 @@
 // - admin_token は拾えるだけ拾う（環境差吸収）
 // - クリック伝播事故で別モーダルが開くのを止める
 // - ★追加/削除 成功後：ページリロードせずに Display Settings を再表示（event_flags を適切にON/OFF）
-// - ★0個のまま閉じた場合：Display Settings を event_flags OFF で再表示（従来要件）
+// - ★0個のまま閉じた場合：Display Settings を event_flags OFF で再表示
 // - ★FIX：固有フラグの追加/削除が行われたら、イベント編集モーダルの更新ボタンをアクティブ化（dirty）
 //
 // 注意：display_settings.js は触らなくてOK（reopenDisplaySettings イベントを投げるだけ）
@@ -142,37 +142,100 @@
   }
 
   // ★FIX：イベント編集モーダルの更新ボタンをアクティブ化（固有フラグの追加/削除が行われたら必ず呼ぶ）
+  //
+  // 重要:
+  // - “ボタンを enable” だけだと、別JSが「未変更」判定で再 disabled に戻すことがある
+  // - なので「フォームに input/change を発火」して dirty 判定を確実に通す
+  // - displaySettingsChanged は「裏更新」を誘発するため dispatch しない
   function markClubEventModalDirty() {
     const clubModal = document.getElementById("club-event-modal");
     if (!clubModal) return;
 
-    const candidates = [
-      "#club-event-update",
-      "#club-event-save",
-      "#club-event-submit",
-      "#club-event-ok",
-      "#club-event-modal-update",
-      "#club-event-modal-save",
-      'button[name="update"]',
-      'button[data-action="update"]',
-      'button[type="submit"]',
-    ];
+    // club-event-modal 内の form を優先（無ければモーダル自体を root として扱う）
+    const form = clubModal.querySelector("form") || clubModal;
 
-    let btn = null;
-    for (const sel of candidates) {
-      const el = clubModal.querySelector(sel);
-      if (el) { btn = el; break; }
+    // 1) JS側の「dirty」フラグ（どの実装でも拾えるように複数立てる）
+    try {
+      clubModal.dataset.displaySettingsDirty = "1";
+      clubModal.dataset.dirty = "1";
+      if (form && form !== clubModal) form.dataset.dirty = "1";
+    } catch {}
+
+    // 2) dirty 判定を通すための hidden を必ず作って input/change を発火
+    //    （“何かが変更された” と判定させる）
+    try {
+      if (form && form.querySelector) {
+        let h = form.querySelector('input[name="__force_dirty"]');
+        if (!h) {
+          h = document.createElement("input");
+          h.type = "hidden";
+          h.name = "__force_dirty";
+          h.value = "1";
+          form.appendChild(h);
+        } else {
+          h.value = "1";
+        }
+
+        h.dispatchEvent(new Event("input", { bubbles: true }));
+        h.dispatchEvent(new Event("change", { bubbles: true }));
+        form.dispatchEvent(new Event("input", { bubbles: true }));
+        form.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    } catch {}
+
+    // 3) 更新/保存ボタン探索（id/name/data-action/aria/text で総当たり）
+    function findButtons() {
+      const nodes = Array.from(clubModal.querySelectorAll("button, input[type='submit'], input[type='button']"));
+      return nodes.filter((el) => {
+        const tag = (el.tagName || "").toLowerCase();
+        const text =
+          tag === "input" ? (el.value || "") : (el.textContent || "");
+        const t = (text || "").replace(/\s+/g, "").trim();
+
+        const id = (el.id || "").toLowerCase();
+        const name = (el.getAttribute("name") || "").toLowerCase();
+        const action = (el.getAttribute("data-action") || "").toLowerCase();
+        const aria = (el.getAttribute("aria-label") || "").toLowerCase();
+        const cls = (el.className || "").toLowerCase();
+        const type = (el.getAttribute("type") || "").toLowerCase();
+
+        // submit はまず候補
+        if (type === "submit") return true;
+
+        // 文字/属性で「更新/保存/反映」系を拾う
+        if (id.includes("update") || id.includes("save")) return true;
+        if (name === "update" || name === "save") return true;
+        if (action.includes("update") || action.includes("save")) return true;
+        if (cls.includes("update") || cls.includes("save")) return true;
+
+        // 日本語ラベル
+        if (aria.includes("更新") || aria.includes("保存") || aria.includes("反映")) return true;
+        if (t.includes("更新") || t.includes("保存") || t.includes("反映")) return true;
+
+        return false;
+      });
     }
 
-    if (btn) {
-      btn.disabled = false;
-      btn.classList.remove("pill-disabled");
-      btn.classList.add("is-active");
-      btn.setAttribute("aria-disabled", "false");
+    function forceEnable() {
+      const btns = findButtons();
+      btns.forEach((btn) => {
+        try {
+          btn.disabled = false;
+          btn.removeAttribute("disabled");
+          btn.classList.remove("pill-disabled");
+          btn.classList.add("is-active");
+          btn.setAttribute("aria-disabled", "false");
+          btn.style.pointerEvents = "";
+        } catch {}
+      });
     }
 
-    clubModal.dataset.displaySettingsDirty = "1";
-    document.dispatchEvent(new CustomEvent("displaySettingsChanged"));
+    // 4) 直後に他JSが戻すケースがあるので複数回叩く
+    forceEnable();
+    setTimeout(forceEnable, 0);
+    setTimeout(forceEnable, 50);
+
+    // ★ここで displaySettingsChanged を dispatch しない（裏更新のトリガになるため）
   }
 
   window.UI = window.UI || {};

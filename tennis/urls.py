@@ -91,7 +91,7 @@ urlpatterns = [
     # Event APIs (event scoped)
     # ============================================================
     path("api/event/add_event_flag/", views.add_event_flag, name="add_event_flag"),
-    path("api/event_flags/delete/", views.delete_event_flag, name="delete_event_flag"),
+    path("api/event/delete_event_flag/", views.delete_event_flag, name="delete_event_flag"),    
     path("api/event/update_attendance/", views.update_attendance, name="update_attendance"),
     path("api/event/update_comment/", views.update_comment, name="update_comment"),
     path("api/event/toggle_flag/", views.toggle_participant_flag, name="toggle_participant_flag"),

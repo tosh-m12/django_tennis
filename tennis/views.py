@@ -598,6 +598,8 @@ def club_home(request, club_public_token, club_admin_token=None):
     member_url = request.build_absolute_uri(reverse("tennis:club_home", args=[club.public_token]))
     admin_url = request.build_absolute_uri(reverse("tennis:club_home_admin", args=[club.public_token, club.admin_token]))
 
+    save_display_settings_url = reverse("tennis:save_event_display_setting")
+
     return render(
         request,
         "tennis/club_home.html",
@@ -629,12 +631,32 @@ def club_home(request, club_public_token, club_admin_token=None):
 # - event_member_class が NULL の行は「このイベントの初回表示」でスナップショット埋め
 # ============================================================
 
+
+
 @ensure_csrf_cookie
 def event_view(request, club_public_token, event_id, club_admin_token=None):
+    """
+    イベントページ（public/admin 共通）
+
+    - admin URL の場合:
+        /c/<public>/e/<event_id>/admin/<admin_token> など
+      → token一致なら is_admin=True とし、当該 event の admin セッションを立てる
+
+    - 表示設定:
+        EventDisplaySetting があれば DB 値（source="db"）
+        無ければデフォルト（source="default"）
+      ※ JS は #page-hooks の dataset を正として読む前提（必ず JSON 文字列を供給する）
+
+    - 重要: GET では DB を書かない（踏襲）
+    - 重要: MatchScheduleDraft は GET の度に破棄（踏襲）
+    """
+
+    # ============================================================
+    # 1) 基本取得 & admin 判定
+    # ============================================================
     club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
     event = get_object_or_404(Event, id=int(event_id), club=club)
 
-    # --- admin判定：token一致なら adminセッションを立てる ---
     is_admin = False
     if club_admin_token is not None:
         if club.admin_token != club_admin_token:
@@ -642,8 +664,12 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         is_admin = True
         _mark_event_admin_session(request, event.id)
 
+    # ============================================================
+    # 2) 定義系（フラグ / クラス）
+    # ============================================================
     flags = list(
-        ClubFlagDefinition.objects.filter(club=club, is_active=True)
+        ClubFlagDefinition.objects
+        .filter(club=club, is_active=True)
         .order_by("display_order", "id")
     )
 
@@ -653,33 +679,45 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         .order_by("display_order", "id")
     )
 
-    # --- イベント表示設定（DB）---
-    try:
-        ds = event.display_setting
-        display_settings = ds.as_dict()
-    except EventDisplaySetting.DoesNotExist:
-        display_settings = {"flags": True, "class": True, "schedule": True}
-    display_settings_json = json.dumps(display_settings, ensure_ascii=False)
-
-    # --- クラス一覧（イベントページのドロップダウン用：クラブ定義）---
     member_classes = list(
-        ClubMemberClass.objects.filter(club=club, is_active=True)
+        ClubMemberClass.objects
+        .filter(club=club, is_active=True)
         .order_by("display_order", "id")
     )
 
-    # --- 固定メンバー（固定行）---
+    # ============================================================
+    # 3) イベント表示設定（DB -> default）
+    #    ※ JS が page-hooks の data-display-settings を読む
+    # ============================================================
+    default_display_settings = {
+        "common_flags": True,
+        "event_flags": False,
+        "class": True,
+        "schedule": True,
+    }
+
+    try:
+        ds = event.display_setting  # OneToOne 想定
+        display_settings = ds.as_dict()
+        display_settings_source = "db"
+    except EventDisplaySetting.DoesNotExist:
+        display_settings = default_display_settings
+        display_settings_source = "default"
+
+    # テンプレに必ず JSON 文字列として渡す（escapejs 前提）
+    display_settings_json = json.dumps(display_settings, ensure_ascii=False)
+
+    # ============================================================
+    # 4) 固定メンバー / EP の下準備（※ DB書き込みなし）
+    # ============================================================
     members = list(
-        Member.objects.filter(club=club, is_fixed=True)
+        Member.objects
+        .filter(club=club, is_fixed=True)
         .select_related("member_class")
         .order_by("member_no", "id")
     )
     member_ids = [m.id for m in members]
 
-    # ============================================================
-    # ★重要：DBを書かない（踏襲）
-    # ============================================================
-
-    # このイベントに既に存在している EP を拾うだけ（固定メンバー分）
     eps_by_member = {
         ep.member_id: ep
         for ep in (
@@ -689,8 +727,10 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         )
     }
 
-    # --- フラグ状態（参加者×フラグ）---
-    # [A] クラブ共通フラグ
+    # ============================================================
+    # 5) 参加者フラグ状態（クラブ共通 / イベント固有）
+    # ============================================================
+    # [A] クラブ共通フラグ（ParticipantFlag: club_flag_definition 側）
     pf_qs = ParticipantFlag.objects.filter(
         event_participant__event=event,
         club_flag_definition__club=club,
@@ -704,11 +744,11 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         flag_states_on[ep_id][fd_id] = bool(pf["is_on"])
         flag_states_val[ep_id][fd_id] = pf["value"]
 
-    # ------------------------------------------------------------
-    # ✅ [B] イベント固有フラグ（ここが不足していたので追加）
-    # ------------------------------------------------------------
+    # [B] イベント固有フラグ（ParticipantFlag: event_flag_definition 側）
     ep_ids_all = list(
-        EventParticipant.objects.filter(event=event).values_list("id", flat=True)
+        EventParticipant.objects
+        .filter(event=event)
+        .values_list("id", flat=True)
     )
     event_flag_ids = [f.id for f in event_flags]
 
@@ -727,15 +767,15 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
             event_flag_states_on[ep_id][fd_id] = bool(pf["is_on"])
             event_flag_states_val[ep_id][fd_id] = pf["value"]
 
-    # --- 公開済み対戦表 ---
+    # ============================================================
+    # 6) 対戦表（published）と Draft 破棄（踏襲）
+    # ============================================================
     ms = MatchSchedule.objects.filter(event=event, published=True).first()
-
-    # 現行踏襲：GETのたびに Draft 破棄
     MatchScheduleDraft.objects.filter(event=event).delete()
 
-    # ------------------------------------------------------------
-    # 固定行
-    # ------------------------------------------------------------
+    # ============================================================
+    # 7) 固定行の組み立て
+    # ============================================================
     fixed_rows = []
     for m in members:
         ep = eps_by_member.get(m.id)
@@ -749,26 +789,37 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         if ep:
             mc = getattr(ep, "event_member_class", None)
             class_name_compat = (ep.class_name or "")
+            attendance = ep.attendance
+            comment = ep.comment or ""
+            participates_match = bool(ep.participates_match)
+            ep_id = ep.id
         else:
             mc = getattr(m, "member_class", None)
             class_name_compat = ""
+            attendance = None
+            comment = ""
+            participates_match = False
+            ep_id = None
 
         fixed_rows.append({
             "member_id": m.id,
-            "ep_id": ep.id if ep else None,
+            "ep_id": ep_id,
             "display_name": display_name,
 
-            "attendance": (ep.attendance if ep else None),
-            "comment": (ep.comment or "") if ep else "",
-            "participates_match": bool(ep.participates_match) if ep else False,
+            "attendance": attendance,
+            "comment": comment,
+            "participates_match": participates_match,
 
             "member_class_id": mc.id if mc else None,
             "member_class_name": (mc.name or "") if mc else "",
 
+            # 旧互換
             "class_name": class_name_compat,
         })
 
-    # --- ゲスト行（固定以外：非固定メンバー含む）---
+    # ============================================================
+    # 8) ゲスト行（固定以外：非固定メンバー含む）
+    # ============================================================
     guest_eps = (
         EventParticipant.objects
         .filter(event=event)
@@ -784,13 +835,13 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
             if (ep.member_id and ep.member)
             else (ep.display_name or "")
         )
-
         mc = getattr(ep, "event_member_class", None)
 
         guest_rows.append({
             "ep_id": ep.id,
             "member_id": ep.member_id,
             "display_name": display_name,
+
             "attendance": ep.attendance,
             "comment": ep.comment or "",
             "participates_match": bool(ep.participates_match),
@@ -798,10 +849,13 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
             "member_class_id": mc.id if mc else None,
             "member_class_name": (mc.name or "") if mc else "",
 
+            # 旧互換
             "class_name": ep.class_name or "",
         })
 
-    # --- 代打候補（公開済み対戦表がある時だけ）---
+    # ============================================================
+    # 9) 代打候補（公開済み対戦表がある時だけ）
+    # ============================================================
     sub_candidates = []
     if ms:
         sub_candidates_qs = (
@@ -822,7 +876,9 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
             for ep in sub_candidates_qs
         ]
 
-    # --- 対戦表表示用 ---
+    # ============================================================
+    # 10) 対戦表の表示用整形
+    # ============================================================
     if ms:
         game_type = ms.game_type or GameType.DOUBLES
         num_rounds = int(ms.round_count or 8)
@@ -838,22 +894,31 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         game_type = GameType.DOUBLES
         num_rounds = 8
 
-        match_count = EventParticipant.objects.filter(event=event, participates_match=True).count() if is_admin else 0
+        match_count = (
+            EventParticipant.objects.filter(event=event, participates_match=True).count()
+            if is_admin else 0
+        )
         num_courts = 0 if match_count < 4 else 2
         publish_state = "no_schedule"
         schedule_for_view = []
         schedule_json_for_publish = None
 
+    # ============================================================
+    # 11) context（JSが読む値は必ず入れる）
+    # ============================================================
     ctx = {
         "club": club,
         "event": event,
         "is_admin": is_admin,
 
+        # --- JS(Display Settings) のために必須 ---
         "display_settings_json": display_settings_json,
+        "display_settings_source": display_settings_source,
         "save_display_settings_url": reverse("tennis:save_event_display_setting"),
 
         "member_classes": member_classes,
 
+        # --- Flags ---
         "flags": flags,
         "flag_input_mode": getattr(club, "flag_input_mode", "check"),
         "flag_states_on": {k: dict(v) for k, v in flag_states_on.items()},
@@ -861,15 +926,15 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
 
         "event_flags": event_flags,
         "max_event_flags": 2,
-
-        # ✅追加：イベント固有フラグの状態（これが無いとリロードで消える）
         "event_flag_states_on": {k: dict(v) for k, v in event_flag_states_on.items()},
         "event_flag_states_val": {k: dict(v) for k, v in event_flag_states_val.items()},
 
+        # --- Participants table rows ---
         "fixed_rows": fixed_rows,
         "guest_rows": guest_rows,
         "max_flags": MAX_FLAGS,
 
+        # --- Schedule ---
         "game_type": game_type,
         "num_rounds": num_rounds,
         "num_courts": num_courts,
@@ -878,6 +943,7 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         "schedule": schedule_for_view,
         "schedule_json": schedule_json_for_publish,
 
+        # --- UI helpers ---
         "show_controls": bool(is_admin),
         "pill_game_type": game_type,
         "pill_num_courts": num_courts,
@@ -888,6 +954,7 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         "sub_candidates": sub_candidates,
         "show_topbar": True,
     }
+
     return render(request, "tennis/event.html", ctx)
 
 
@@ -1020,11 +1087,10 @@ def club_rename_club(request):
 
 @require_POST
 def club_create_event(request):
-    # --- params（キー揺れ吸収） ---
     club_id = (request.POST.get("club_id") or "").strip()
     date_str = (request.POST.get("date") or request.POST.get("date_str") or "").strip()
 
-    admin_token = (request.POST.get("admin_token") or "").strip()  # ★幹事認可（統一）
+    admin_token = (request.POST.get("admin_token") or "").strip()
     title = (request.POST.get("title") or "").strip()
     place = (request.POST.get("place") or "").strip()
     start_str = (request.POST.get("start_time") or "").strip()
@@ -1502,31 +1568,36 @@ def add_guest_participant(request):
 def save_event_display_setting(request):
     event_id = (request.POST.get("event_id") or "").strip()
     if not event_id:
-        return JsonResponse({"error": "missing_event_id"}, status=400)
+        return JsonResponse({"ok": False, "error": "missing_event_id"}, status=400)
 
     event = get_object_or_404(Event, id=int(event_id))
 
-    if not _is_event_admin_session(request, event.id):
-        return JsonResponse({"error": "forbidden"}, status=403)
-
     raw = (request.POST.get("settings_json") or "").strip()
     if not raw:
-        return JsonResponse({"error": "missing_settings_json"}, status=400)
+        return JsonResponse({"ok": False, "error": "missing_settings_json"}, status=400)
 
     try:
         s = json.loads(raw)
     except Exception:
-        return JsonResponse({"error": "bad_json"}, status=400)
+        return JsonResponse({"ok": False, "error": "bad_json"}, status=400)
 
-    show_flags = bool(s.get("flags", True))
-    show_class = bool(s.get("class", True))
-    show_schedule = bool(s.get("schedule", True))
+    # ✅ 確定仕様：4キーのみ受付（互換・揺れ吸収はしない）
+    required_keys = ("common_flags", "event_flags", "class", "schedule")
+    if not isinstance(s, dict) or any(k not in s for k in required_keys):
+        return JsonResponse({"ok": False, "error": "bad_settings_keys"}, status=400)
+
+    # ✅ bool に正規化（JSが true/false を送る前提）
+    common_flags = bool(s.get("common_flags"))
+    event_flags  = bool(s.get("event_flags"))
+    show_class   = bool(s.get("class"))
+    show_schedule= bool(s.get("schedule"))
 
     obj, _ = EventDisplaySetting.objects.get_or_create(event=event)
-    obj.show_flags = show_flags
+    obj.show_flags = common_flags
+    obj.show_event_flags = event_flags
     obj.show_class = show_class
     obj.show_schedule = show_schedule
-    obj.save()
+    obj.save(update_fields=["show_flags", "show_event_flags", "show_class", "show_schedule", "updated_at"])
 
     return JsonResponse({"ok": True, "settings": obj.as_dict()})
 

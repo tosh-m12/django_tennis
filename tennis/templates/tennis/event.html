@@ -12,31 +12,33 @@
 
 {% block content %}
 
+
 <div id="page-hooks"
      data-page="event"
      data-club-token="{{ club.public_token }}"
      data-is-admin="{% if is_admin %}1{% else %}0{% endif %}"
      data-event-id="{{ event.id }}"
      data-save-display-settings-url="{{ save_display_settings_url }}"
-     data-display-settings='{{ display_settings_json|escapejs }}'>
+     data-display-settings='{{ display_settings_json|escapejs }}'
+     data-display-settings-source="{{ display_settings_source }}">
 </div>
 
-{# ★キャンセル済み：画面全体トーンダウン（CSS: .event-page.is-cancelled） #}
 <div class="event-page {% if event.cancelled %}is-cancelled{% endif %}">
+
 
   <div class="event-head">
     <h2 class="event-title">{{ event.title }}</h2>
 
     <div id="event-meta-bar"
-        class="event-meta-bar{% if is_admin %} is-admin is-clickable{% else %} is-public{% endif %}{% if event.cancelled %} is-cancelled{% endif %}"
-        data-club-id="{{ club.id }}"   {# ✅安全策：club_id をここにも入れる（JS fallback 用） #}
-        data-date="{{ event.date|date:'Y-m-d' }}"
-        data-title="{{ event.title|default:'' }}"
-        data-place="{{ event.place|default:'' }}"
-        data-start="{{ event.start_time|time:'H:i'|default_if_none:'' }}"
-        data-end="{{ event.end_time|time:'H:i'|default_if_none:'' }}"
-        data-cancelled="{% if event.cancelled %}1{% else %}0{% endif %}"
-        {% if is_admin %}title="クリックして編集"{% endif %}>
+         class="event-meta-bar{% if is_admin %} is-admin is-clickable{% else %} is-public{% endif %}{% if event.cancelled %} is-cancelled{% endif %}"
+         data-club-id="{{ club.id }}"
+         data-date="{{ event.date|date:'Y-m-d' }}"
+         data-title="{{ event.title|default:'' }}"
+         data-place="{{ event.place|default:'' }}"
+         data-start="{{ event.start_time|time:'H:i'|default_if_none:'' }}"
+         data-end="{{ event.end_time|time:'H:i'|default_if_none:'' }}"
+         data-cancelled="{% if event.cancelled %}1{% else %}0{% endif %}"
+         {% if is_admin %}title="クリックして編集"{% endif %}>
 
       <span class="event-meta-text" id="event-meta-text">
         {{ event.date|date:"Y-m-d" }}
@@ -56,14 +58,14 @@
     {% endif %}
   </div>
 
-  {# admin-only: event meta edit に必要な hook（event.js が参照） #}
+  {# admin-only: event meta edit hooks（event.js が参照） #}
   {% if is_admin %}
     <div id="event-edit-hooks"
-        data-event-id="{{ event.id }}"
-        data-club-id="{{ club.id }}"
-        data-public-token="{{ club.public_token }}"
-        data-admin-token="{{ club.admin_token }}"
-        data-update-url="{% url 'tennis:ajax_update_event' %}">
+         data-event-id="{{ event.id }}"
+         data-club-id="{{ club.id }}"
+         data-public-token="{{ club.public_token }}"
+         data-admin-token="{{ club.admin_token }}"
+         data-update-url="{% url 'tennis:ajax_update_event' %}">
     </div>
   {% endif %}
 
@@ -71,52 +73,52 @@
 
   <div class="section-head">
     <h3 class="section-title">出席者リスト</h3>
-    <button type="button" class="btn btn-pill" id="add-guest-btn">
-      参加登録
-    </button>
+    <button type="button" class="btn btn-pill" id="add-guest-btn">参加登録</button>
   </div>
 
   <div class="participants-wrap">
     <meta name="csrf-token" content="{{ csrf_token }}">
 
-    <table
-      id="participants-table"
-      data-is-admin="{% if is_admin %}1{% else %}0{% endif %}"
-      data-event-id="{{ event.id }}"
-      data-club-id="{{ club.id }}"
-      {% if is_admin %}data-admin-token="{{ club.admin_token }}"{% endif %}
-      data-publish-state="{{ publish_state }}"
-      data-update-attendance-url="{% url 'tennis:update_attendance' %}"
-      data-update-comment-url="{% url 'tennis:update_comment' %}"
-      data-toggle-flag-url="{% url 'tennis:toggle_participant_flag' %}"
-      data-flag-input-mode="{{ flag_input_mode }}"
-      data-set-flag-value-url="{% url 'tennis:set_participant_flag_value' %}"
-      data-set-participates-match-url="{% url 'tennis:set_participates_match' %}"
-      data-add-guest-url="{% url 'tennis:add_guest_participant' %}"
-      data-publish-url="{% url 'tennis:publish_schedule' %}"
-      data-save-score-url="{% url 'tennis:save_match_score' %}"
-      data-substitute-url="{% url 'tennis:substitute_slot' %}"
+    <table id="participants-table"
+           data-is-admin="{% if is_admin %}1{% else %}0{% endif %}"
+           data-event-id="{{ event.id }}"
+           data-club-id="{{ club.id }}"
+           {% if is_admin %}data-admin-token="{{ club.admin_token }}"{% endif %}
+           data-publish-state="{{ publish_state }}"
 
-      {# ✅イベント側でクラス変更を保存するAPI #}
-      data-set-member-class-url="{% url 'tennis:set_participant_class' %}">
+           data-update-attendance-url="{% url 'tennis:update_attendance' %}"
+           data-update-comment-url="{% url 'tennis:update_comment' %}"
+           data-toggle-flag-url="{% url 'tennis:toggle_participant_flag' %}"
+           data-flag-input-mode="{{ flag_input_mode }}"
+           data-set-flag-value-url="{% url 'tennis:set_participant_flag_value' %}"
+           data-set-participates-match-url="{% url 'tennis:set_participates_match' %}"
+           data-add-guest-url="{% url 'tennis:add_guest_participant' %}"
+
+           data-publish-url="{% url 'tennis:publish_schedule' %}"
+           data-save-score-url="{% url 'tennis:save_match_score' %}"
+           data-substitute-url="{% url 'tennis:substitute_slot' %}"
+
+           data-set-member-class-url="{% url 'tennis:set_participant_class' %}">
 
       <colgroup>
         <col style="width: 40px;">
         <col style="width: 130px;">
-        <col style="width: 50px;">   {# 出欠 #}
+        <col style="width: 50px;">  {# 出欠 #}
         {% if is_admin %}
-          <col style="width: 80px;">   {# 試合参加 #}
+          <col style="width: 80px;">  {# 試合参加 #}
         {% endif %}
+
+        {# common flags #}
         {% for flag in flags %}<col>{% endfor %}
 
-        {% if event_flags %}
-          {% for eflag in event_flags %}<col>{% endfor %}
-        {% endif %}
+        {# event flags（0件なら0 col） #}
+        {% for eflag in event_flags %}<col>{% endfor %}
 
-        {# ✅クラス（コメント左） #}
-        <col style="width: 140px;">
+        {# class #}
+        <col data-ds="class" style="width: 140px;">
 
-        <col style="width: 180px;">  {# コメント #}
+        {# comment #}
+        <col style="width: 180px;">
       </colgroup>
 
       <thead>
@@ -127,19 +129,20 @@
           {% if is_admin %}
             <th>試合参加</th>
           {% endif %}
+
+          {# common flags header（display_settings.js: th.flag-header が対象） #}
           {% for flag in flags %}
             <th class="flag-header" data-flag-id="{{ flag.id }}">
               <span class="flag-name">{{ flag.name }}</span>
             </th>
           {% endfor %}
 
-          {% if event_flags %}
-            {% for flag in event_flags %}
-              <th class="flag-header event-flag-header" data-event-flag-id="{{ flag.id }}">
-                <span class="flag-name">{{ flag.name }}</span>
-              </th>
-            {% endfor %}
-          {% endif %}
+          {# event flags header（display_settings.js: .event-flag-header が対象） #}
+          {% for flag in event_flags %}
+            <th class="flag-header event-flag-header" data-event-flag-id="{{ flag.id }}">
+              <span class="flag-name">{{ flag.name }}</span>
+            </th>
+          {% endfor %}
 
           <th data-ds="class">クラス</th>
           <th>コメント</th>
@@ -147,17 +150,17 @@
       </thead>
 
       <tbody>
-        {# ============= 固定メンバー（未登録行=ep_id空の可能性あり） ============= #}
+
         {% for row in fixed_rows %}
         <tr class="participant-row"
             data-row-kind="fixed"
             data-member-id="{{ row.member_id }}"
             data-ep-id="{{ row.ep_id|default_if_none:'' }}">
+
           <td class="participant-index"><span class="idx">{{ forloop.counter }}</span></td>
 
           <td><div class="tb-player-card-sm">{{ row.display_name }}</div></td>
 
-          {# ★出欠（幹事/一般どちらも操作可：attendance-btn は常に出す） #}
           <td class="attendance-cell">
             <button type="button"
                     class="attendance-btn"
@@ -176,13 +179,12 @@
             </button>
           </td>
 
-          {# ★試合参加（admin）＋ attendance!=yes は初期非表示 #}
           {% if is_admin %}
             <td class="check-cell match-cell">
               <button type="button"
                       class="check-btn toggle-check match-toggle
-                            {% if row.participates_match %}is-on{% endif %}
-                            {% if row.attendance != 'yes' %}is-hidden{% endif %}"
+                             {% if row.participates_match %}is-on{% endif %}
+                             {% if row.attendance != 'yes' %}is-hidden{% endif %}"
                       data-kind="match"
                       data-member-id="{{ row.member_id }}"
                       data-ep-id="{{ row.ep_id|default_if_none:'' }}">
@@ -191,31 +193,31 @@
             </td>
           {% endif %}
 
-          {# ===== flags ===== #}
+          {# ----- common flags ----- #}
           {% for flag in flags %}
             <td class="check-cell">
               {% if flag.input_mode == "digit" %}
-                {# ✅ digit：flag_states_val を参照 #}
                 {% with ep_flags=flag_states_val|get_item:row.ep_id %}
                   {% with val=ep_flags|get_item:flag.id %}
                     <input type="text"
-                          inputmode="numeric"
-                          pattern="[0-9]"
-                          maxlength="1"
-                          class="tb-score-input flag-digit-input"
-                          data-input-mode="digit"
-                          value="{% if val != None %}{{ val }}{% endif %}"
-                          data-member-id="{{ row.member_id }}"
-                          data-ep-id="{{ row.ep_id|default_if_none:'' }}"
-                          data-flag-id="{{ flag.id }}">
+                           inputmode="numeric"
+                           pattern="[0-9]"
+                           maxlength="1"
+                           class="tb-score-input flag-digit-input"
+                           data-flag-scope="club"
+                           data-input-mode="digit"
+                           value="{% if val != None %}{{ val }}{% endif %}"
+                           data-member-id="{{ row.member_id }}"
+                           data-ep-id="{{ row.ep_id|default_if_none:'' }}"
+                           data-flag-id="{{ flag.id }}">
                   {% endwith %}
                 {% endwith %}
               {% else %}
-                {# ✅ check：flag_states_on を参照 #}
                 {% with ep_flags=flag_states_on|get_item:row.ep_id %}
                   {% with on=ep_flags|get_item:flag.id %}
                     <button type="button"
                             class="check-btn toggle-check {% if on %}is-on{% endif %}"
+                            data-flag-scope="club"
                             data-member-id="{{ row.member_id }}"
                             data-ep-id="{{ row.ep_id|default_if_none:'' }}"
                             data-flag-id="{{ flag.id }}">
@@ -227,45 +229,43 @@
             </td>
           {% endfor %}
 
-          {# ===== flags（イベント固有） ===== #}
-          {% if event_flags %}
-            {% for flag in event_flags %}
-              <td class="check-cell event-flag-cell">
-                {% if flag.input_mode == "digit" %}
-                  {% with ep_flags=event_flag_states_val|get_item:row.ep_id %}
-                    {% with val=ep_flags|get_item:flag.id %}
-                      <input type="text"
-                            inputmode="numeric"
-                            pattern="[0-9]"
-                            maxlength="1"
-                            class="tb-score-input flag-digit-input event-flag-digit-input"
+          {# ----- event flags ----- #}
+          {% for flag in event_flags %}
+            <td class="check-cell event-flag-cell">
+              {% if flag.input_mode == "digit" %}
+                {% with ep_flags=event_flag_states_val|get_item:row.ep_id %}
+                  {% with val=ep_flags|get_item:flag.id %}
+                    <input type="text"
+                           inputmode="numeric"
+                           pattern="[0-9]"
+                           maxlength="1"
+                           class="tb-score-input flag-digit-input event-flag-digit-input"
+                           data-flag-scope="event"
+                           data-input-mode="digit"
+                           value="{% if val != None %}{{ val }}{% endif %}"
+                           data-member-id="{{ row.member_id }}"
+                           data-ep-id="{{ row.ep_id|default_if_none:'' }}"
+                           data-flag-id="{{ flag.id }}">
+                  {% endwith %}
+                {% endwith %}
+              {% else %}
+                {% with ep_flags=event_flag_states_on|get_item:row.ep_id %}
+                  {% with on=ep_flags|get_item:flag.id %}
+                    <button type="button"
+                            class="check-btn toggle-check {% if on %}is-on{% endif %}"
                             data-flag-scope="event"
-                            data-input-mode="digit"
-                            value="{% if val != None %}{{ val }}{% endif %}"
                             data-member-id="{{ row.member_id }}"
                             data-ep-id="{{ row.ep_id|default_if_none:'' }}"
                             data-flag-id="{{ flag.id }}">
-                    {% endwith %}
+                      <span class="check-icon {% if on %}check-on{% else %}check-off{% endif %}">✓</span>
+                    </button>
                   {% endwith %}
-                {% else %}
-                  {% with ep_flags=event_flag_states_on|get_item:row.ep_id %}
-                    {% with on=ep_flags|get_item:flag.id %}
-                      <button type="button"
-                              class="check-btn toggle-check {% if on %}is-on{% endif %}"
-                              data-flag-scope="event"
-                              data-member-id="{{ row.member_id }}"
-                              data-ep-id="{{ row.ep_id|default_if_none:'' }}"
-                              data-flag-id="{{ flag.id }}">
-                        <span class="check-icon {% if on %}check-on{% else %}check-off{% endif %}">✓</span>
-                      </button>
-                    {% endwith %}
-                  {% endwith %}
-                {% endif %}
-              </td>
-            {% endfor %}
-          {% endif %}
+                {% endwith %}
+              {% endif %}
+            </td>
+          {% endfor %}
 
-          {# ✅クラス（コメント左） #}
+          {# class #}
           <td class="member-class-cell" data-ds="class">
             {% if is_admin %}
               <select class="participant-class-select member-class-select"
@@ -274,9 +274,7 @@
                       data-current-class-id="{{ row.member_class_id|default_if_none:'' }}">
                 <option value="" {% if not row.member_class_id %}selected{% endif %}></option>
                 {% for c in member_classes %}
-                  <option value="{{ c.id }}" {% if row.member_class_id == c.id %}selected{% endif %}>
-                    {{ c.name }}
-                  </option>
+                  <option value="{{ c.id }}" {% if row.member_class_id == c.id %}selected{% endif %}>{{ c.name }}</option>
                 {% endfor %}
               </select>
             {% else %}
@@ -284,29 +282,27 @@
             {% endif %}
           </td>
 
-
+          {# comment #}
           <td class="comment-cell">
             <div class="comment-editable"
-                contenteditable="true"
-                data-member-id="{{ row.member_id }}"
-                data-ep-id="{{ row.ep_id|default_if_none:'' }}">{{ row.comment|default:'' }}</div>
+                 contenteditable="true"
+                 data-member-id="{{ row.member_id }}"
+                 data-ep-id="{{ row.ep_id|default_if_none:'' }}">{{ row.comment|default:'' }}</div>
           </td>
         </tr>
         {% endfor %}
 
-        {# ============= ゲスト（臨時参加：追加されたらこの表に表示される） ============= #}
+
         {% for row in guest_rows %}
         <tr class="participant-row"
             data-row-kind="guest"
             data-member-id="{{ row.member_id|default_if_none:'' }}"
             data-ep-id="{{ row.ep_id }}">
-          <td class="participant-index">
-            <span class="idx">{{ fixed_rows|length|add:forloop.counter }}</span>
-          </td>
+
+          <td class="participant-index"><span class="idx">{{ fixed_rows|length|add:forloop.counter }}</span></td>
 
           <td><div class="tb-player-card-sm">{{ row.display_name }}</div></td>
 
-          {# ★出欠（常に操作可） #}
           <td class="attendance-cell">
             <button type="button"
                     class="attendance-btn"
@@ -325,13 +321,12 @@
             </button>
           </td>
 
-          {# ★試合参加（admin）＋ attendance!=yes は初期非表示 #}
           {% if is_admin %}
             <td class="check-cell match-cell">
               <button type="button"
                       class="check-btn toggle-check match-toggle
-                            {% if row.participates_match %}is-on{% endif %}
-                            {% if row.attendance != 'yes' %}is-hidden{% endif %}"
+                             {% if row.participates_match %}is-on{% endif %}
+                             {% if row.attendance != 'yes' %}is-hidden{% endif %}"
                       data-kind="match"
                       data-member-id="{{ row.member_id|default_if_none:'' }}"
                       data-ep-id="{{ row.ep_id }}">
@@ -340,31 +335,31 @@
             </td>
           {% endif %}
 
-          {# ===== flags ===== #}
+          {# ----- common flags ----- #}
           {% for flag in flags %}
             <td class="check-cell">
               {% if flag.input_mode == "digit" %}
-                {# ✅ digit：flag_states_val を参照 #}
                 {% with ep_flags=flag_states_val|get_item:row.ep_id %}
                   {% with val=ep_flags|get_item:flag.id %}
                     <input type="text"
-                          inputmode="numeric"
-                          pattern="[0-9]"
-                          maxlength="1"
-                          class="tb-score-input flag-digit-input"
-                          data-input-mode="digit"
-                          value="{% if val != None %}{{ val }}{% endif %}"
-                          data-member-id="{{ row.member_id|default_if_none:'' }}"
-                          data-ep-id="{{ row.ep_id }}"
-                          data-flag-id="{{ flag.id }}">
+                           inputmode="numeric"
+                           pattern="[0-9]"
+                           maxlength="1"
+                           class="tb-score-input flag-digit-input"
+                           data-flag-scope="club"
+                           data-input-mode="digit"
+                           value="{% if val != None %}{{ val }}{% endif %}"
+                           data-member-id="{{ row.member_id|default_if_none:'' }}"
+                           data-ep-id="{{ row.ep_id }}"
+                           data-flag-id="{{ flag.id }}">
                   {% endwith %}
                 {% endwith %}
               {% else %}
-                {# ✅ check：flag_states_on を参照 #}
                 {% with ep_flags=flag_states_on|get_item:row.ep_id %}
                   {% with on=ep_flags|get_item:flag.id %}
                     <button type="button"
                             class="check-btn toggle-check {% if on %}is-on{% endif %}"
+                            data-flag-scope="club"
                             data-member-id="{{ row.member_id|default_if_none:'' }}"
                             data-ep-id="{{ row.ep_id }}"
                             data-flag-id="{{ flag.id }}">
@@ -376,48 +371,45 @@
             </td>
           {% endfor %}
 
-          {% if event_flags %}
-            {% for flag in event_flags %}
-              <td class="check-cell event-flag-cell">
-                {% if flag.input_mode == "digit" %}
-                  {% with ep_flags=event_flag_states_val|get_item:row.ep_id %}
-                    {% with val=ep_flags|get_item:flag.id %}
-                      <input type="text"
-                            inputmode="numeric"
-                            pattern="[0-9]"
-                            maxlength="1"
-                            class="tb-score-input flag-digit-input event-flag-digit-input"
+          {# ----- event flags ----- #}
+          {% for flag in event_flags %}
+            <td class="check-cell event-flag-cell">
+              {% if flag.input_mode == "digit" %}
+                {% with ep_flags=event_flag_states_val|get_item:row.ep_id %}
+                  {% with val=ep_flags|get_item:flag.id %}
+                    <input type="text"
+                           inputmode="numeric"
+                           pattern="[0-9]"
+                           maxlength="1"
+                           class="tb-score-input flag-digit-input event-flag-digit-input"
+                           data-flag-scope="event"
+                           data-input-mode="digit"
+                           value="{% if val != None %}{{ val }}{% endif %}"
+                           data-member-id="{{ row.member_id|default_if_none:'' }}"
+                           data-ep-id="{{ row.ep_id }}"
+                           data-flag-id="{{ flag.id }}">
+                  {% endwith %}
+                {% endwith %}
+              {% else %}
+                {% with ep_flags=event_flag_states_on|get_item:row.ep_id %}
+                  {% with on=ep_flags|get_item:flag.id %}
+                    <button type="button"
+                            class="check-btn toggle-check {% if on %}is-on{% endif %}"
                             data-flag-scope="event"
-                            data-input-mode="digit"
-                            value="{% if val != None %}{{ val }}{% endif %}"
                             data-member-id="{{ row.member_id|default_if_none:'' }}"
                             data-ep-id="{{ row.ep_id }}"
                             data-flag-id="{{ flag.id }}">
-                    {% endwith %}
+                      <span class="check-icon {% if on %}check-on{% else %}check-off{% endif %}">✓</span>
+                    </button>
                   {% endwith %}
-                {% else %}
-                  {% with ep_flags=event_flag_states_on|get_item:row.ep_id %}
-                    {% with on=ep_flags|get_item:flag.id %}
-                      <button type="button"
-                              class="check-btn toggle-check {% if on %}is-on{% endif %}"
-                              data-flag-scope="event"
-                              data-member-id="{{ row.member_id|default_if_none:'' }}"
-                              data-ep-id="{{ row.ep_id }}"
-                              data-flag-id="{{ flag.id }}">
-                        <span class="check-icon {% if on %}check-on{% else %}check-off{% endif %}">✓</span>
-                      </button>
-                    {% endwith %}
-                  {% endwith %}
-                {% endif %}
-              </td>
-            {% endfor %}
-          {% endif %}
+                {% endwith %}
+              {% endif %}
+            </td>
+          {% endfor %}
 
-
-          {# ✅クラス（コメント左） #}
+          {# class #}
           <td class="member-class-cell" data-ds="class">
             {% if is_admin %}
-              {# guestは member_id が空の可能性があるので、空なら disabled #}
               <select class="participant-class-select member-class-select"
                       data-member-id="{{ row.member_id|default_if_none:'' }}"
                       data-ep-id="{{ row.ep_id }}"
@@ -425,9 +417,7 @@
                       {% if not row.member_id %}disabled{% endif %}>
                 <option value="" {% if not row.member_class_id %}selected{% endif %}></option>
                 {% for c in member_classes %}
-                  <option value="{{ c.id }}" {% if row.member_class_id == c.id %}selected{% endif %}>
-                    {{ c.name }}
-                  </option>
+                  <option value="{{ c.id }}" {% if row.member_class_id == c.id %}selected{% endif %}>{{ c.name }}</option>
                 {% endfor %}
               </select>
             {% else %}
@@ -435,22 +425,23 @@
             {% endif %}
           </td>
 
+          {# comment #}
           <td class="comment-cell">
             <div class="comment-editable"
-                contenteditable="true"
-                data-member-id="{{ row.member_id|default_if_none:'' }}"
-                data-ep-id="{{ row.ep_id }}">{{ row.comment|default:'' }}</div>
+                 contenteditable="true"
+                 data-member-id="{{ row.member_id|default_if_none:'' }}"
+                 data-ep-id="{{ row.ep_id }}">{{ row.comment|default:'' }}</div>
           </td>
+
         </tr>
         {% endfor %}
+
       </tbody>
     </table>
-
   </div>
 
   {{ sub_candidates|json_script:"sub-candidates-json" }}
 
-  {# ★固定もゲストも0件ならメッセージ表示 #}
   {% if not fixed_rows and not guest_rows %}
     <div class="participant-empty">名前がまだ登録されていません。</div>
   {% endif %}
@@ -458,49 +449,48 @@
   <hr>
 
   {% if is_admin %}
-  <h3>対戦表（ランダム生成）</h3>
+    <h3>対戦表（ランダム生成）</h3>
 
-  <div class="match-settings-bar">
-    <div class="match-pill-group">
+    <div class="match-settings-bar">
+      <div class="match-pill-group">
+        <button type="button"
+                id="pill-game-type"
+                class="settings-pill game-type-pill settings-trigger {% if game_type == 'singles' %}pill-singles{% else %}pill-doubles{% endif %}">
+          {% if game_type == "singles" %}シングルス{% else %}ダブルス{% endif %}
+        </button>
+
+        <button type="button" id="pill-num-courts" class="settings-pill settings-trigger">
+          {{ num_courts }} 面
+        </button>
+
+        <button type="button" id="pill-match-count" class="settings-pill settings-trigger">
+          {{ match_count }} 人
+        </button>
+
+        <button type="button" id="pill-num-rounds" class="settings-pill settings-trigger">
+          {{ num_rounds }} ラウンド
+        </button>
+      </div>
+
       <button type="button"
-              id="pill-game-type"
-              class="settings-pill game-type-pill settings-trigger {% if game_type == 'singles' %}pill-singles{% else %}pill-doubles{% endif %}">
-        {% if game_type == "singles" %}シングルス{% else %}ダブルス{% endif %}
-      </button>
-
-      <button type="button" id="pill-num-courts" class="settings-pill settings-trigger">
-        {{ num_courts }} 面
-      </button>
-
-      <button type="button" id="pill-match-count" class="settings-pill settings-trigger">
-        {{ match_count }} 人
-      </button>
-
-      <button type="button" id="pill-num-rounds" class="settings-pill settings-trigger">
-        {{ num_rounds }} ラウンド
+              id="publish-pill"
+              class="settings-pill publish-pill {% if publish_state == 'no_schedule' or publish_state == 'published' %}pill-disabled{% endif %}"
+              data-publish-state="{{ publish_state }}"
+              onclick="publishSchedule()"
+              {% if publish_state == 'no_schedule' or publish_state == 'published' %}disabled{% endif %}>
+        {% if publish_state == 'published' %}
+          公開済み
+        {% elif publish_state == 'changed' %}
+          再公開
+        {% else %}
+          📢 対戦表を公開
+        {% endif %}
       </button>
     </div>
-
-    <button type="button"
-            id="publish-pill"
-            class="settings-pill publish-pill {% if publish_state == 'no_schedule' or publish_state == 'published' %}pill-disabled{% endif %}"
-            data-publish-state="{{ publish_state }}"
-            onclick="publishSchedule()"
-            {% if publish_state == 'no_schedule' or publish_state == 'published' %}disabled{% endif %}>
-      {% if publish_state == 'published' %}
-        公開済み
-      {% elif publish_state == 'changed' %}
-        再公開
-      {% else %}
-        📢 対戦表を公開
-      {% endif %}
-    </button>
-  </div>
   {% endif %}
 
   <h3>対戦表</h3>
-  <div id="schedule-area"
-      data-can-edit-score="{% if publish_state == 'published' %}1{% else %}0{% endif %}">
+  <div id="schedule-area" data-can-edit-score="{% if publish_state == 'published' %}1{% else %}0{% endif %}">
     {% include "tennis/_schedule_block.html" %}
   </div>
 

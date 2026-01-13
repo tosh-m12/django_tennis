@@ -1677,6 +1677,10 @@
         // ★開く：metaBar クリックで edit モード起動（←欠けていた）
         // ============================================================
         metaBar.addEventListener("click", () => {
+          const until = window.__suppressMetaBarClickUntil || 0;
+          if (until && Date.now() < until) {
+            return;
+          }
           if (mode) mode.value = "edit";
           if (titleEl) titleEl.textContent = "イベント編集";
 

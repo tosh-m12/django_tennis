@@ -1,30 +1,639 @@
-4) _optional_admin_token_check() の存在が“混乱の元”（中）
 
-「送られてきたらチェック、無ければスルー」は後方互換には便利だけど、
-
-JSが壊れて token が送られなくなった瞬間に 認可が弱くなる可能性がある
-
-“どのAPIがどの認可で守られてるか” が読み取りづらい
-
-今は event系はセッションで守ってるので致命ではないけど、「クラブtokenも見る/見ない」が増えると地雷化しやすい。
-
-5) club_rename_member のEP一括更新は仕様要確認（中）
-EventParticipant.objects.filter(member=m).update(display_name=m.display_name)
+1. 確定仕様（ここまで議論して固まった内容）
 
 
-これで過去イベントの表示名も全部追随する。
 
-もし「過去の表示名は固定したい（当時の名前のまま）」ならアウト。
+1-1. LocalStorageは使わない
 
-逆に「常に最新名に追随」が仕様ならOK（あなたの最近の“追随させる”発言的にはこっちっぽい）。
 
-6) クラス周り：class_name 互換フィールドの扱い（小〜中）
+•	表示設定の保存・一時退避に localStorageは使わない。
+•	新規作成時も既存編集時も、localStorageで「下書き保持」はしない。
 
-今は event_member_class(FK) が正で、class_name は互換/デバッグ用に残してる状態。
 
-残すなら、どこで使うかを明確に（テンプレ/JSが参照してないなら将来消す候補）
 
-2重管理なので、どこかの更新漏れが出ると「表示が食い違う」原因になりやすい
+
+
+1-2. 表示設定モーダルが出現する場所は2箇所のみ
+
+
+表示設定モーダルは 必ず次の2箇所だけで開く。
+
+1.	club_home画面のカレンダー上でイベントを新規作成した時
+2.	イベント作成後に、後から表示設定を変更したい時（イベントページ側）
+
+
+
+
+
+1-3. 表示設定の編集権限は幹事のみ
+
+
+•	表示設定の編集（トグル操作・保存）は 幹事のみ可能。
+•	画面側でも幹事以外は操作できない（UIガード）。
+•	サーバ側でも幹事以外の更新は拒否（最終防衛線）。
+
+
+
+
+
+1-4. 新規イベント作成時の表示設定の扱い
+
+
+•	デフォルト値に準ずる。
+•	変更がなければ デフォルトのままで良い。
+•	変更がある場合は、デフォルト値を上書きする形で新規イベントのDB（EventDisplaySetting）に登録する。
+•	新規作成時の表示設定情報は JSONで扱う（localStorageなし）。
+•	キーは統一（common_flags, event_flags, class, schedule）。
+
+
+
+
+
+1-5. 既存イベントの表示設定変更（ルートA）
+
+
+既存イベントで表示設定を変えるときは ルートA。
+
+•	チェックボックス（トグル）を変更したら、その場で即DBに反映（バックグラウンド保存）。
+•	保存ボタンでまとめて保存、の方式ではない（即反映方式）。
+
+
+
+
+
+1-6. 既存イベントのモーダル閉じ方（戻り先とリロード）
+
+
+
+表示設定モーダルの閉じる動作
+
+
+•	既存イベントの表示設定モーダルで
+「閉じる」「×」「Esc」「外側クリック」
+→ イベント編集モーダルに戻るだけ（ここではリロードしない）
+
+
+
+イベント編集モーダルの閉じる動作
+
+
+•	イベント編集モーダルで
+「閉じる」「×」「Esc」「外側クリック」
+→ 画面リロードして最新設定を反映
+
+
+
+
+
+1-7. 通信失敗時の扱い
+
+
+•	表示設定トグルの通信（DB保存）が失敗したら、UIのトグル状態を元に戻してDBと一致させる。
+•	“失敗してもUIだけ進む”はしない。
+
+
+
+
+
+1-8. 連打・連続操作対策（方式は議論済み）
+
+
+•	新規イベント作成時・既存イベント編集時ともに、連打・連続操作で壊れないよう送信制御を入れる。
+•	方式は「さっき議論した通り」（ここで蒸し返さない）。
+※要点：二重送信・順不同レスポンス・UIブレを防ぐ。
+
+
+
+
+
+2. 修正方針（全コードにおける全体方針）
+
+
+ここからは「上の仕様を実現するために、どこをどう直すか」をファイル/機能単位で全部書く。
+
+
+
+
+2-1. サーバ側（views.py / API）
+
+
+
+(A) 表示設定保存APIの幹事限定を確実化
+
+
+•	save_event_display_setting は 幹事のみ更新可に統一する。
+
+o	具体的には adminセッションチェック（_guard_admin_only か _is_event_admin_session）を必須化。
+o	これにより「幹事のみ編集」をサーバで保証。
+•	
+
+
+
+(B) 受け取るデータ形式は統一JSON
+
+
+•	クライアントからは settings_json（または settings）として
+common_flags / event_flags / class / schedule を含むJSONを送る。
+•	サーバは現行の 正規化ロジック（旧キー吸収）を維持しつつ、最終的にDBに保存。
+
+
+
+(C) 失敗時に戻す前提のため、APIは“成功/失敗”を明確に返す
+
+
+•	200: {ok: true, settings: ...}
+•	4xx/5xx: {ok: false, error: ...} 相当（あるいは現状のerror形式でも可）
+•	JS側が「失敗＝ロールバック」を確実に判断できる形にする。
+
+
+
+
+
+2-2. テンプレート側（event.html / club_home.html）
+
+
+
+(A) hooks（dataset）の供給を統一
+
+
+•	既存イベントページは #page-hooks に以下を必ず載せる：
+
+o	data-event-id
+o	data-save-display-settings-url
+o	data-display-settings（JSON文字列）
+o	data-is-admin
+•	
+•	JSは このdatasetだけを信頼して動く（他の場所に散らさない）。
+
+
+
+(B) 新規イベント作成時の表示設定JSONの取り回し
+
+
+•	club_home側の「新規作成フロー」で、表示設定モーダルは JSONを保持して送れる形にする。
+•	localStorageは使わない。
+
+
+
+
+
+2-3. フロント側JS（display_settings.js / event.js / club_home.js等）
+
+
+
+(A) 既存イベント：トグル即保存（ルートA）
+
+
+•	チェックボックス変更 → 即 save_event_display_setting をPOST
+•	成功：UIはそのまま
+•	失敗：トグルを元に戻す（DB一致）
+
+
+
+(B) 連打・連続操作対策（送信制御）
+
+
+•	トグル操作に対して、
+
+o	二重送信を抑制
+o	最終状態に収束
+o	レスポンス順不同でもUIが戻らない
+ための制御を実装する（議論済み方式）。
+•	
+
+
+
+(C) モーダルが2重に出る問題の根絶（イベント伝播）
+
+
+•	「表示設定の部分をクリックすると表示設定モーダルと同時にイベント編集モーダルが後ろに出る」問題を止める。
+•	表示設定オープンのクリックでは stopPropagation / preventDefault を正しく入れて、
+“背面のイベント編集モーダル起動トリガー”に伝播させない。
+
+
+
+(D) 閉じる動作の統一
+
+
+•	表示設定モーダル：閉じる/×/Esc/外側クリック → イベント編集モーダルへ戻る
+•	イベント編集モーダル：閉じる/×/Esc/外側クリック → 画面リロード
+•	リロードの責務は「イベント編集モーダルのクローズ側」に集約（表示設定側ではしない）
+
+
+
+
+
+3. ファイルごとの改修ステップ（実作業順）
+
+
+1.	views.py
+
+o	save_event_display_setting を幹事限定に固定（ガード復活/統一）
+o	レスポンス形式をJSが判定しやすい形に揃える（ok / error）
+2.	
+3.	event.html
+
+o	#page-hooks に save_display_settings_url / display_settings_json / is_admin / event_id が常に入ることを確認（不足があれば補う）
+4.	
+5.	club_home.html（新規作成側）
+
+o	新規作成フローで表示設定モーダルを開く導線を2箇所の1つとして整理
+o	表示設定はJSONで保持（localStorage撤廃）
+6.	
+7.	表示設定JS（display_settings.js もしくは event.js内の該当ブロック）
+
+o	トグル即保存（ルートA）実装
+o	失敗時ロールバック実装
+o	送信制御（連打対策）実装
+o	stopPropagation/preventDefaultで背面モーダル起動を遮断
+8.	
+9.	モーダル制御JS（event編集モーダル側）
+
+o	表示設定モーダルクローズは「戻るだけ」
+o	イベント編集モーダルクローズ時のみ location.reload() を実行
+10.	
+
+
+
+Step 1（最優先）: models を“正”にしてデフォルトと正規化を確定
+
+
+
+対象ファイル
+
+
+•	tennis/models.py
+
+
+
+目的
+
+
+•	表示設定のデフォルト値の唯一の置き場を models に固定
+•	統一キー（common_flags, event_flags, class, schedule）を models 側で確定
+•	views/JS は今後 このモデルの関数だけを見る（直書き禁止）
+
+
+
+修正内容（具体）
+
+
+1.	EventDisplaySetting に「統一キーのデフォルト辞書」を定義
+
+o	例：DEFAULTS = {...}
+2.	
+3.	EventDisplaySetting に「辞書→モデル」変換の正規化関数を追加
+
+o	旧キーが来ても吸収する（互換は models 側で完結）
+o	normalize_dict(payload_dict) -> normalized_dict
+
+	入力：flags/show_flags/show_class/show_schedule 等が混ざってもOK
+	出力：必ず common_flags/event_flags/class/schedule の4キーbool
+o	
+4.	
+5.	EventDisplaySetting に「モデル→統一辞書」の関数を確定
+
+o	as_dict() は統一キーで返す（ここが“唯一の真実”）
+6.	
+7.	差分判定関数を追加
+
+o	is_default_dict(d) -> bool（DEFAULTS と一致したら True）
+o	目的：変更が無ければDB行を作らない/または削除運用を確実にする
+8.	
+
+
+
+
+
+Step 2: views の表示設定ロジックを models 参照に統一（直書き削除）
+
+
+
+対象ファイル
+
+
+•	tennis/views.py
+
+
+
+目的
+
+
+•	event_view がデフォルトを持たない（models参照のみ）
+•	保存APIが「幹事のみ」「即DB反映」「失敗時はUI戻し（JS側）」前提で整う
+
+
+
+修正内容（具体）
+
+
+1.	event_view の default_display_settings = {...} を削除
+
+o	EventDisplaySetting.DEFAULTS（または default_dict()）を使う
+2.	
+3.	event_view の display_settings_json を 統一キーの辞書で必ず作る
+
+o	DB行がある → obj.as_dict()
+o	無い → EventDisplaySetting.DEFAULTS
+o	display_settings_source は db/default のままでOK
+4.	
+5.	save_event_display_setting を 幹事のみに戻す
+
+o	いまコメントアウトされている admin check を復活させる（あなたの仕様「表示設定の編集は幹事のみ」）
+o	返却は {"ok": True, "settings": obj.as_dict()}（統一キーのみ）
+6.	
+7.	save_event_display_setting の保存仕様を「変更があった時だけ上書き」にする
+
+o	normalize → DEFAULTS と比較
+o	DEFAULTS と同じなら：
+
+	既存行があれば削除（または保持しない方針なら delete）
+	なければ何もしない
+o	
+o	DEFAULTS と差分ありなら：update_or_create して保存
+8.	
+
+
+
+
+
+Step 3: URL設計とテンプレへの埋め込みを一本化（AJAXをどこからでも呼べる状態）
+
+
+
+対象ファイル
+
+
+•	tennis/urls.py
+•	tennis/templates/tennis/event.html
+•	tennis/templates/tennis/club_home.html（新規作成モーダル側で表示設定モーダルを出す場合）
+•	（必要なら）tennis/templates/tennis/base.html
+
+
+
+目的
+
+
+•	表示設定APIのURLを常に同じ名前で reverse できるようにする
+•	JSが「ページがどこでも」同じ呼び方で叩ける
+
+
+
+修正内容（具体）
+
+
+1.	path("api/event/display_setting/save/", views.save_event_display_setting, name="save_event_display_setting")
+
+o	これを 単一ルートとして固定（既にあるなら確認して揺れを消す）
+2.	
+3.	eventページ：#page-hooks に
+
+o	data-save-display-settings-url="..."
+o	data-display-settings='...'（統一キーJSON）
+を必ず入れる（あなたの event_view は既にここまで来てるので、揺れを消す）
+4.	
+5.	club_home新規作成モーダル側：表示設定モーダルを出すなら
+
+o	同じく data-save-display-settings-url を埋める
+o	ただし新規作成時は「デフォルト準拠」なので、保存はイベント作成時にまとめて（後述JS側）
+6.	
+
+
+
+
+
+Step 4: JS（表示設定モーダル）をルートA挙動に合わせて整理
+
+
+
+対象ファイル
+
+
+•	tennis/static/tennis/display_settings.js（または表示設定を担当してるJS）
+•	tennis/static/tennis/event.js
+•	tennis/static/tennis/club_home.js（新規作成モーダル側があるなら）
+
+
+
+目的
+
+
+•	LocalStorage完全撤廃
+•	既存イベント：チェック変更のたびに即AJAX保存（送信制御付き）
+•	失敗時はUIを戻す
+•	閉じる/×/Esc/外側クリック：イベント編集モーダルへ戻るだけ
+•	イベント編集モーダルを閉じた時にだけリロード
+
+
+
+
+全部消す前提で、仕様＆修正方針を固定する。
+
+
+
+
+固まった仕様（表示設定まわり）
+
+
+
+対象
+
+
+•	表示設定モーダルは 2箇所のみ
+
+1.	club_home で「新規イベント作成」時
+2.	event ページで「既存イベントの表示設定変更」時（幹事のみ）
+•	
+
+
+
+キー（これ以外は存在しない）
+
+
+•	送受信・DB・JS・テンプレすべて この4キーに統一
+
+o	common_flags
+o	event_flags
+o	class
+o	schedule
+•	
+
+
+
+デフォルト
+
+
+•	models の default が唯一のデフォルト
+
+o	show_flags=True
+o	show_event_flags=False
+o	show_class=True
+o	show_schedule=True
+•	
+•	views 側に default dict を持たない（持つなら参照用の定数にするが、基本は不要）
+
+
+
+既存イベント（ルートA確定）
+
+
+•	チェック操作 → 即 AJAX で DB 反映
+•	通信失敗時 → UIは元に戻す（DBと一致させる）
+•	連打/連続操作 → 送信制御（後述）
+•	モーダルの「閉じる/×/Esc/外側クリック」→ イベント編集モーダルへ戻るだけ
+•	イベント編集モーダルの「閉じる/×/Esc/外側クリック」→ ページリロードして最新反映
+
+
+
+新規イベント作成時
+
+
+•	表示設定は デフォルトに準ずる
+•	変更があった場合のみ デフォルトを上書きする形で DB 登録
+•	localStorage は使わない
+•	一時保存は **JSON（モーダル内の状態）**で持つ（連打/連続操作対策として）
+
+
+
+
+
+連打・連続操作対策（具体）
+
+
+
+既存イベントの表示設定（即DB反映）
+
+
+•	in-flight ガード：同一キーのリクエストが飛んでいる間は、そのチェックボックスを disabled にする
+•	最後の操作を優先：同一キーで短時間に切り替えが連続したら、
+
+o	送信中に再トグルされた場合は「保留値」を持ち、
+o	先のリクエスト完了後に 最新の保留値だけを送る（キューは1個まで）
+•	
+•	失敗時は UI をサーバ確定状態に戻す（＝直前の状態に戻す）
+
+
+
+新規イベント作成時（JSON保持）
+
+
+•	モーダル内の状態はJSオブジェクトで保持（保存ボタンまで送らない）
+•	作成ボタン連打は ボタンdisabled + in-flight で1回だけ通す
+
+
+
+
+
+「揺れ吸収」削除に伴うルール
+
+
+•	views は旧キーを一切見ない
+•	旧キーが来たら 400 bad_request（開発中に気付けるようにする）
+•	save_event_display_setting は settings_json が無ければ 400
+settings_json の中に4キーが揃っていなければ 400
+
+
+
+
+
+修正方針（全体）
+
+
+結論から言うと、まずサーバ側(API/モデル)を“正”として固めてから、JSをそれに合わせるのがブレない。
+
+
+
+
+ファイルごとの修正ステップ（確定版）
+
+
+
+Step 1: models.py（デフォルトの唯一化）
+
+
+•	EventDisplaySetting はあなたが貼った形でOK
+•	as_dict() はこの4キーのみ返す（OK）
+•	余計な互換関数や旧フィールド参照があれば削除
+
+
+
+Step 2: views.py（互換削除・厳格化）
+
+
+•	event_view
+
+o	display_settings は
+
+	event.display_setting.as_dict() が取れればそれ
+	無ければ models default のままの as_dict 相当を作る必要があるが、
+
+	OneToOneが無い場合は DB未作成＝デフォルト表示なので
+	view内では {"common_flags": True, ...} みたいな dict をハードコードせず、
+	**「無ければ models のデフォルト値で仮dict生成」**にする（後で具体コード出す）
+	
+o	
+•	
+•	save_event_display_setting
+
+o	旧キー吸収ロジック全削除
+o	settings_json を parse
+o	4キー存在チェック & bool化（ただし "true"/"false" 程度の文字列はJS側で送らない前提にするなら、ここも厳格にしてOK）
+o	EventDisplaySetting.objects.get_or_create(event=event) → 4項目を保存 → as_dict() を返す
+o	幹事のみ編集：adminセッションガードを必ず入れる（あなたの仕様）
+•	
+
+
+
+Step 3: urls.py
+
+
+•	JSが叩くURLをテンプレに渡す
+•	既存：save_display_settings_url を event_view context に入れているのでこれを正として統一
+•	club_home（新規作成）側も、必要なら同じ save_display_settings_url を渡す（または作成APIに統合する）
+
+
+
+Step 4: templates（data属性の統一）
+
+
+•	event.html の #page-hooks
+
+o	data-display-settings は 4キーJSONのみ
+o	data-save-display-settings-url は必須
+•	
+•	club_home.html（新規作成モーダル）
+
+o	表示設定の初期状態はデフォルト（JS側で作る）
+o	作成時に変更があった場合だけ送る
+•	
+
+
+
+Step 5: JS（event.js / club_home.js / display_settings.js の整理）
+
+
+•	送信payloadは常に：
+
+o	event_id
+o	settings_json（4キーのみ）
+•	
+•	連打対策（in-flight + latest-only）
+•	失敗時ロールバック
+
+
+
+
+次にやること（あなたが「消す」と言ったので最短で進める）
+
+1.	views.py の save_event_display_setting を“厳格4キー版”に書き換える方針（差分）
+2.	event.js 側の送信payloadを4キー固定にする（差分）
+3.	旧キーがどこから送られているかをコード上で潰す（残骸掃除）
+
+
+この流れで、もうループしない形に落とす。
+
+必要なら次の返信で、Step2（views.pyの差分）をそのまま貼る。
+
 
 
 
