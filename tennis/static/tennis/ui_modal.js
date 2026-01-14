@@ -408,7 +408,7 @@
         return;
       }
 
-      window.UI?.showMessage?.("固有フラグを追加しました");
+      // window.UI?.showMessage?.("固有フラグを追加しました");
       close();
 
       document.dispatchEvent(new CustomEvent("eventFlagsUpdated", { detail: { action: "add", ...data } }));
@@ -584,7 +584,7 @@
         return;
       }
 
-      window.UI?.showMessage?.("固有フラグを削除しました");
+      // window.UI?.showMessage?.("固有フラグを削除しました");
       close();
 
       document.dispatchEvent(new CustomEvent("eventFlagsUpdated", {

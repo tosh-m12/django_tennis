@@ -653,7 +653,7 @@
           if (data.ep_id) applyEpIdToRow(row, data.ep_id);
 
           sel.dataset.prev = classId;
-          safeShowMessage("クラスを保存しました", 1400);
+          // safeShowMessage("クラスを保存しました", 1400);
 
           // 公開済みなら再公開導線
           markChangedIfPublishedExists();
@@ -1643,10 +1643,8 @@
 
           submitBtn.textContent = "更新";
 
-          const disabled = !dirty;
-          submitBtn.disabled = disabled;
-          submitBtn.classList.toggle("pill-disabled", disabled);
-          submitBtn.classList.toggle("is-disabled", disabled);
+          submitBtn.disabled = false;
+          submitBtn.classList.remove("pill-disabled", "is-disabled");
         }
 
         function updateDirtyState() {
@@ -1654,10 +1652,9 @@
           syncHiddenTime();
 
           const d = computeDirty();
-          if (d === isDirty) return;
-
           isDirty = d;
-          setSubmitState(true, isDirty);
+
+          setSubmitState(true, true);
         }
 
         function attachDirtyWatchersOnce() {
@@ -1711,7 +1708,7 @@
 
           initialSnapshot = snapshotNow();
           isDirty = false;
-          setSubmitState(true, false);
+          setSubmitState(true, true);
 
           openModal();
         });
@@ -1782,7 +1779,7 @@
         );
 
         // ============================================================
-        // submit（編集のみ）
+        // submit（編集のみ）: ★常に POST → close → reload
         // ============================================================
         form.addEventListener("submit", async (ev) => {
           const currentMode = (mode?.value || "create").trim();
@@ -1790,47 +1787,16 @@
 
           ev.preventDefault();
 
+          // hidden time を確実に同期
           syncHiddenTime();
 
-          // ★表示設定の変更も「変更あり」として扱う
           const clubModalEl = form?.closest("#club-event-modal");
-          const dsDirty = (clubModalEl?.dataset?.displaySettingsDirty || "") === "1";
 
-          if (!computeDirty() && !dsDirty) {
-            safeShowMessage("変更がありません", 1600);
-            return;
-          }
-
-          // ★表示設定だけ変更された場合：
-          //   - ここでページリロードする（要件）
-          //   - その前に必要なら即時反映もしてOK（見た目のズレ防止）
-          if (!computeDirty() && dsDirty) {
-            // dirty フラグを落とす（※リロードするので実害はないが、状態整合のため）
-            if (clubModalEl) clubModalEl.dataset.displaySettingsDirty = "0";
-
-            //（任意）保存済みの表示設定を event ページに即反映（リロード前の一瞬だけ）
-            try {
-              const eventId2 = String(eventId || "").trim();
-              if (eventId2 && window.TennisDisplaySettings?.loadByKey && window.TennisDisplaySettings?.applyAll) {
-                const key = `tennis:display_settings:event:${eventId2}`;
-                const s = window.TennisDisplaySettings.loadByKey(key);
-                window.TennisDisplaySettings.applyAll(s);
-              }
-            } catch {}
-
-            closeModal();
-            safeShowMessage("更新しました", 800);
-
-            // ★要件：更新ボタン押下後はリロード
-            setTimeout(() => {
-              window.location.reload();
-            }, 80);
-            return;
-          }
-
+          // ボタン連打防止
           const prevDisabled = submitBtn?.disabled;
           if (submitBtn) submitBtn.disabled = true;
 
+          // ★「表示されている内容をそのままDBへ」なので FormData(form) を素直に使う
           const fd = new FormData(form);
           fd.set("event_id", String(eventId));
           fd.set("admin_token", adminToken);
@@ -1851,7 +1817,7 @@
               return;
             }
 
-            // ---- 既存のメタ更新などはそのまま ----
+            // ---- 既存のメタ更新などは維持（ただし最終的に reload するので必須ではないが残す） ----
             metaBar.dataset.date = data.event.date || "";
             metaBar.dataset.title = data.event.title || "";
             metaBar.dataset.place = data.event.place || "";
@@ -1867,8 +1833,13 @@
 
             const h2 = document.querySelector(".event-title");
             if (h2) h2.textContent = data.event.title || "";
-            document.title = (data.event.title || "") + " - 幹事用";
 
+            // title 反映（ただし reload する）
+            if (data.event.title) {
+              document.title = (data.event.title || "") + " - 幹事用";
+            }
+
+            // snapshot を更新（内部整合のため）
             initialSnapshot = {
               title: (data.event.title || "").trim(),
               place: (data.event.place || "").trim(),
@@ -1876,18 +1847,15 @@
               end: (data.event.end_time || "").trim(),
             };
             isDirty = false;
-            setSubmitState(true, false);
 
             // ★表示設定 dirty もクリア（念のため）
             if (clubModalEl) clubModalEl.dataset.displaySettingsDirty = "0";
 
             closeModal();
-            safeShowMessage("更新しました", 800);
+            // safeShowMessage("更新しました", 800);
 
-            // ★要件：更新ボタン押下後はリロード（API更新でも同じ挙動に統一）
-            setTimeout(() => {
-              window.location.reload();
-            }, 80);
+            // ★仕様：更新押下後は常にリロード
+            setTimeout(() => window.location.reload(), 80);
 
             try {
               localStorage.setItem(

@@ -911,7 +911,7 @@ document.addEventListener("DOMContentLoaded", () => {
         await postForm(urlSetMember, fd);
 
         sel.dataset.prev = classId;
-        UI?.showMessage?.("クラスを更新しました", 1400);
+        // UI?.showMessage?.("クラスを更新しました", 1400);
       } catch (err) {
         console.error(err);
         sel.value = prev;
