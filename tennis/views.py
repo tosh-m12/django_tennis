@@ -2,6 +2,7 @@
 import calendar
 import json
 import datetime as dt
+import logging
 from collections import defaultdict
 from datetime import time
 
@@ -39,6 +40,8 @@ from .models import (
 MAX_FLAGS = 3  # V1仕様：クラブごとのフラグ最大数
 
 MAX_EVENT_FLAGS = 2
+
+log = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -1497,6 +1500,11 @@ def set_participant_flag_value(request):
 
     blocked = _guard_participant_change(request, event, require_admin_when_published=True)
     if blocked:
+        log.warning("set_flag_value blocked: path=%s ua=%s referer=%s cookies=%s",
+                    request.path,
+                    request.META.get("HTTP_USER_AGENT",""),
+                    request.META.get("HTTP_REFERER",""),
+                    list(request.COOKIES.keys()))
         return blocked
 
     ep_id = ((request.POST.get("ep_id") or "").strip()
