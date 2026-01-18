@@ -218,8 +218,16 @@ LOGGING = {
             "level": "ERROR",
             "propagate": False,
         },
+
+        # ★追加：CSRF 403 の理由を出す
+        "django.security.csrf": {
+            "handlers": ["console"],
+            "level": "WARNING",
+            "propagate": False,
+        },
     },
 }
+
 
 
 # ============================================================
