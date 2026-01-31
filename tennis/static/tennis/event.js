@@ -921,7 +921,7 @@
       if (Number.isNaN(v)) v = autoClamped;
 
       // ★「手動で面数を変えていない」or「直近も自動値だった」場合は自動追従
-      const shouldAutoFollow = (!courtsManuallySet) || (lastAutoCourts !== null && v === lastAutoCourts);
+      const shouldAutoFollow = (!courtsManuallySet);
       if (shouldAutoFollow) {
         v = autoClamped;
       }
@@ -1150,6 +1150,14 @@
         const triggers = qsa(".settings-trigger");
         const closeBtn = document.getElementById("close-settings-modal");
 
+        // ★面数をユーザーが触ったら「手動」にする
+        const courtsInput = document.getElementById("id_num_courts");
+        if (courtsInput) {
+          const markManual = () => { courtsManuallySet = true; };
+          courtsInput.addEventListener("input", markManual);
+          courtsInput.addEventListener("change", markManual);
+        }
+
         const openModal = () => {
           const countPill = modal.querySelector(".count-pill");
           if (countPill) countPill.textContent = String(getMatchCountFromCheckboxes());
@@ -1195,6 +1203,7 @@
             let val = parseInt(input.value || "0", 10);
 
             if (targetId === "num_courts") {
+              courtsManuallySet = true;
               const matchCount = getMatchCountFromCheckboxes();
               const gt = document.getElementById("id_game_type")?.value || "doubles";
               const perCourt = gt === "singles" ? 2 : 4;
