@@ -1007,6 +1007,7 @@
           headers: { "X-CSRFToken": csrftoken },
           body: fd,
         });
+
         const data = await r.json().catch(() => ({}));
         if (!r.ok || data.error) {
           safeShowMessage("対戦表の再生成に失敗しました", 2600);
@@ -1018,6 +1019,9 @@
         const statsArea2 = document.getElementById("stats-area");
         if (scheduleArea2 && typeof data.schedule_html === "string") scheduleArea2.innerHTML = data.schedule_html;
         if (statsArea2 && typeof data.stats_html === "string") statsArea2.innerHTML = data.stats_html;
+
+        // ✅ 再生成直後は「未公開」扱いに落とす（残留値対策の保険）
+        if (scheduleArea2) scheduleArea2.dataset.canEditScore = "0";
 
         // ===== ★追加：publish 用 JSON をDOMに保存 =====
         if (typeof data.schedule_json === "string" && data.schedule_json.trim()) {
@@ -1031,16 +1035,12 @@
           st.textContent = data.schedule_json;
         }
 
-
         // ★成功したら「生成済み」にする（ここが肝）
         hasScheduleEverGenerated = true;
 
-        // ★初回生成直後：公開ボタンを有効化
-        //  - 既に published なら changed（再公開）へ
-        //  - それ以外は ready（公開可能）へ
-        const cur = getPublishState();
-        if (cur === "published") setPublishStateUI("changed");
-        else setPublishStateUI("ready");
+        // ✅ 重要：再生成成功＝未公開の新スケジュール（draft）なので publishState は必ず ready
+        //   - ここで published/chagned にすると「公開済み扱いで代打できてしまう」事故の土台になる
+        setPublishStateUI("ready");
 
         const pillGameType = document.getElementById("pill-game-type");
         const pillNumCourts = document.getElementById("pill-num-courts");
@@ -1064,13 +1064,16 @@
         const modalCountPill = document.querySelector("#match-settings-modal .count-pill");
         if (modalCountPill && data.match_count !== undefined) modalCountPill.textContent = String(data.match_count);
 
-        markChangedIfPublishedExists();
+        // ✅ 再生成後は draft なので「published を前提にした changed 表示」は不要
+        // markChangedIfPublishedExists();
+
         syncCourtsLimitByCurrentState();
       } catch (err) {
         console.error(err);
         safeShowMessage("対戦表の再生成に失敗しました（ネットワーク）", 2600);
       }
     }
+
 
 
     // ============================================================
@@ -1886,9 +1889,9 @@
     }
 
     // ============================================================
-    // [COMMON] 代打（名前カード click → modal → apply）【完成版】
-    //  - 公開済み（canEditScore=1）なら一般画面でも可能
-    //  - data-substitute-url と sub-candidates-json が必須
+    // [COMMON] 代打（名前カード click → modal → apply）【修正版】
+    //  - ✅ 未公開(draft)では代打禁止（裏に公開済みがあっても禁止）
+    //  - ✅ 判定は data-can-edit-score ではなく publishState を使用
     // ============================================================
     const subUrl = (participantsTable.dataset.substituteUrl || "").trim();
     const subModal = document.getElementById("substitute-modal");
@@ -1959,9 +1962,9 @@
       const scheduleArea = document.getElementById("schedule-area");
       if (!scheduleArea || !scheduleArea.contains(card)) return;
 
-      // 公開済みでのみ代打可能（一般もOK）
-      const canEditScore = (scheduleArea.dataset.canEditScore || "0") === "1";
-      if (!canEditScore) {
+      // ✅ 未公開(draft)では代打禁止（裏に公開済みがあっても禁止）
+      const state = getPublishState(); // "published" のときだけOK
+      if (state !== "published") {
         safeShowMessage("未公開の対戦表では代打設定できません（公開後に可能）", 2200);
         return;
       }
@@ -1990,6 +1993,14 @@
 
     // 適用
     subOk?.addEventListener("click", async () => {
+      // ✅ 二重防御：未公開なら実行させない
+      const state = getPublishState();
+      if (state !== "published") {
+        safeShowMessage("未公開の対戦表では代打設定できません（公開後に可能）", 2200);
+        closeSub();
+        return;
+      }
+
       if (!subTarget) return;
 
       const newEpId = (subSelect?.value || "").trim();
@@ -1998,7 +2009,7 @@
         return;
       }
 
-      // 同一人物選択は何もしない（サーバ側でも弾いてるが、UX的に先に止める）
+      // 同一人物選択は何もしない
       if (subTarget.oldEpId && String(subTarget.oldEpId) === String(newEpId)) {
         safeShowMessage("同じ人が選択されています", 1800);
         return;
@@ -2011,8 +2022,6 @@
       fd.append("team", subTarget.team);
       fd.append("slot_index", subTarget.slotIndex);
       fd.append("new_ep_id", newEpId);
-
-      // 安全性向上（サーバで一致確認に使える）
       if (subTarget.oldEpId) fd.append("old_ep_id", subTarget.oldEpId);
 
       try {
@@ -2024,7 +2033,15 @@
         });
 
         const data = await r.json().catch(() => ({}));
+
         if (!r.ok || !data.ok) {
+          // ✅ サーバ側ガード対応（後述の draft_exists）
+          if (data && data.error === "draft_exists") {
+            safeShowMessage("未公開の対戦表では代打設定できません（公開後に可能）", 2200);
+            closeSub();
+            return;
+          }
+
           console.error("substitute failed:", r.status, data);
           safeShowMessage("代打の反映に失敗しました", 2600);
           return;
@@ -2046,6 +2063,7 @@
         safeShowMessage("代打の反映に失敗しました（ネットワーク）", 2600);
       }
     });
+
 
 
     // init

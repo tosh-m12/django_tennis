@@ -2049,6 +2049,7 @@ def club_toggle_member_fixed(request):
 # Substitute (代打) : substitute_slot（仕様コメントは元のまま）
 # ============================================================
 
+
 @require_POST
 def substitute_slot(request):
     event_id = request.POST.get("event_id")
@@ -2057,6 +2058,222 @@ def substitute_slot(request):
     team = request.POST.get("team")         # "1" or "2"
     slot_index = request.POST.get("slot_index")
     new_ep_id = request.POST.get("new_ep_id")
+
+    if not (event_id and round_no and court_no and team and slot_index and new_ep_id):
+        return JsonResponse({"ok": False, "error": "bad_request"}, status=400)
+
+    try:
+        event_id_i = int(event_id)
+        round_no_i = int(round_no)
+        court_no_i = int(court_no)
+        team_i = int(team)
+        slot_index_i = int(slot_index)
+        new_ep_id_i = int(new_ep_id)
+    except Exception:
+        return JsonResponse({"ok": False, "error": "bad_number"}, status=400)
+
+    if team_i not in (1, 2):
+        return JsonResponse({"ok": False, "error": "bad_team"}, status=400)
+
+    event = get_object_or_404(Event, id=event_id_i)
+
+    # ✅ 重要：未公開(draft)が存在するなら代打は禁止（裏に公開済みがあっても禁止）
+    #  - これが無いと「未公開(1面)を触っているつもりが、公開済み(2面)を書き換える」事故が起きる
+    if MatchSchedule.objects.filter(event=event, published=False).exists():
+        return JsonResponse({"ok": False, "error": "draft_exists"}, status=409)
+
+    new_ep = (
+        EventParticipant.objects
+        .filter(id=new_ep_id_i, event=event)
+        .select_related("member")
+        .first()
+    )
+    if not new_ep:
+        return JsonResponse({"ok": False, "error": "no_participant"}, status=404)
+    if (new_ep.attendance or "") != "yes":
+        return JsonResponse({"ok": False, "error": "not_attendance_yes"}, status=409)
+
+    with transaction.atomic():
+        ms = (
+            MatchSchedule.objects
+            .select_for_update()
+            .filter(event=event, published=True)
+            .first()
+        )
+        if not ms:
+            return JsonResponse({"ok": False, "error": "no_published_schedule"}, status=409)
+
+        sched = ms.schedule_json or []
+        if not isinstance(sched, list):
+            return JsonResponse({"ok": False, "error": "bad_schedule"}, status=500)
+
+        target_round = None
+        for r in sched:
+            if not isinstance(r, dict):
+                continue
+            try:
+                rr = int(r.get("round", -1))
+            except Exception:
+                continue
+            if rr == round_no_i:
+                target_round = r
+                break
+        if not target_round:
+            return JsonResponse({"ok": False, "error": "no_round"}, status=404)
+
+        matches = target_round.get("matches") or []
+        if not isinstance(matches, list):
+            return JsonResponse({"ok": False, "error": "bad_matches"}, status=500)
+
+        if not (1 <= court_no_i <= len(matches)):
+            return JsonResponse({"ok": False, "error": "no_court"}, status=404)
+
+        m = matches[court_no_i - 1]
+        if not isinstance(m, dict):
+            return JsonResponse({"ok": False, "error": "bad_match"}, status=500)
+
+        team_key = "team1" if team_i == 1 else "team2"
+        if team_key not in m or not isinstance(m.get(team_key), list):
+            return JsonResponse({"ok": False, "error": "bad_team"}, status=500)
+
+        if not (0 <= slot_index_i < len(m[team_key])):
+            return JsonResponse({"ok": False, "error": "bad_slot"}, status=400)
+
+        try:
+            old_ep_id = int(m[team_key][slot_index_i])
+        except Exception:
+            return JsonResponse({"ok": False, "error": "bad_old_ep_id"}, status=500)
+
+        if old_ep_id == new_ep_id_i:
+            score_map = _build_score_map(ms)
+            schedule_for_view = _merge_scores_into_schedule(ms.schedule_json, score_map)
+            ctx = {
+                "event": event,
+                "schedule": schedule_for_view,
+                "schedule_json": None,
+                "ep_name_map": _build_ep_name_map(event),
+                "show_controls": True,
+                "pill_game_type": ms.game_type or GameType.DOUBLES,
+                "pill_num_courts": int(ms.court_count or 1),
+                "pill_num_rounds": int(ms.round_count or 8),
+                "pill_match_count": int(EventParticipant.objects.filter(event=event, participates_match=True).count()),
+                "publish_state": "published",
+            }
+            schedule_html = render_to_string("tennis/_schedule_block.html", ctx, request=request)
+            return JsonResponse({"ok": True, "schedule_html": schedule_html})
+
+        found_pos = None
+
+        for mi, mm in enumerate(matches):
+            if not isinstance(mm, dict):
+                continue
+            for tk in ("team1", "team2"):
+                lst = mm.get(tk) or []
+                if not isinstance(lst, list):
+                    continue
+                for si, pid in enumerate(lst):
+                    try:
+                        if int(pid) == new_ep_id_i:
+                            found_pos = ("match", mi, tk, si)
+                            break
+                    except Exception:
+                        continue
+                if found_pos:
+                    break
+            if found_pos:
+                break
+
+        rests = target_round.get("rests") or []
+        if not isinstance(rests, list):
+            rests = []
+
+        if not found_pos:
+            for ri, pid in enumerate(rests):
+                try:
+                    if int(pid) == new_ep_id_i:
+                        found_pos = ("rest", ri)
+                        break
+                except Exception:
+                    continue
+
+        if found_pos:
+            if found_pos[0] == "match":
+                _t, mi, tk, si = found_pos
+                if (
+                    isinstance(matches[mi], dict)
+                    and isinstance(matches[mi].get(tk), list)
+                    and 0 <= si < len(matches[mi][tk])
+                ):
+                    matches[mi][tk][si] = old_ep_id
+                else:
+                    return JsonResponse({"ok": False, "error": "bad_found_pos"}, status=500)
+            else:
+                _t, ri = found_pos
+                if 0 <= ri < len(rests):
+                    rests[ri] = old_ep_id
+                else:
+                    return JsonResponse({"ok": False, "error": "bad_found_pos"}, status=500)
+
+            m[team_key][slot_index_i] = new_ep_id_i
+            rests = [x for x in rests if str(x) != str(new_ep_id_i)]
+        else:
+            m[team_key][slot_index_i] = new_ep_id_i
+
+            existing_rest_ints = []
+            for x in rests:
+                try:
+                    existing_rest_ints.append(int(x))
+                except Exception:
+                    continue
+            if old_ep_id not in existing_rest_ints:
+                rests.append(old_ep_id)
+
+            rests = [x for x in rests if str(x) != str(new_ep_id_i)]
+
+        target_round["matches"] = matches
+        target_round["rests"] = rests
+
+        ms.schedule_json = sched
+        ms.save(update_fields=["schedule_json", "updated_at"])
+
+        MatchScore.objects.filter(
+            match_schedule=ms,
+            round_no=round_no_i,
+            court_no=court_no_i,
+        ).delete()
+
+    ms2 = MatchSchedule.objects.filter(event=event, published=True).first()
+    if not ms2:
+        return JsonResponse({"ok": False, "error": "no_published_schedule"}, status=409)
+
+    score_map = _build_score_map(ms2)
+    schedule_for_view = _merge_scores_into_schedule(ms2.schedule_json, score_map)
+
+    ctx = {
+        "event": event,
+        "schedule": schedule_for_view,
+        "schedule_json": None,
+        "ep_name_map": _build_ep_name_map(event),
+        "show_controls": True,
+        "pill_game_type": ms2.game_type or GameType.DOUBLES,
+        "pill_num_courts": int(ms2.court_count or 1),
+        "pill_num_rounds": int(ms2.round_count or 8),
+        "pill_match_count": int(EventParticipant.objects.filter(event=event, participates_match=True).count()),
+        "publish_state": "published",
+    }
+
+    schedule_html = render_to_string("tennis/_schedule_block.html", ctx, request=request)
+    return JsonResponse({"ok": True, "schedule_html": schedule_html})
+
+    event_id = request.POST.get("event_id")
+    round_no = request.POST.get("round_no")
+    court_no = request.POST.get("court_no")
+    team = request.POST.get("team")         # "1" or "2"
+    slot_index = request.POST.get("slot_index")
+    new_ep_id = request.POST.get("new_ep_id")
+    event = get_object_or_404(Event, id=event_id)
+
+    
 
     if not (event_id and round_no and court_no and team and slot_index and new_ep_id):
         return JsonResponse({"ok": False, "error": "bad_request"}, status=400)
