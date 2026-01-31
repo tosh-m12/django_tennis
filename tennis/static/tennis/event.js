@@ -245,11 +245,21 @@
     }
 
     function getPublishState() {
+      // 0) participants-table（admin/public 共通で存在）
+      const s0 = (participantsTable?.dataset?.publishState || participantsTable?.dataset?.publish_state || "").trim();
+      if (s0) return s0;
+
+      // 1) admin UI の publish pill（adminだけ）
       const btn = getPublishBtn();
-      return (btn?.dataset?.publishState || btn?.dataset?.publish_state || "").trim();
+      const s1 = (btn?.dataset?.publishState || btn?.dataset?.publish_state || "").trim();
+      if (s1) return s1;
+
+      return "";
     }
 
     function setPublishStateUI(state) {
+      if (participantsTable) participantsTable.dataset.publishState = state;
+
       const btn = getPublishBtn();
       if (!btn) return;
 
@@ -1962,9 +1972,9 @@
       const scheduleArea = document.getElementById("schedule-area");
       if (!scheduleArea || !scheduleArea.contains(card)) return;
 
-      // ✅ 未公開(draft)では代打禁止（裏に公開済みがあっても禁止）
-      const state = getPublishState(); // "published" のときだけOK
-      if (state !== "published") {
+      const state = getPublishState(); // published / changed を許可
+      const canSubstitute = (state === "published" || state === "changed");
+      if (!canSubstitute) {
         safeShowMessage("未公開の対戦表では代打設定できません（公開後に可能）", 2200);
         return;
       }
@@ -1993,13 +2003,14 @@
 
     // 適用
     subOk?.addEventListener("click", async () => {
-      // ✅ 二重防御：未公開なら実行させない
       const state = getPublishState();
-      if (state !== "published") {
+      const canSubstitute = (state === "published" || state === "changed");
+      if (!canSubstitute) {
         safeShowMessage("未公開の対戦表では代打設定できません（公開後に可能）", 2200);
         closeSub();
         return;
       }
+
 
       if (!subTarget) return;
 
@@ -2053,8 +2064,13 @@
           scheduleArea.innerHTML = data.schedule_html;
         }
 
-        // 公開済み対戦表が変更された（幹事なら再公開導線へ）
-        if (isAdmin) markChangedIfPublishedExists();
+        // ✅ 仕様：代打は「公開済み対戦表の修正」なので公開状態は維持する
+        //  - 再公開(changed)にはしない
+        //  - UIが崩れて未公開表示になるのを防ぐため、明示的に published に固定
+        if (participantsTable) participantsTable.dataset.publishState = "published";
+        if (typeof setPublishStateUI === "function") setPublishStateUI("published");
+        if (scheduleArea) scheduleArea.dataset.canEditScore = "1"; // 公開済み扱いを維持（必要なら）
+
 
         safeShowMessage("代打を反映しました。（スコアは再入力してください）", 2200);
         closeSub();
