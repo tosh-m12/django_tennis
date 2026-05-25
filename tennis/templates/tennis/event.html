@@ -88,6 +88,7 @@
 
            data-update-attendance-url="{% url 'tennis:update_attendance' %}"
            data-update-comment-url="{% url 'tennis:update_comment' %}"
+           data-update-name-url="{% url 'tennis:update_participant_display_name' %}"
            data-toggle-flag-url="{% url 'tennis:toggle_participant_flag' %}"
            data-flag-input-mode="{{ flag_input_mode }}"
            data-set-flag-value-url="{% url 'tennis:set_participant_flag_value' %}"
@@ -159,7 +160,7 @@
 
           <td class="participant-index"><span class="idx">{{ forloop.counter }}</span></td>
 
-          <td><div class="tb-player-card-sm">{{ row.display_name }}</div></td>
+          <td><div class="tb-player-card-sm editable-name" role="button" tabindex="0" title="タップして名前を編集">{{ row.display_name }}</div></td>
 
           <td class="attendance-cell">
             <button type="button"
@@ -301,7 +302,7 @@
 
           <td class="participant-index"><span class="idx">{{ fixed_rows|length|add:forloop.counter }}</span></td>
 
-          <td><div class="tb-player-card-sm">{{ row.display_name }}</div></td>
+          <td><div class="tb-player-card-sm editable-name" role="button" tabindex="0" title="タップして名前を編集">{{ row.display_name }}</div></td>
 
           <td class="attendance-cell">
             <button type="button"

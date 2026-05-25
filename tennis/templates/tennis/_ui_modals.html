@@ -128,6 +128,44 @@
 {% endif %}
 
 {% comment %}
+[4b] 名前編集モーダル（event：一般/幹事どちらも・名前タップで開く）
+{% endcomment %}
+{% if event %}
+<div id="event-name-edit-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content event-modal modal-has-topbar"
+       role="dialog" aria-modal="true" aria-labelledby="event-name-edit-modal-title">
+
+    <div class="modal-topbar">
+      <div class="modal-topbar-title" id="event-name-edit-modal-title">メンバー名変更</div>
+      <button type="button"
+              id="close-event-name-edit-modal"
+              class="modal-topbar-btn"
+              aria-label="閉じる">×</button>
+    </div>
+
+    <form class="modal-form" id="event-name-edit-form">
+      {% csrf_token %}
+      <input type="hidden" id="event-name-edit-ep-id" value="">
+      <input type="hidden" id="event-name-edit-member-id" value="">
+
+      <div class="field-group">
+        <label for="event-name-edit-input">メンバー名</label>
+        <input type="text"
+               id="event-name-edit-input"
+               class="event-title-input"
+               maxlength="100"
+               autocomplete="off">
+      </div>
+
+      <div class="modal-actions">
+        <button type="submit" class="btn btn-pill btn-primary">保存</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endif %}
+
+{% comment %}
 [5] 対戦表条件モーダル（event + adminのみ）
 - event.js が open/close/値のstepper、送信、バリデーション
 {% endcomment %}

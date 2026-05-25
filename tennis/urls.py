@@ -94,6 +94,7 @@ urlpatterns = [
     path("api/event/delete_event_flag/", views.delete_event_flag, name="delete_event_flag"),    
     path("api/event/update_attendance/", views.update_attendance, name="update_attendance"),
     path("api/event/update_comment/", views.update_comment, name="update_comment"),
+    path("api/event/update_name/", views.update_participant_display_name, name="update_participant_display_name"),
     path("api/event/toggle_flag/", views.toggle_participant_flag, name="toggle_participant_flag"),
     path("api/event/set_participates_match/", views.set_participates_match, name="set_participates_match"),
     path("api/event/add_guest/", views.add_guest_participant, name="add_guest_participant"),
