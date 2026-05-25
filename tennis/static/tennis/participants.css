@@ -68,9 +68,10 @@
     white-space: nowrap;
 }
 
-/* 名前タップで編集できる見た目 */
+/* 名前タップで編集できる見た目（設定ページの .member-name に合わせて下線） */
 .tb-player-card-sm.editable-name {
     cursor: pointer;
+    text-decoration: underline;
 }
 .tb-player-card-sm.editable-name:hover {
     border-color: #1f7a8c;
