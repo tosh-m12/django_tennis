@@ -14,7 +14,9 @@ from __future__ import annotations
 
 import datetime
 
+from django.db import connection
 from django.test import TestCase, override_settings
+from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
@@ -93,6 +95,17 @@ class EventViewContextTests(TestCase):
         self.assertEqual(eon[self.ep_b.id][self.ef1.id], True)
         # A はイベントフラグ未設定
         self.assertNotIn(self.ep_a.id, eon)
+
+    def test_participant_flags_loaded_in_single_query(self):
+        # 候補2: 共通/固有フラグを1クエリに統合した効果を固定
+        url = reverse("tennis:event_public", args=[self.club.public_token, self.event.id])
+        with CaptureQueriesContext(connection) as ctx:
+            self.client.get(url)
+        pf_selects = [
+            q for q in ctx.captured_queries
+            if "tennis_participantflag" in q["sql"].lower() and q["sql"].lstrip().lower().startswith("select")
+        ]
+        self.assertEqual(len(pf_selects), 1)
 
     def test_flag_definitions_in_context(self):
         ctx = self._get_public().context

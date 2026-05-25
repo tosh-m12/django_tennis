@@ -766,39 +766,41 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
     # ============================================================
     # 5) 参加者フラグ状態（クラブ共通 / イベント固有）
     # ============================================================
-    # [A] クラブ共通フラグ（ParticipantFlag: club_flag_definition 側）
-    pf_qs = ParticipantFlag.objects.filter(
-        event_participant__event=event,
-        club_flag_definition__club=club,
-    ).values("event_participant_id", "club_flag_definition_id", "is_on", "value")
+    # クラブ共通フラグ／イベント固有フラグを1クエリで取得し、メモリ上で振り分ける。
+    # 取得集合は旧実装の「共通フラグクエリ ∪ 固有フラグクエリ」と一致する：
+    #   - 共通: event内 かつ club_flag_definition__club=club
+    #   - 固有: event内 かつ event_flag_definition が当該イベントのアクティブフラグ
+    # （CheckConstraint により1行は共通/固有のどちらか一方のみ → 振り分けは排他）
+    event_flag_ids = [f.id for f in event_flags]
+
+    pf_qs = (
+        ParticipantFlag.objects
+        .filter(event_participant__event=event)
+        .filter(
+            models.Q(club_flag_definition__club=club)
+            | models.Q(event_flag_definition_id__in=event_flag_ids)
+        )
+        .values(
+            "event_participant_id",
+            "club_flag_definition_id",
+            "event_flag_definition_id",
+            "is_on",
+            "value",
+        )
+    )
 
     flag_states_on = defaultdict(dict)
     flag_states_val = defaultdict(dict)
-    for pf in pf_qs:
-        ep_id = pf["event_participant_id"]
-        fd_id = pf["club_flag_definition_id"]
-        flag_states_on[ep_id][fd_id] = bool(pf["is_on"])
-        flag_states_val[ep_id][fd_id] = pf["value"]
-
-    # [B] イベント固有フラグ（ParticipantFlag: event_flag_definition 側）
-    ep_ids_all = list(
-        EventParticipant.objects
-        .filter(event=event)
-        .values_list("id", flat=True)
-    )
-    event_flag_ids = [f.id for f in event_flags]
-
     event_flag_states_on = defaultdict(dict)
     event_flag_states_val = defaultdict(dict)
 
-    if ep_ids_all and event_flag_ids:
-        epf_qs = ParticipantFlag.objects.filter(
-            event_participant_id__in=ep_ids_all,
-            event_flag_definition_id__in=event_flag_ids,
-        ).values("event_participant_id", "event_flag_definition_id", "is_on", "value")
-
-        for pf in epf_qs:
-            ep_id = pf["event_participant_id"]
+    for pf in pf_qs:
+        ep_id = pf["event_participant_id"]
+        if pf["club_flag_definition_id"] is not None:
+            fd_id = pf["club_flag_definition_id"]
+            flag_states_on[ep_id][fd_id] = bool(pf["is_on"])
+            flag_states_val[ep_id][fd_id] = pf["value"]
+        elif pf["event_flag_definition_id"] is not None:
             fd_id = pf["event_flag_definition_id"]
             event_flag_states_on[ep_id][fd_id] = bool(pf["is_on"])
             event_flag_states_val[ep_id][fd_id] = pf["value"]
