@@ -11,9 +11,11 @@ from __future__ import annotations
 
 import datetime
 
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 
-from tennis.views import build_month_ranking
+from tennis.views import build_month_ranking, build_month_rankings
 from tennis.models import Event
 
 from .factories import (
@@ -117,3 +119,47 @@ class BuildMonthRankingTests(TestCase):
     def test_empty_events(self):
         result = build_month_ranking(Event.objects.none(), "singles")
         self.assertEqual(result, {"ranked": [], "others": []})
+
+
+class BuildMonthRankingsConsolidationTests(TestCase):
+    """候補1: build_month_rankings の単一パス集計が個別呼び出しと等価かつ低クエリであることを固定。"""
+
+    def setUp(self):
+        self.club = make_club()
+        self.event = make_event(self.club, date=datetime.date(2026, 5, 1))
+        m_a = make_member(self.club, "Aさん")
+        m_b = make_member(self.club, "Bさん")
+        ep_a = make_ep(self.event, member=m_a, attendance="yes")
+        ep_b = make_ep(self.event, member=m_b, attendance="yes")
+        schedule = [
+            {"round": i, "matches": [{"court": 1, "team1": [ep_a.id], "team2": [ep_b.id]}], "rests": []}
+            for i in range(1, 4)
+        ]
+        ms = make_published_schedule(
+            self.event, schedule, game_type="singles", court_count=1, round_count=3
+        )
+        for i, (a, b) in enumerate([(6, 0), (6, 1), (6, 2)], start=1):
+            make_score(ms, i, 1, a, b)
+
+    def _qs(self):
+        return Event.objects.filter(club=self.club)
+
+    def test_consolidated_equals_separate_calls(self):
+        combined = build_month_rankings(self._qs(), ["singles", "doubles"])
+        self.assertEqual(combined["singles"], build_month_ranking(self._qs(), "singles"))
+        self.assertEqual(combined["doubles"], build_month_ranking(self._qs(), "doubles"))
+
+    def test_consolidated_uses_fewer_queries(self):
+        with CaptureQueriesContext(connection) as combined_ctx:
+            build_month_rankings(self._qs(), ["singles", "doubles"])
+        with CaptureQueriesContext(connection) as separate_ctx:
+            build_month_ranking(self._qs(), "singles")
+            build_month_ranking(self._qs(), "doubles")
+        self.assertLess(len(combined_ctx), len(separate_ctx))
+
+    def test_empty_events_returns_both_types(self):
+        result = build_month_rankings(Event.objects.none(), ["singles", "doubles"])
+        self.assertEqual(
+            result,
+            {"singles": {"ranked": [], "others": []}, "doubles": {"ranked": [], "others": []}},
+        )

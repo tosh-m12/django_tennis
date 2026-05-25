@@ -337,36 +337,23 @@ def _optional_admin_token_check(request, club: Club):
 # Ranking（現行踏襲）
 # ============================================================
 
-def build_month_ranking(events_qs, game_type: str, min_matches: int = 3):
-    events = list(events_qs)
-    if not events:
-        return {"ranked": [], "others": []}
+def _collect_schedule_ep_ids(schedule_json, sink: set) -> None:
+    """schedule_json の team1/team2 に含まれる ep_id(int) を sink に集める。"""
+    for r in (schedule_json or []):
+        for m in (r.get("matches") or []):
+            for p in (m.get("team1") or []):
+                if isinstance(p, int) or (isinstance(p, str) and p.isdigit()):
+                    sink.add(int(p))
+            for p in (m.get("team2") or []):
+                if isinstance(p, int) or (isinstance(p, str) and p.isdigit()):
+                    sink.add(int(p))
 
-    ms_by_event = {}
-    for ms in MatchSchedule.objects.filter(event__in=events, published=True, game_type=game_type):
-        ms_by_event[ms.event_id] = ms
 
-    # 月の対象イベントに出てくるEPをまとめて引く（高速化）
-    # ※ schedule_json に入っているのが ep_id 前提
-    ep_ids = set()
-    for ev in events:
-        ms = ms_by_event.get(ev.id)
-        if not ms or not ms.schedule_json:
-            continue
-        for r in (ms.schedule_json or []):
-            for m in (r.get("matches") or []):
-                for p in (m.get("team1") or []):
-                    if isinstance(p, int) or (isinstance(p, str) and p.isdigit()):
-                        ep_ids.add(int(p))
-                for p in (m.get("team2") or []):
-                    if isinstance(p, int) or (isinstance(p, str) and p.isdigit()):
-                        ep_ids.add(int(p))
-
-    ep_map = {
-        ep.id: ep
-        for ep in EventParticipant.objects.filter(id__in=list(ep_ids)).select_related("member")
-    }
-
+def _compute_ranking_from(events, ms_by_event, ep_map, min_matches):
+    """
+    1ゲームタイプ分の集計（旧 build_month_ranking 本体）。
+    ms_by_event / ep_map は呼び出し側で用意して渡す（クエリ共有のため）。
+    """
     stats = {}
 
     def ensure(key, name):
@@ -457,6 +444,51 @@ def build_month_ranking(events_qs, game_type: str, min_matches: int = 3):
         r["rank"] = i
 
     return {"ranked": ranked, "others": others}
+
+
+def build_month_rankings(events_qs, game_types, min_matches: int = 3):
+    """
+    複数ゲームタイプのランキングを1パスで集計する。
+    MatchSchedule / EventParticipant のクエリ・schedule_json パースを
+    タイプ間で共有するため、club_home の二重計算を解消する。
+
+    戻り値: {game_type: {"ranked": [...], "others": [...]}}
+    各タイプの結果は build_month_ranking(events_qs, game_type) と一致する。
+    """
+    game_types = list(game_types)
+    events = list(events_qs)
+    result = {gt: {"ranked": [], "others": []} for gt in game_types}
+    if not events:
+        return result
+
+    # 公開済み対戦表を1クエリで取得し、game_type 別に振り分け
+    ms_by_type = {gt: {} for gt in game_types}
+    for ms in MatchSchedule.objects.filter(
+        event__in=events, published=True, game_type__in=game_types
+    ):
+        bucket = ms_by_type.get(ms.game_type)
+        if bucket is not None:
+            bucket[ms.event_id] = ms
+
+    # 全タイプ横断で ep_id を集め、EP を1クエリでまとめて引く
+    ep_ids: set = set()
+    for gt in game_types:
+        for ms in ms_by_type[gt].values():
+            _collect_schedule_ep_ids(ms.schedule_json, ep_ids)
+
+    ep_map = {
+        ep.id: ep
+        for ep in EventParticipant.objects.filter(id__in=list(ep_ids)).select_related("member")
+    }
+
+    for gt in game_types:
+        result[gt] = _compute_ranking_from(events, ms_by_type[gt], ep_map, min_matches)
+    return result
+
+
+def build_month_ranking(events_qs, game_type: str, min_matches: int = 3):
+    """単一ゲームタイプのランキング（後方互換）。中身は build_month_rankings に委譲。"""
+    return build_month_rankings(events_qs, [game_type], min_matches)[game_type]
 
 
 # ============================================================
@@ -587,8 +619,9 @@ def club_home(request, club_public_token, club_admin_token=None):
 
     month_weeks = _build_month_calendar(year, month, events_qs)
 
-    ranking_doubles = build_month_ranking(events_qs, GameType.DOUBLES)
-    ranking_singles = build_month_ranking(events_qs, GameType.SINGLES)
+    rankings = build_month_rankings(events_qs, [GameType.DOUBLES, GameType.SINGLES])
+    ranking_doubles = rankings[GameType.DOUBLES]
+    ranking_singles = rankings[GameType.SINGLES]
 
     prev_month_date = (first - dt.timedelta(days=1)).replace(day=1)
     prev_year, prev_month = prev_month_date.year, prev_month_date.month
