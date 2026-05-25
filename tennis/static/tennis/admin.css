@@ -73,16 +73,6 @@
     transform: none !important;
 }
 
-/* 公開状態の注意ボックス */
-.publish-notice {
-    margin-top: 8px;
-    padding: 8px 10px;
-    background: #e8f4ff;
-    border-radius: 4px;
-    font-size: 0.9rem;
-    border: 1px solid #c2ddff;
-}
-
 
 
 /* =========================================
