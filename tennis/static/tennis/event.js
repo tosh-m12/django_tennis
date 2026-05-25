@@ -227,6 +227,7 @@
     const urls = {
       updateAttendance: participantsTable.dataset.updateAttendanceUrl,
       updateComment: participantsTable.dataset.updateCommentUrl,
+      updateName: participantsTable.dataset.updateNameUrl,
       toggleFlag: participantsTable.dataset.toggleFlagUrl,
       setFlagValue: participantsTable.dataset.setFlagValueUrl,
       setParticipatesMatch: participantsTable.dataset.setParticipatesMatchUrl,
@@ -871,6 +872,104 @@
           } catch (err) {
             console.error(err);
             safeShowMessage("参加登録に失敗しました", 2600);
+          } finally {
+            if (submitBtn) submitBtn.disabled = false;
+          }
+        });
+      }
+    }
+
+    // ============================================================
+    // [NAME EDIT] 参加者名タップで編集（一般/幹事どちらも・公開後/終了後も可）
+    // ============================================================
+    if (urls.updateName) {
+      const modal = document.getElementById("event-name-edit-modal");
+      const closeBtn = document.getElementById("close-event-name-edit-modal");
+      const form = document.getElementById("event-name-edit-form");
+      const input = document.getElementById("event-name-edit-input");
+      const hiddenEpId = document.getElementById("event-name-edit-ep-id");
+      const hiddenMemberId = document.getElementById("event-name-edit-member-id");
+
+      if (modal && form && input) {
+        let targetNameEl = null;
+        let targetRow = null;
+
+        const open = (nameEl, row, epId, memberId, currentName) => {
+          targetNameEl = nameEl;
+          targetRow = row;
+          hiddenEpId.value = epId || "";
+          hiddenMemberId.value = memberId || "";
+          input.value = currentName || "";
+          modal.classList.add("is-open");
+          modal.setAttribute("aria-hidden", "false");
+          setTimeout(() => { input.focus(); input.select(); }, 0);
+        };
+
+        const close = () => {
+          const active = document.activeElement;
+          if (active && modal.contains(active)) active.blur();
+          modal.classList.remove("is-open");
+          modal.setAttribute("aria-hidden", "true");
+          targetNameEl = null;
+          targetRow = null;
+        };
+
+        // 名前セルのクリック/タップ → モーダルを開く（イベント委譲）
+        participantsTable.addEventListener("click", (e) => {
+          const nameEl = e.target.closest(".editable-name");
+          if (!nameEl) return;
+          const row = getRowFromEl(nameEl);
+          if (!row) return;
+          const epId = String(row.dataset.epId || "").trim();
+          const memberId = String(row.dataset.memberId || "").trim();
+          if (!epId && !memberId) return;
+          open(nameEl, row, epId, memberId, (nameEl.textContent || "").trim());
+        });
+
+        closeBtn?.addEventListener("click", close);
+        modal.addEventListener("click", (e) => { if (e.target === modal) close(); });
+        document.addEventListener("keydown", (e) => {
+          if (e.key === "Escape" && modal.classList.contains("is-open")) close();
+        });
+
+        form.addEventListener("submit", async (e) => {
+          e.preventDefault();
+
+          const name = (input.value || "").trim();
+          if (!name) {
+            safeShowMessage("名前を入力してください", 2200);
+            input.focus();
+            return;
+          }
+
+          const fd = new FormData();
+          fd.append("event_id", eventId);
+          const epId = (hiddenEpId.value || "").trim();
+          const memberId = (hiddenMemberId.value || "").trim();
+          if (epId) fd.append("ep_id", epId);
+          else if (memberId) fd.append("member_id", memberId);
+          fd.append("display_name", name);
+
+          const submitBtn = form.querySelector('button[type="submit"]');
+          if (submitBtn) submitBtn.disabled = true;
+
+          try {
+            const r = await fetch(urls.updateName, {
+              method: "POST",
+              credentials: "include",
+              headers: { "X-CSRFToken": csrftoken },
+              body: fd,
+            });
+            const data = await r.json().catch(() => ({}));
+            if (!r.ok || !data.ok) throw new Error("not ok");
+
+            if (targetNameEl) targetNameEl.textContent = data.display_name || name;
+            if (targetRow && data.ep_id) applyEpIdToRow(targetRow, data.ep_id);
+            close();
+            safeShowMessage("名前を更新しました", 1600);
+          } catch (err) {
+            console.error(err);
+            safeShowMessage("名前の更新に失敗しました", 2600);
           } finally {
             if (submitBtn) submitBtn.disabled = false;
           }

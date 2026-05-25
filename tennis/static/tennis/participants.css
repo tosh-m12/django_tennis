@@ -68,6 +68,19 @@
     white-space: nowrap;
 }
 
+/* 名前タップで編集できる見た目 */
+.tb-player-card-sm.editable-name {
+    cursor: pointer;
+}
+.tb-player-card-sm.editable-name:hover {
+    border-color: #1f7a8c;
+    box-shadow: 0 0 0 2px rgba(31, 122, 140, 0.15);
+}
+.tb-player-card-sm.editable-name:focus-visible {
+    outline: 2px solid #1f7a8c;
+    outline-offset: 1px;
+}
+
 /* 行ホバー時の薄いハイライト */
 #participants-table tbody tr:hover td {
     background: #fafafa;

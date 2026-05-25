@@ -1413,6 +1413,64 @@ def update_comment(request):
 
 
 @require_POST
+def update_participant_display_name(request):
+    """
+    イベントページからの表示名編集（一般/幹事どちらも可、公開後/終了後も可）。
+
+    - メンバー紐付き（固定メンバー）: Member.display_name を更新し、当該メンバーの
+      全 EventParticipant に伝播する（設定ページの club_rename_member と同じ挙動＝クラブ全体反映）。
+    - ゲスト（member 無し）: 当該 EventParticipant.display_name のみ更新。
+    - EP が無い固定メンバー（未登録行）: member_id 指定で EP を作ってから更新。
+
+    ※ 出欠/コメント編集と異なり、名前の訂正はいつでも可能としたいので
+       _guard_participant_change（公開後/終了後の一般ユーザー制限）は適用しない。
+    """
+    event_id = (request.POST.get("event_id") or "").strip()
+    if not event_id:
+        return JsonResponse({"ok": False, "error": "missing_event_id"}, status=400)
+
+    event = get_object_or_404(Event, id=int(event_id))
+
+    new_name = (request.POST.get("display_name") or "").strip()
+    if not new_name:
+        return JsonResponse({"ok": False, "error": "empty_name"}, status=400)
+    if len(new_name) > 100:
+        return JsonResponse({"ok": False, "error": "name_too_long"}, status=400)
+
+    ep_id = (request.POST.get("ep_id") or "").strip()
+    member_id = (request.POST.get("member_id") or "").strip()
+
+    member = None
+    if ep_id:
+        ep = get_object_or_404(
+            EventParticipant.objects.select_related("member"), id=int(ep_id), event=event
+        )
+        member = ep.member
+    elif member_id:
+        member = get_object_or_404(Member, id=int(member_id), club=event.club)
+        ep = _get_or_create_ep(event, member, member.display_name)
+    else:
+        return JsonResponse({"ok": False, "error": "missing_target"}, status=400)
+
+    if member is not None:
+        # クラブ全体に反映（club_rename_member と同じ伝播）
+        member.display_name = new_name
+        member.save(update_fields=["display_name", "updated_at"])
+        EventParticipant.objects.filter(member=member).update(display_name=new_name)
+    else:
+        # ゲスト：このイベントの表示名のみ
+        ep.display_name = new_name
+        ep.save(update_fields=["display_name", "updated_at"])
+
+    return JsonResponse({
+        "ok": True,
+        "ep_id": ep.id,
+        "member_id": ep.member_id,
+        "display_name": new_name,
+    })
+
+
+@require_POST
 def set_participates_match(request):
     event_id = (request.POST.get("event_id") or "").strip()
 
