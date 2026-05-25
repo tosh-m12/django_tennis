@@ -515,9 +515,6 @@
         fd.append("checked", willOn ? "1" : "0");
         fd.append("flag_scope", (btn.dataset.flagScope || "club"));
 
-        const adminToken = participantsTable.dataset.adminToken;
-        if (adminToken) fd.append("admin_token", adminToken);
-
         try {
           const r = await fetch(urls.toggleFlag, {
             method: "POST",
@@ -570,9 +567,6 @@
           fd.append("flag_id", flagId);
           fd.append("value", v); // "" = クリア
           fd.append("flag_scope", (input.dataset.flagScope || "club"));
-
-          const adminToken = participantsTable.dataset.adminToken;
-          if (adminToken) fd.append("admin_token", adminToken);
 
           try {
             const r = await fetch(urls.setFlagValue, {

@@ -1640,22 +1640,26 @@ def set_participant_flag_value(request):
     flag_id = (request.POST.get("flag_id") or "").strip()
     value_raw = (request.POST.get("value") or "").strip()  # "" でクリア
 
+    # ★flag_scope（"club" or "event"）— toggle_participant_flag と同じ扱い。
+    #   固有フラグ(event)の digit 入力にも対応する。
+    flag_scope = (request.POST.get("flag_scope") or "club").strip().lower()
+    if flag_scope not in ("club", "event"):
+        flag_scope = "club"
+
     if not event_id or not flag_id:
         return JsonResponse({"ok": False, "error": "bad_request"}, status=400)
 
     event = get_object_or_404(Event, id=int(event_id))
-    flagdef = get_object_or_404(
-        ClubFlagDefinition, id=int(flag_id), club=event.club, is_active=True
-    )
 
-    # blocked = _guard_participant_change(request, event, require_admin_when_published=False)
-    # if blocked:
-    #     log.warning("set_flag_value blocked: path=%s ua=%s referer=%s cookies=%s",
-    #                 request.path,
-    #                 request.META.get("HTTP_USER_AGENT",""),
-    #                 request.META.get("HTTP_REFERER",""),
-    #                 list(request.COOKIES.keys()))
-    #     return blocked
+    # フラグ定義を scope で取得（club=ClubFlagDefinition / event=EventFlagDefinition）
+    if flag_scope == "event":
+        flagdef = get_object_or_404(
+            EventFlagDefinition, id=int(flag_id), event=event, is_active=True
+        )
+    else:
+        flagdef = get_object_or_404(
+            ClubFlagDefinition, id=int(flag_id), club=event.club, is_active=True
+        )
 
     ep_id = ((request.POST.get("ep_id") or "").strip()
              or (request.POST.get("participant_id") or "").strip())
@@ -1679,15 +1683,28 @@ def set_participant_flag_value(request):
         if next_val < 0 or next_val > 9:
             return JsonResponse({"ok": False, "error": "bad_value"}, status=400)
 
-    obj, _created = ParticipantFlag.objects.get_or_create(
-        event_participant=ep,
-        club_flag_definition=flagdef,
-    )
+    # ParticipantFlag を scope で get_or_create（CheckConstraint: 片側のみ非null）
+    if flag_scope == "event":
+        obj, _created = ParticipantFlag.objects.get_or_create(
+            event_participant=ep,
+            event_flag_definition=flagdef,
+            defaults={"club_flag_definition": None},
+        )
+        if obj.club_flag_definition_id is not None:
+            obj.club_flag_definition = None
+    else:
+        obj, _created = ParticipantFlag.objects.get_or_create(
+            event_participant=ep,
+            club_flag_definition=flagdef,
+            defaults={"event_flag_definition": None},
+        )
+        if obj.event_flag_definition_id is not None:
+            obj.event_flag_definition = None
 
     obj.value = next_val
     obj.is_on = (next_val is not None)  # 数字が入っていればON扱い
     try:
-        obj.save(update_fields=["value", "is_on", "updated_at"])
+        obj.save(update_fields=["value", "is_on", "club_flag_definition", "event_flag_definition", "updated_at"])
     except Exception:
         obj.save()
 
@@ -1695,6 +1712,7 @@ def set_participant_flag_value(request):
         "ok": True,
         "ep_id": ep.id,
         "flag_id": flagdef.id,
+        "flag_scope": flag_scope,
         "value": obj.value,                 # None or int
         "checked": bool(obj.is_on),         # 互換用
     })
