@@ -110,6 +110,62 @@ class SubstituteSlotTests(TestCase):
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(resp.json()["error"], "bad_request")
 
+    def test_swap_when_new_ep_already_in_another_match(self):
+        # new_ep が別コートの試合に居る場合は「入替」になる。
+        # 2コート構成を別途用意する。
+        ep6 = make_ep(self.event, display_name="P6", attendance="yes", participates_match=True)
+        ep7 = make_ep(self.event, display_name="P7", attendance="yes", participates_match=True)
+        ep8 = make_ep(self.event, display_name="P8", attendance="yes", participates_match=True)
+
+        schedule = [{
+            "round": 1,
+            "matches": [
+                {"court": 1, "team1": [self.ep1.id, self.ep2.id], "team2": [self.ep3.id, self.ep4.id]},
+                {"court": 2, "team1": [self.ep5.id, ep6.id], "team2": [ep7.id, ep8.id]},
+            ],
+            "rests": [],
+        }]
+        # 既存の公開対戦表を作り直す
+        self.ms.schedule_json = schedule
+        self.ms.court_count = 2
+        self.ms.save(update_fields=["schedule_json", "court_count"])
+        make_score(self.ms, 1, 2, 4, 1)  # コート2にもスコア
+
+        # コート1 team1 slot0(=ep1) に、コート2に居る ep5 を投入
+        resp = self._post(court_no=1, team=1, slot_index=0, new_ep_id=self.ep5.id)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["ok"])
+
+        self.ms.refresh_from_db()
+        matches = self.ms.schedule_json[0]["matches"]
+        # ep5 が コート1 team1[0] に入り、押し出された ep1 は ep5 が居た位置（コート2 team1[0]）へ
+        self.assertEqual(matches[0]["team1"][0], self.ep5.id)
+        self.assertEqual(matches[1]["team1"][0], self.ep1.id)
+        # rests は変化なし（ep5 は元々 rests に居ない）
+        self.assertEqual(self.ms.schedule_json[0]["rests"], [])
+
+        # スコアは対象コート(1)のみ削除、相手コート(2)は残る（現状挙動）
+        self.assertFalse(
+            MatchScore.objects.filter(match_schedule=self.ms, round_no=1, court_no=1).exists()
+        )
+        self.assertTrue(
+            MatchScore.objects.filter(match_schedule=self.ms, round_no=1, court_no=2).exists()
+        )
+
+    def test_substitute_player_not_in_round_appends_old_to_rests(self):
+        # new_ep がそのラウンドのどこにも居ない場合：押し出された old_ep が rests に追加される
+        ep9 = make_ep(self.event, display_name="P9(未スケジュール)", attendance="yes", participates_match=True)
+        resp = self._post(new_ep_id=ep9.id)
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["ok"])
+
+        self.ms.refresh_from_db()
+        rnd = self.ms.schedule_json[0]
+        self.assertEqual(rnd["matches"][0]["team1"][0], ep9.id)
+        # 元の ep1 が rests に追加され、元から居た ep5 も残る
+        self.assertIn(self.ep1.id, rnd["rests"])
+        self.assertIn(self.ep5.id, rnd["rests"])
+
     def test_same_player_is_noop(self):
         # 既に team1[0] に居る ep1 を指定 → 変化なし・published 維持
         resp = self._post(new_ep_id=self.ep1.id)
