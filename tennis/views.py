@@ -333,6 +333,26 @@ def _optional_admin_token_check(request, club: Club):
     return None
 
 
+def _require_club_admin_token(request, club):
+    """
+    幹事トークン認可（club系管理APIの統一実装）。
+
+    POST の admin_token が club.admin_token と一致しなければ
+    403 {"ok": False, "error": "forbidden", "message": ...} を返す。OKなら None。
+
+    ※ 旧実装はエンドポイントごとに status(400/403) や error 文字列がバラついていたが、
+       本ヘルパで 403 / "forbidden" に統一する（フロントは ok/error の有無で判定しており
+       認可エラー値での機能分岐は無いことを確認済み）。
+    """
+    admin_token = (request.POST.get("admin_token") or "").strip()
+    if not admin_token or admin_token != (club.admin_token or ""):
+        return JsonResponse(
+            {"ok": False, "error": "forbidden", "message": "幹事のみ操作できます。"},
+            status=403,
+        )
+    return None
+
+
 # ============================================================
 # Ranking（現行踏襲）
 # ============================================================
@@ -1042,10 +1062,10 @@ def club_add_flag(request):
     if not name or len(name) > 80:
         return JsonResponse({"error": "bad_name"}, status=400)
 
-    # 認可：admin_token チェック
-    admin_token = (request.POST.get("admin_token") or "").strip()
-    if not admin_token or admin_token != (club.admin_token or ""):
-        return JsonResponse({"error": "forbidden"}, status=403)
+    # 認可：admin_token チェック（統一ヘルパ）
+    blocked = _require_club_admin_token(request, club)
+    if blocked:
+        return blocked
 
     # input_mode（check / digit）
     input_mode = (request.POST.get("input_mode") or "check").strip()
@@ -1097,8 +1117,9 @@ def club_delete_flag(request):
         return JsonResponse({"error": "flag_id required"}, status=400)
 
     club = get_object_or_404(Club, id=int(club_id), is_active=True)
-    if club.admin_token != admin_token:
-        return JsonResponse({"error": "admin token mismatch"}, status=400)
+    blocked = _require_club_admin_token(request, club)
+    if blocked:
+        return blocked
 
     flag = get_object_or_404(
         ClubFlagDefinition,
@@ -1125,8 +1146,9 @@ def club_rename_flag(request):
         return JsonResponse({"error": "admin_token required"}, status=400)
 
     flag = get_object_or_404(ClubFlagDefinition, id=int(flag_id), is_active=True)
-    if (flag.club.admin_token or "").strip() != admin_token:
-        return JsonResponse({"error": "forbidden"}, status=403)
+    blocked = _require_club_admin_token(request, flag.club)
+    if blocked:
+        return blocked
 
     flag.name = name
     flag.save(update_fields=["name", "updated_at"])
@@ -1145,8 +1167,9 @@ def club_rename_club(request):
         return JsonResponse({"ok": False, "error": "name required"}, status=400)
 
     club = get_object_or_404(Club, id=int(club_id), is_active=True)
-    if club.admin_token != admin_token:
-        return JsonResponse({"ok": False, "error": "admin_token_mismatch"}, status=403)
+    blocked = _require_club_admin_token(request, club)
+    if blocked:
+        return blocked
 
     club.name = name
     club.save(update_fields=["name", "updated_at"])
@@ -1179,8 +1202,9 @@ def club_create_event(request):
     club = get_object_or_404(Club, id=club_id_i, is_active=True)
 
     # --- ★幹事認可（統一） ---
-    if not admin_token or admin_token != (club.admin_token or ""):
-        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+    blocked = _require_club_admin_token(request, club)
+    if blocked:
+        return blocked
 
     # --- date / time ---
     d = _parse_date_yyyy_mm_dd(date_str)
@@ -1252,8 +1276,9 @@ def club_cancel_event(request):
 
     # ★イベント→クラブのtokenで認可
     ev = get_object_or_404(Event.objects.select_related("club"), id=int(event_id))
-    if (ev.club.admin_token or "").strip() != admin_token:
-        return JsonResponse({"error": "forbidden"}, status=403)
+    blocked = _require_club_admin_token(request, ev.club)
+    if blocked:
+        return blocked
 
     ev.cancelled = not bool(ev.cancelled)
     ev.save(update_fields=["cancelled", "updated_at"])
@@ -1271,8 +1296,9 @@ def club_delete_event(request):
 
     # ★イベント→クラブのtokenで認可
     ev = get_object_or_404(Event.objects.select_related("club"), id=int(event_id))
-    if (ev.club.admin_token or "").strip() != admin_token:
-        return JsonResponse({"error": "forbidden"}, status=403)
+    blocked = _require_club_admin_token(request, ev.club)
+    if blocked:
+        return blocked
 
     ev.delete()
     return JsonResponse({"ok": True})
@@ -1541,8 +1567,9 @@ def club_set_flag_input_mode(request):
         return JsonResponse({"ok": False, "error": "bad_mode"}, status=400)
 
     club = get_object_or_404(Club, id=int(club_id), is_active=True)
-    if (club.admin_token or "").strip() != admin_token:
-        return JsonResponse({"ok": False, "error": "forbidden"}, status=403)
+    blocked = _require_club_admin_token(request, club)
+    if blocked:
+        return blocked
 
     club.flag_input_mode = mode
     club.save(update_fields=["flag_input_mode"])
@@ -2045,8 +2072,9 @@ def club_add_member(request):
         return JsonResponse({"error": "missing"}, status=400)
 
     club = get_object_or_404(Club, id=int(club_id), is_active=True)
-    if club.admin_token != admin_token:
-        return JsonResponse({"error": "admin_token_mismatch"}, status=403)
+    blocked = _require_club_admin_token(request, club)
+    if blocked:
+        return blocked
 
     if not name:
         return JsonResponse({"error": "empty_name"}, status=400)
@@ -2077,8 +2105,9 @@ def club_rename_member(request):
         return JsonResponse({"error": "missing"}, status=400)
 
     club = get_object_or_404(Club, id=int(club_id), is_active=True)
-    if club.admin_token != admin_token:
-        return JsonResponse({"error": "admin_token_mismatch"}, status=403)
+    blocked = _require_club_admin_token(request, club)
+    if blocked:
+        return blocked
 
     if not name:
         return JsonResponse({"error": "empty_name"}, status=400)
@@ -2101,8 +2130,9 @@ def club_toggle_member_fixed(request):
         return JsonResponse({"error": "missing"}, status=400)
 
     club = get_object_or_404(Club, id=int(club_id), is_active=True)
-    if club.admin_token != admin_token:
-        return JsonResponse({"error": "admin_token_mismatch"}, status=403)
+    blocked = _require_club_admin_token(request, club)
+    if blocked:
+        return blocked
 
     m = get_object_or_404(Member, id=int(member_id), club=club)
     m.is_fixed = checked
@@ -2336,8 +2366,9 @@ def club_add_class(request):
         return JsonResponse({"ok": False, "error": "missing_name"}, status=400)
 
     club = get_object_or_404(Club, id=int(club_id), is_active=True)
-    if club.admin_token != admin_token:
-        return JsonResponse({"ok": False, "error": "admin_token_mismatch"}, status=403)
+    blocked = _require_club_admin_token(request, club)
+    if blocked:
+        return blocked
 
     last = ClubMemberClass.objects.filter(club=club, is_active=True).order_by("-display_order", "-id").first()
     next_order = (last.display_order + 1) if last else 1
@@ -2359,8 +2390,9 @@ def club_rename_class(request):
         return JsonResponse({"ok": False, "error": "missing_name"}, status=400)
 
     club = get_object_or_404(Club, id=int(club_id), is_active=True)
-    if club.admin_token != admin_token:
-        return JsonResponse({"ok": False, "error": "admin_token_mismatch"}, status=403)
+    blocked = _require_club_admin_token(request, club)
+    if blocked:
+        return blocked
 
     c = get_object_or_404(ClubMemberClass, id=int(class_id), club=club)
     c.name = name
@@ -2378,8 +2410,9 @@ def club_delete_class(request):
         return JsonResponse({"ok": False, "error": "missing_params"}, status=400)
 
     club = get_object_or_404(Club, id=int(club_id), is_active=True)
-    if club.admin_token != admin_token:
-        return JsonResponse({"ok": False, "error": "admin_token_mismatch"}, status=403)
+    blocked = _require_club_admin_token(request, club)
+    if blocked:
+        return blocked
 
     c = get_object_or_404(ClubMemberClass, id=int(class_id), club=club)
     c.is_active = False
@@ -2411,8 +2444,9 @@ def club_set_member_class(request):
         return JsonResponse({"ok": False, "error": "bad_params"}, status=400)
 
     club = get_object_or_404(Club, id=club_id_i, is_active=True)
-    if (club.admin_token or "") != admin_token:
-        return JsonResponse({"ok": False, "error": "admin_token_mismatch"}, status=403)
+    blocked = _require_club_admin_token(request, club)
+    if blocked:
+        return blocked
 
     m = get_object_or_404(Member, id=member_id_i, club=club)
 
