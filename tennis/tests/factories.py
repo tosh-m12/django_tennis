@@ -8,11 +8,14 @@ from __future__ import annotations
 
 from tennis.models import (
     Club,
+    ClubFlagDefinition,
     Event,
+    EventFlagDefinition,
     EventParticipant,
     MatchSchedule,
     MatchScore,
     Member,
+    ParticipantFlag,
 )
 
 
@@ -75,6 +78,36 @@ def make_score(ms: MatchSchedule, round_no: int, court_no: int, a: int, b: int) 
         court_no=court_no,
         side_a_score=a,
         side_b_score=b,
+    )
+
+
+def make_club_flag(club: Club, name: str, display_order: int, *, input_mode: str = "check") -> ClubFlagDefinition:
+    return ClubFlagDefinition.objects.create(
+        club=club, name=name, display_order=display_order, input_mode=input_mode
+    )
+
+
+def make_event_flag(event: Event, name: str, display_order: int, *, input_mode: str = "check") -> EventFlagDefinition:
+    return EventFlagDefinition.objects.create(
+        event=event, name=name, display_order=display_order, input_mode=input_mode
+    )
+
+
+def make_participant_flag(
+    ep: EventParticipant,
+    *,
+    club_flag: ClubFlagDefinition | None = None,
+    event_flag: EventFlagDefinition | None = None,
+    is_on: bool = False,
+    value: int | None = None,
+) -> ParticipantFlag:
+    # CheckConstraint: club_flag / event_flag のどちらか一方のみ
+    return ParticipantFlag.objects.create(
+        event_participant=ep,
+        club_flag_definition=club_flag,
+        event_flag_definition=event_flag,
+        is_on=is_on,
+        value=value,
     )
 
 
