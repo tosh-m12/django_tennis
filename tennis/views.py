@@ -2115,6 +2115,69 @@ def club_toggle_member_fixed(request):
 # ============================================================
 
 
+def _find_target_round(sched, round_no):
+    """schedule_json(list) から round 番号一致の round dict を返す。無ければ None。"""
+    for r in sched:
+        if not isinstance(r, dict):
+            continue
+        try:
+            rr = int(r.get("round", -1))
+        except Exception:
+            continue
+        if rr == round_no:
+            return r
+    return None
+
+
+def _find_ep_in_matches(matches, ep_id):
+    """matches 内に ep_id が居れば ("match", match_idx, team_key, slot_idx) を返す。無ければ None。"""
+    for mi, mm in enumerate(matches):
+        if not isinstance(mm, dict):
+            continue
+        for tk in ("team1", "team2"):
+            lst = mm.get(tk) or []
+            if not isinstance(lst, list):
+                continue
+            for si, pid in enumerate(lst):
+                try:
+                    if int(pid) == ep_id:
+                        return ("match", mi, tk, si)
+                except Exception:
+                    continue
+    return None
+
+
+def _find_ep_in_rests(rests, ep_id):
+    """rests 内に ep_id が居れば ("rest", rest_idx) を返す。無ければ None。"""
+    for ri, pid in enumerate(rests):
+        try:
+            if int(pid) == ep_id:
+                return ("rest", ri)
+        except Exception:
+            continue
+    return None
+
+
+def _render_published_schedule_response(event, ms, request):
+    """公開済み対戦表のHTMLを描画し、ok レスポンスを返す（substitute_slot 共通の返却処理）。"""
+    score_map = _build_score_map(ms)
+    schedule_for_view = _merge_scores_into_schedule(ms.schedule_json, score_map)
+    ctx = {
+        "event": event,
+        "schedule": schedule_for_view,
+        "schedule_json": None,
+        "ep_name_map": _build_ep_name_map(event),
+        "show_controls": True,
+        "pill_game_type": ms.game_type or GameType.DOUBLES,
+        "pill_num_courts": int(ms.court_count or 1),
+        "pill_num_rounds": int(ms.round_count or 8),
+        "pill_match_count": int(EventParticipant.objects.filter(event=event, participates_match=True).count()),
+        "publish_state": "published",
+    }
+    schedule_html = render_to_string("tennis/_schedule_block.html", ctx, request=request)
+    return JsonResponse({"ok": True, "schedule_html": schedule_html, "publish_state": "published"})
+
+
 @require_POST
 def substitute_slot(request):
     event_id = request.POST.get("event_id")
@@ -2172,17 +2235,7 @@ def substitute_slot(request):
             return JsonResponse({"ok": False, "error": "bad_schedule"}, status=500)
 
         # --- 対象 round 取得 ---
-        target_round = None
-        for r in sched:
-            if not isinstance(r, dict):
-                continue
-            try:
-                rr = int(r.get("round", -1))
-            except Exception:
-                continue
-            if rr == round_no_i:
-                target_round = r
-                break
+        target_round = _find_target_round(sched, round_no_i)
         if not target_round:
             return JsonResponse({"ok": False, "error": "no_round"}, status=404)
 
@@ -2209,56 +2262,17 @@ def substitute_slot(request):
 
         # 同じなら何もしない（公開状態維持）
         if old_ep_id == new_ep_id_i:
-            score_map = _build_score_map(ms)
-            schedule_for_view = _merge_scores_into_schedule(ms.schedule_json, score_map)
-            ctx = {
-                "event": event,
-                "schedule": schedule_for_view,
-                "schedule_json": None,
-                "ep_name_map": _build_ep_name_map(event),
-                "show_controls": True,
-                "pill_game_type": ms.game_type or GameType.DOUBLES,
-                "pill_num_courts": int(ms.court_count or 1),
-                "pill_num_rounds": int(ms.round_count or 8),
-                "pill_match_count": int(EventParticipant.objects.filter(event=event, participates_match=True).count()),
-                "publish_state": "published",
-            }
-            schedule_html = render_to_string("tennis/_schedule_block.html", ctx, request=request)
-            return JsonResponse({"ok": True, "schedule_html": schedule_html, "publish_state": "published"})
+            return _render_published_schedule_response(event, ms, request)
 
-        # --- new_ep が他に居たら入替 ---
-        found_pos = None
-        for mi, mm in enumerate(matches):
-            if not isinstance(mm, dict):
-                continue
-            for tk in ("team1", "team2"):
-                lst = mm.get(tk) or []
-                if not isinstance(lst, list):
-                    continue
-                for si, pid in enumerate(lst):
-                    try:
-                        if int(pid) == new_ep_id_i:
-                            found_pos = ("match", mi, tk, si)
-                            break
-                    except Exception:
-                        continue
-                if found_pos:
-                    break
-            if found_pos:
-                break
+        # --- new_ep が他に居たら入替（matches を先に、無ければ rests を探す） ---
+        found_pos = _find_ep_in_matches(matches, new_ep_id_i)
 
         rests = target_round.get("rests") or []
         if not isinstance(rests, list):
             rests = []
 
         if not found_pos:
-            for ri, pid in enumerate(rests):
-                try:
-                    if int(pid) == new_ep_id_i:
-                        found_pos = ("rest", ri)
-                        break
-                except Exception:
-                    continue
+            found_pos = _find_ep_in_rests(rests, new_ep_id_i)
 
         if found_pos:
             if found_pos[0] == "match":
@@ -2303,23 +2317,7 @@ def substitute_slot(request):
     if not ms2:
         return JsonResponse({"ok": False, "error": "no_published_schedule"}, status=409)
 
-    score_map = _build_score_map(ms2)
-    schedule_for_view = _merge_scores_into_schedule(ms2.schedule_json, score_map)
-
-    ctx = {
-        "event": event,
-        "schedule": schedule_for_view,
-        "schedule_json": None,
-        "ep_name_map": _build_ep_name_map(event),
-        "show_controls": True,
-        "pill_game_type": ms2.game_type or GameType.DOUBLES,
-        "pill_num_courts": int(ms2.court_count or 1),
-        "pill_num_rounds": int(ms2.round_count or 8),
-        "pill_match_count": int(EventParticipant.objects.filter(event=event, participates_match=True).count()),
-        "publish_state": "published",
-    }
-    schedule_html = render_to_string("tennis/_schedule_block.html", ctx, request=request)
-    return JsonResponse({"ok": True, "schedule_html": schedule_html, "publish_state": "published"})
+    return _render_published_schedule_response(event, ms2, request)
 
 
 # ============================================================
