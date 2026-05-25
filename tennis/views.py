@@ -669,6 +669,156 @@ def club_home(request, club_public_token, club_admin_token=None):
 
 
 
+def _resolve_event_display_settings(event):
+    """
+    イベント表示設定を (display_settings: dict, source: str) で返す。
+    DB に EventDisplaySetting があれば as_dict()/"db"、無ければデフォルト/"default"。
+    """
+    default = {
+        "common_flags": True,
+        "event_flags": False,
+        "class": True,
+        "schedule": True,
+    }
+    try:
+        return event.display_setting.as_dict(), "db"  # OneToOne 想定
+    except EventDisplaySetting.DoesNotExist:
+        return default, "default"
+
+
+def _load_participant_flag_states(event, club, event_flags):
+    """
+    参加者フラグ状態（クラブ共通 / イベント固有）を1クエリで取得し、メモリ上で振り分ける。
+    取得集合は旧実装の「共通フラグクエリ ∪ 固有フラグクエリ」と一致：
+      - 共通: event内 かつ club_flag_definition__club=club
+      - 固有: event内 かつ event_flag_definition が当該イベントのアクティブフラグ
+    （CheckConstraint により1行は共通/固有のどちらか一方のみ → 振り分けは排他）
+
+    Returns: (flag_states_on, flag_states_val, event_flag_states_on, event_flag_states_val)
+      いずれも defaultdict(dict): {ep_id: {flag_def_id: 値}}
+    """
+    event_flag_ids = [f.id for f in event_flags]
+
+    pf_qs = (
+        ParticipantFlag.objects
+        .filter(event_participant__event=event)
+        .filter(
+            models.Q(club_flag_definition__club=club)
+            | models.Q(event_flag_definition_id__in=event_flag_ids)
+        )
+        .values(
+            "event_participant_id",
+            "club_flag_definition_id",
+            "event_flag_definition_id",
+            "is_on",
+            "value",
+        )
+    )
+
+    flag_states_on = defaultdict(dict)
+    flag_states_val = defaultdict(dict)
+    event_flag_states_on = defaultdict(dict)
+    event_flag_states_val = defaultdict(dict)
+
+    for pf in pf_qs:
+        ep_id = pf["event_participant_id"]
+        if pf["club_flag_definition_id"] is not None:
+            fd_id = pf["club_flag_definition_id"]
+            flag_states_on[ep_id][fd_id] = bool(pf["is_on"])
+            flag_states_val[ep_id][fd_id] = pf["value"]
+        elif pf["event_flag_definition_id"] is not None:
+            fd_id = pf["event_flag_definition_id"]
+            event_flag_states_on[ep_id][fd_id] = bool(pf["is_on"])
+            event_flag_states_val[ep_id][fd_id] = pf["value"]
+
+    return flag_states_on, flag_states_val, event_flag_states_on, event_flag_states_val
+
+
+def _build_fixed_rows(members, eps_by_member):
+    """
+    固定メンバーの参加者テーブル行を組み立てる。
+    EP が無い固定メンバー（未登録行）も行を作り、ep_id=None・出欠未設定で返す。
+    """
+    rows = []
+    for m in members:
+        ep = eps_by_member.get(m.id)
+
+        display_name = (
+            ep.member.display_name
+            if (ep and ep.member_id and ep.member)
+            else (ep.display_name if ep else (m.display_name or ""))
+        )
+
+        if ep:
+            mc = getattr(ep, "event_member_class", None)
+            class_name_compat = (ep.class_name or "")
+            attendance = ep.attendance
+            comment = ep.comment or ""
+            participates_match = bool(ep.participates_match)
+            ep_id = ep.id
+        else:
+            mc = getattr(m, "member_class", None)
+            class_name_compat = ""
+            attendance = None
+            comment = ""
+            participates_match = False
+            ep_id = None
+
+        rows.append({
+            "member_id": m.id,
+            "ep_id": ep_id,
+            "display_name": display_name,
+
+            "attendance": attendance,
+            "comment": comment,
+            "participates_match": participates_match,
+
+            "member_class_id": mc.id if mc else None,
+            "member_class_name": (mc.name or "") if mc else "",
+
+            # 旧互換
+            "class_name": class_name_compat,
+        })
+    return rows
+
+
+def _build_guest_rows(event, member_ids):
+    """固定メンバー以外（ゲスト/非固定メンバー）の参加者テーブル行を組み立てる。"""
+    guest_eps = (
+        EventParticipant.objects
+        .filter(event=event)
+        .exclude(member_id__in=member_ids)
+        .select_related("member", "event_member_class")
+        .order_by("id")
+    )
+
+    rows = []
+    for ep in guest_eps:
+        display_name = (
+            ep.member.display_name
+            if (ep.member_id and ep.member)
+            else (ep.display_name or "")
+        )
+        mc = getattr(ep, "event_member_class", None)
+
+        rows.append({
+            "ep_id": ep.id,
+            "member_id": ep.member_id,
+            "display_name": display_name,
+
+            "attendance": ep.attendance,
+            "comment": ep.comment or "",
+            "participates_match": bool(ep.participates_match),
+
+            "member_class_id": mc.id if mc else None,
+            "member_class_name": (mc.name or "") if mc else "",
+
+            # 旧互換
+            "class_name": ep.class_name or "",
+        })
+    return rows
+
+
 @ensure_csrf_cookie
 def event_view(request, club_public_token, event_id, club_admin_token=None):
     """
@@ -725,21 +875,7 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
     # 3) イベント表示設定（DB -> default）
     #    ※ JS が page-hooks の data-display-settings を読む
     # ============================================================
-    default_display_settings = {
-        "common_flags": True,
-        "event_flags": False,
-        "class": True,
-        "schedule": True,
-    }
-
-    try:
-        ds = event.display_setting  # OneToOne 想定
-        display_settings = ds.as_dict()
-        display_settings_source = "db"
-    except EventDisplaySetting.DoesNotExist:
-        display_settings = default_display_settings
-        display_settings_source = "default"
-
+    display_settings, display_settings_source = _resolve_event_display_settings(event)
     # テンプレに必ず JSON 文字列として渡す（escapejs 前提）
     display_settings_json = json.dumps(display_settings, ensure_ascii=False)
 
@@ -766,44 +902,12 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
     # ============================================================
     # 5) 参加者フラグ状態（クラブ共通 / イベント固有）
     # ============================================================
-    # クラブ共通フラグ／イベント固有フラグを1クエリで取得し、メモリ上で振り分ける。
-    # 取得集合は旧実装の「共通フラグクエリ ∪ 固有フラグクエリ」と一致する：
-    #   - 共通: event内 かつ club_flag_definition__club=club
-    #   - 固有: event内 かつ event_flag_definition が当該イベントのアクティブフラグ
-    # （CheckConstraint により1行は共通/固有のどちらか一方のみ → 振り分けは排他）
-    event_flag_ids = [f.id for f in event_flags]
-
-    pf_qs = (
-        ParticipantFlag.objects
-        .filter(event_participant__event=event)
-        .filter(
-            models.Q(club_flag_definition__club=club)
-            | models.Q(event_flag_definition_id__in=event_flag_ids)
-        )
-        .values(
-            "event_participant_id",
-            "club_flag_definition_id",
-            "event_flag_definition_id",
-            "is_on",
-            "value",
-        )
-    )
-
-    flag_states_on = defaultdict(dict)
-    flag_states_val = defaultdict(dict)
-    event_flag_states_on = defaultdict(dict)
-    event_flag_states_val = defaultdict(dict)
-
-    for pf in pf_qs:
-        ep_id = pf["event_participant_id"]
-        if pf["club_flag_definition_id"] is not None:
-            fd_id = pf["club_flag_definition_id"]
-            flag_states_on[ep_id][fd_id] = bool(pf["is_on"])
-            flag_states_val[ep_id][fd_id] = pf["value"]
-        elif pf["event_flag_definition_id"] is not None:
-            fd_id = pf["event_flag_definition_id"]
-            event_flag_states_on[ep_id][fd_id] = bool(pf["is_on"])
-            event_flag_states_val[ep_id][fd_id] = pf["value"]
+    (
+        flag_states_on,
+        flag_states_val,
+        event_flag_states_on,
+        event_flag_states_val,
+    ) = _load_participant_flag_states(event, club, event_flags)
 
     # ============================================================
     # 6) 対戦表（published）と Draft 破棄（踏襲）
@@ -812,84 +916,10 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
     MatchScheduleDraft.objects.filter(event=event).delete()
 
     # ============================================================
-    # 7) 固定行の組み立て
+    # 7) 固定行 / 8) ゲスト行の組み立て
     # ============================================================
-    fixed_rows = []
-    for m in members:
-        ep = eps_by_member.get(m.id)
-
-        display_name = (
-            ep.member.display_name
-            if (ep and ep.member_id and ep.member)
-            else (ep.display_name if ep else (m.display_name or ""))
-        )
-
-        if ep:
-            mc = getattr(ep, "event_member_class", None)
-            class_name_compat = (ep.class_name or "")
-            attendance = ep.attendance
-            comment = ep.comment or ""
-            participates_match = bool(ep.participates_match)
-            ep_id = ep.id
-        else:
-            mc = getattr(m, "member_class", None)
-            class_name_compat = ""
-            attendance = None
-            comment = ""
-            participates_match = False
-            ep_id = None
-
-        fixed_rows.append({
-            "member_id": m.id,
-            "ep_id": ep_id,
-            "display_name": display_name,
-
-            "attendance": attendance,
-            "comment": comment,
-            "participates_match": participates_match,
-
-            "member_class_id": mc.id if mc else None,
-            "member_class_name": (mc.name or "") if mc else "",
-
-            # 旧互換
-            "class_name": class_name_compat,
-        })
-
-    # ============================================================
-    # 8) ゲスト行（固定以外：非固定メンバー含む）
-    # ============================================================
-    guest_eps = (
-        EventParticipant.objects
-        .filter(event=event)
-        .exclude(member_id__in=member_ids)
-        .select_related("member", "event_member_class")
-        .order_by("id")
-    )
-
-    guest_rows = []
-    for ep in guest_eps:
-        display_name = (
-            ep.member.display_name
-            if (ep.member_id and ep.member)
-            else (ep.display_name or "")
-        )
-        mc = getattr(ep, "event_member_class", None)
-
-        guest_rows.append({
-            "ep_id": ep.id,
-            "member_id": ep.member_id,
-            "display_name": display_name,
-
-            "attendance": ep.attendance,
-            "comment": ep.comment or "",
-            "participates_match": bool(ep.participates_match),
-
-            "member_class_id": mc.id if mc else None,
-            "member_class_name": (mc.name or "") if mc else "",
-
-            # 旧互換
-            "class_name": ep.class_name or "",
-        })
+    fixed_rows = _build_fixed_rows(members, eps_by_member)
+    guest_rows = _build_guest_rows(event, member_ids)
 
     # ============================================================
     # 9) 代打候補（公開済み対戦表がある時だけ）
