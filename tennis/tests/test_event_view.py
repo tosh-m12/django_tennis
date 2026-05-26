@@ -113,6 +113,19 @@ class EventViewContextTests(TestCase):
         self.assertEqual([f.id for f in ctx["event_flags"]], [self.ef1.id])
 
     # ---- 参加者行 ----
+    def test_withdrawn_flag_for_deleted_member(self):
+        # 退会（メンバー削除）したEPは guest_rows に withdrawn=True で出る
+        m = make_member(self.club, "退会者", member_no=9, is_fixed=False)
+        ep = make_ep(self.event, member=m, attendance="yes")
+        m.delete()  # pre_delete シグナルで member_deleted=True、member_id=None
+
+        ctx = self._get_public().context
+        rows = {r["ep_id"]: r for r in ctx["guest_rows"]}
+        self.assertIn(ep.id, rows)
+        self.assertTrue(rows[ep.id]["withdrawn"])
+        # 通常ゲスト（未削除）は withdrawn=False
+        self.assertFalse(rows[self.guest.id]["withdrawn"])
+
     def test_fixed_and_guest_rows(self):
         ctx = self._get_public().context
         fixed = {r["member_id"]: r for r in ctx["fixed_rows"]}

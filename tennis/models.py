@@ -3,6 +3,8 @@ import uuid
 
 from django.db import models
 from django.db.models import Q
+from django.db.models.signals import pre_delete
+from django.dispatch import receiver
 from django.utils import timezone
 
 
@@ -171,6 +173,11 @@ class EventParticipant(models.Model):
     )
 
     class_name = models.CharField(max_length=40, blank=True, default="")
+
+    # 紐づく Member が削除（退会）された EP の印。
+    # member は SET_NULL で外れるため「退会者」か「元々ゲスト」かを区別できなくなる。
+    # それを判別し、過去イベントの参加表で退会者をグレーアウト表示するためのフラグ。
+    member_deleted = models.BooleanField(default=False)
 
     participates_match = models.BooleanField(default=False)  # 幹事のみ操作
     comment = models.TextField(blank=True)
@@ -549,4 +556,19 @@ class AuditLog(models.Model):
 
     def __str__(self) -> str:
         return f"{self.created_at} {self.actor_token_kind} {self.action}"
+
+
+# ============================================================
+# Signals
+# ============================================================
+
+@receiver(pre_delete, sender=Member)
+def _mark_event_participants_on_member_delete(sender, instance, **kwargs):
+    """
+    Member 削除時、その Member に紐づく EventParticipant に退会印を付ける。
+    - member は直後に SET_NULL で外れるため、削除“前”にここで印を残す。
+    - club_delete_member ビュー / Django admin / QuerySet.delete() のいずれの
+      削除経路でも pre_delete が発火するため、経路に依存せず印が付く。
+    """
+    EventParticipant.objects.filter(member=instance).update(member_deleted=True)
 

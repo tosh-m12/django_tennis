@@ -73,6 +73,13 @@
     cursor: pointer;
     text-decoration: underline;
 }
+
+/* 退会（メンバー削除）済み：過去イベントの参加表でグレーアウト */
+.tb-player-card-sm.is-withdrawn {
+    color: #aaa;
+    background: #f3f3f3;
+    border-color: #ddd;
+}
 .tb-player-card-sm.editable-name:hover {
     border-color: #1f7a8c;
     box-shadow: 0 0 0 2px rgba(31, 122, 140, 0.15);

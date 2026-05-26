@@ -796,6 +796,9 @@ def _build_fixed_rows(members, eps_by_member):
             "member_class_id": mc.id if mc else None,
             "member_class_name": (mc.name or "") if mc else "",
 
+            # 退会（メンバー削除）済みEPの印
+            "withdrawn": bool(ep.member_deleted) if ep else False,
+
             # 旧互換
             "class_name": class_name_compat,
         })
@@ -832,6 +835,9 @@ def _build_guest_rows(event, member_ids):
 
             "member_class_id": mc.id if mc else None,
             "member_class_name": (mc.name or "") if mc else "",
+
+            # 退会（メンバー削除）済みEPの印
+            "withdrawn": bool(ep.member_deleted),
 
             # 旧互換
             "class_name": ep.class_name or "",
