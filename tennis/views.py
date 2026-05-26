@@ -2216,6 +2216,37 @@ def club_toggle_member_fixed(request):
     return JsonResponse({"ok": True, "member_id": m.id, "is_fixed": m.is_fixed})
 
 
+@require_POST
+def club_delete_member(request):
+    """
+    メンバー削除（設定ページ・幹事のみ）。
+    - 非固定メンバー(is_fixed=False)のみ削除可。固定メンバーは拒否。
+    - EventParticipant.member は SET_NULL のため、当該メンバーの出欠/戦績
+      （EventParticipant 行・schedule_json 内の ep_id 参照・スコア）はそのまま残る。
+      削除されるのは Member 行のみ。
+    """
+    club_id = request.POST.get("club_id")
+    member_id = request.POST.get("member_id")
+
+    if not club_id or not member_id:
+        return JsonResponse({"ok": False, "error": "missing"}, status=400)
+
+    club = get_object_or_404(Club, id=int(club_id), is_active=True)
+    blocked = _require_club_admin_token(request, club)
+    if blocked:
+        return blocked
+
+    m = get_object_or_404(Member, id=int(member_id), club=club)
+
+    # 固定メンバーは削除不可（非固定のみ対象）
+    if m.is_fixed:
+        return JsonResponse({"ok": False, "error": "fixed_member"}, status=400)
+
+    deleted_id = m.id
+    m.delete()  # EP は SET_NULL で残る（履歴・戦績を保持）
+    return JsonResponse({"ok": True, "member_id": deleted_id})
+
+
 # ============================================================
 # Substitute (代打) : substitute_slot（仕様コメントは元のまま）
 # ============================================================

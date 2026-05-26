@@ -511,6 +511,11 @@
       </div>
 
       <div class="modal-actions">
+        {# 非固定メンバーのときだけ JS で表示（固定メンバーは保存のみ） #}
+        <button type="button"
+                id="member-delete-btn"
+                class="btn btn-pill member-delete-btn"
+                hidden>削除</button>
         <button type="submit" class="btn btn-pill btn-primary">保存</button>
       </div>
     </form>
