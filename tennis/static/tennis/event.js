@@ -453,40 +453,66 @@
     }
 
     // ============================================================
-    // [COMMON] フラグON/OFF（保存）
+    // [COMMON] フラグON/OFF（モーダルで確認してから保存）
+    //  - 誤操作防止のため、出欠と同様にモーダル経由にする
+    //  - 共通フラグ(club)とイベント固有フラグ(event)で別モーダル
+    //  - digit型(数字入力)は対象外（input で別途処理）
     // ============================================================
     if (urls.toggleFlag) {
-      participantsTable.addEventListener("click", async (e) => {
-        const btn = e.target.closest(".toggle-check");
-        if (!btn) return;
+      const flagModals = {
+        club: {
+          modal: document.getElementById("club-flag-toggle-modal"),
+          closeBtn: document.getElementById("close-club-flag-toggle-modal"),
+          title: document.getElementById("club-flag-toggle-modal-title"),
+        },
+        event: {
+          modal: document.getElementById("event-flag-toggle-modal"),
+          closeBtn: document.getElementById("close-event-flag-toggle-modal"),
+          title: document.getElementById("event-flag-toggle-modal-title"),
+        },
+      };
 
-        if (btn.closest("td")?.querySelector('[data-input-mode="digit"]')) {
+      let pending = null; // { btn, row, scope }
+
+      const closeModal = (m) => {
+        if (!m || !m.modal) return;
+        const active = document.activeElement;
+        if (active && m.modal.contains(active)) active.blur();
+        m.modal.classList.remove("is-open");
+        m.modal.setAttribute("aria-hidden", "true");
+      };
+      const closeAllFlagModals = () => {
+        Object.values(flagModals).forEach(closeModal);
+        pending = null;
+      };
+
+      async function applyFlag(willOn) {
+        if (!pending) return;
+        const { btn, row, scope } = pending;
+        const flagId = (btn.dataset.flagId || "").trim();
+        if (!flagId) {
+          closeAllFlagModals();
           return;
         }
 
-        const flagId = (btn.dataset.flagId || "").trim();
-        if (!flagId) return;
-
-        if ((btn.dataset.kind || "") === "match") return;
-
-        const row = getRowFromEl(btn);
-        const ids = getIdsFromEl(btn);
-
-        const willOn = !btn.classList.contains("is-on");
-        btn.classList.toggle("is-on", willOn);
-
+        // 楽観的UI更新（失敗時ロールバック）
+        const prevOn = btn.classList.contains("is-on");
         const icon = btn.querySelector(".check-icon");
+        btn.classList.toggle("is-on", willOn);
         if (icon) {
           icon.classList.toggle("check-on", willOn);
           icon.classList.toggle("check-off", !willOn);
         }
 
+        const ids = getIdsFromEl(btn);
         const fd = new FormData();
         fd.append("event_id", eventId);
         appendParticipant(fd, ids, row);
         fd.append("flag_id", flagId);
         fd.append("checked", willOn ? "1" : "0");
-        fd.append("flag_scope", (btn.dataset.flagScope || "club"));
+        fd.append("flag_scope", scope);
+
+        closeAllFlagModals();
 
         try {
           const r = await fetch(urls.toggleFlag, {
@@ -499,13 +525,52 @@
           if (!r.ok || !data.ok) throw new Error("not ok");
           if (data.ep_id) applyEpIdToRow(row, data.ep_id);
         } catch {
-          btn.classList.toggle("is-on", !willOn);
+          btn.classList.toggle("is-on", prevOn);
           if (icon) {
-            icon.classList.toggle("check-on", !willOn);
-            icon.classList.toggle("check-off", willOn);
+            icon.classList.toggle("check-on", prevOn);
+            icon.classList.toggle("check-off", !prevOn);
           }
           safeShowMessage("フラグ更新に失敗しました", 2600);
         }
+      }
+
+      // 各モーダルの選択/閉じるを配線
+      Object.values(flagModals).forEach((m) => {
+        if (!m.modal) return;
+        m.closeBtn?.addEventListener("click", () => closeModal(m));
+        m.modal.addEventListener("click", (ev) => {
+          if (ev.target === m.modal) closeModal(m);
+        });
+        qsa(".flag-choice", m.modal).forEach((choice) => {
+          choice.addEventListener("click", () => {
+            applyFlag((choice.dataset.flagState || "") === "on");
+          });
+        });
+      });
+      document.addEventListener("keydown", (ev) => {
+        if (ev.key !== "Escape") return;
+        Object.values(flagModals).forEach((m) => {
+          if (m.modal && m.modal.classList.contains("is-open")) closeModal(m);
+        });
+      });
+
+      // フラグセルのクリック → 対応するモーダルを開く
+      participantsTable.addEventListener("click", (e) => {
+        const btn = e.target.closest(".toggle-check");
+        if (!btn) return;
+        if ((btn.dataset.kind || "") === "match") return; // 試合参加は別ハンドラ
+        if (btn.closest("td")?.querySelector('[data-input-mode="digit"]')) return; // digitはinput
+        const flagId = (btn.dataset.flagId || "").trim();
+        if (!flagId) return;
+
+        const scope = (btn.dataset.flagScope || "club") === "event" ? "event" : "club";
+        const m = flagModals[scope];
+        if (!m || !m.modal) return;
+
+        pending = { btn, row: getRowFromEl(btn), scope };
+        if (m.title) m.title.textContent = (btn.dataset.flagName || "").trim() || "フラグを選択";
+        m.modal.classList.add("is-open");
+        m.modal.setAttribute("aria-hidden", "false");
       });
     }
 

@@ -219,6 +219,7 @@
                     <button type="button"
                             class="check-btn toggle-check {% if on %}is-on{% endif %}"
                             data-flag-scope="club"
+                            data-flag-name="{{ flag.name }}"
                             data-member-id="{{ row.member_id }}"
                             data-ep-id="{{ row.ep_id|default_if_none:'' }}"
                             data-flag-id="{{ flag.id }}">
@@ -255,6 +256,7 @@
                     <button type="button"
                             class="check-btn toggle-check {% if on %}is-on{% endif %}"
                             data-flag-scope="event"
+                            data-flag-name="{{ flag.name }}"
                             data-member-id="{{ row.member_id }}"
                             data-ep-id="{{ row.ep_id|default_if_none:'' }}"
                             data-flag-id="{{ flag.id }}">
@@ -361,6 +363,7 @@
                     <button type="button"
                             class="check-btn toggle-check {% if on %}is-on{% endif %}"
                             data-flag-scope="club"
+                            data-flag-name="{{ flag.name }}"
                             data-member-id="{{ row.member_id|default_if_none:'' }}"
                             data-ep-id="{{ row.ep_id }}"
                             data-flag-id="{{ flag.id }}">
@@ -397,6 +400,7 @@
                     <button type="button"
                             class="check-btn toggle-check {% if on %}is-on{% endif %}"
                             data-flag-scope="event"
+                            data-flag-name="{{ flag.name }}"
                             data-member-id="{{ row.member_id|default_if_none:'' }}"
                             data-ep-id="{{ row.ep_id }}"
                             data-flag-id="{{ flag.id }}">
