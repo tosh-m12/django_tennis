@@ -73,6 +73,7 @@ urlpatterns = [
     path("api/club/add_member/", views.club_add_member, name="club_add_member"),
     path("api/club/rename_member/", views.club_rename_member, name="club_rename_member"),
     path("api/club/toggle_member_fixed/", views.club_toggle_member_fixed, name="club_toggle_member_fixed"),
+    path("api/club/delete_member/", views.club_delete_member, name="club_delete_member"),
 
     # NOTE: 既存URL互換のため prefix を変更しない（現状維持）
     path(

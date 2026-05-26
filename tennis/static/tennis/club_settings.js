@@ -467,15 +467,32 @@ document.addEventListener("DOMContentLoaded", () => {
       const form = document.getElementById("member-rename-form");
       const input = document.getElementById("member-rename-input");
       const hiddenId = document.getElementById("member-rename-member-id");
+      const titleEl = document.getElementById("member-rename-modal-title");
+      const deleteBtn = document.getElementById("member-delete-btn");
+      const deleteUrl = hooks.dataset.deleteUrl;
 
       if (!table || !modal || !form || !input || !hiddenId) return;
 
       let currentNameEl = null;
+      let currentTr = null;
 
-      function openModal(memberId, currentName, nameEl) {
+      function openModal(memberId, currentName, nameEl, tr) {
         currentNameEl = nameEl || null;
+        currentTr = tr || null;
         hiddenId.value = memberId || "";
         input.value = currentName || "";
+
+        // 非固定メンバーのときだけ削除ボタンを表示し、タイトルを「変更・削除」にする。
+        // 固定状態はトグルのライブ状態（is-on）から判定する。
+        // ※ .btn-pill は display:inline-flex を持つため hidden 属性では隠れない。
+        //    style.display で制御する。
+        const isFixed = !!tr?.querySelector(".member-fixed-toggle")?.classList.contains("is-on");
+        const canDelete = !isFixed && !!deleteUrl;
+        if (deleteBtn) deleteBtn.style.display = canDelete ? "" : "none";
+        if (titleEl) {
+          titleEl.textContent = canDelete ? "メンバー名変更・削除" : "メンバー名変更";
+        }
+
         modal.classList.add("is-open");
         modal.setAttribute("aria-hidden", "false");
         setTimeout(() => input.focus(), 0);
@@ -486,6 +503,9 @@ document.addEventListener("DOMContentLoaded", () => {
         modal.setAttribute("aria-hidden", "true");
         hiddenId.value = "";
         currentNameEl = null;
+        currentTr = null;
+        if (deleteBtn) deleteBtn.style.display = "none";
+        if (titleEl) titleEl.textContent = "メンバー名変更";
       }
 
       closeBtn?.addEventListener("click", (e) => {
@@ -516,7 +536,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const cur = (nameEl.textContent || "").trim();
 
         if (!memberId) return;
-        openModal(memberId, cur, nameEl);
+        openModal(memberId, cur, nameEl, tr);
       });
 
       form.addEventListener("submit", async (e) => {
@@ -553,6 +573,41 @@ document.addEventListener("DOMContentLoaded", () => {
           UI.showMessage("変更に失敗しました（ネットワーク）。", 2600);
         }
       });
+
+      // 削除（非固定メンバーのみ・モーダル内の削除ボタン）
+      if (deleteBtn && deleteUrl) {
+        deleteBtn.addEventListener("click", () => {
+          const memberId = (hiddenId.value || "").trim();
+          if (!memberId) return;
+          const name = (input.value || "").trim();
+          const tr = currentTr;
+
+          // 確認モーダル(ui-confirm)は名前変更モーダルより手前に被るため、先に閉じる
+          closeModal();
+
+          UI.confirm(`「${name}」を削除しますか？　過去の出欠・戦績データは残ります。`, {
+            okText: "削除",
+            onOk: async () => {
+              const fd = new FormData();
+              fd.append("club_id", clubId);
+              fd.append("admin_token", adminToken);
+              fd.append("member_id", memberId);
+              try {
+                const data = await post(deleteUrl, fd);
+                if (!data.ok) {
+                  UI.showMessage("削除に失敗しました。", 2600);
+                  return;
+                }
+                if (tr) tr.remove();
+                UI.showMessage("メンバーを削除しました。", 1800);
+              } catch (err) {
+                console.error(err);
+                UI.showMessage("削除に失敗しました（ネットワーク）。", 2600);
+              }
+            },
+          });
+        });
+      }
     })();
 
     // fixed トグルのみ
