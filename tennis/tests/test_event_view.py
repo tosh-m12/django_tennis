@@ -126,6 +126,24 @@ class EventViewContextTests(TestCase):
         # 通常ゲスト（未削除）は withdrawn=False
         self.assertFalse(rows[self.guest.id]["withdrawn"])
 
+    def test_past_event_grays_all_guests(self):
+        # 過去イベント（開催日が今日より前）ではゲスト行を全てグレーアウト
+        past = make_event(self.club, date=timezone.localdate() - datetime.timedelta(days=1))
+        g = make_ep(past, display_name="一見さん", attendance="yes")
+        url = reverse("tennis:event_public", args=[self.club.public_token, past.id])
+        ctx = self.client.get(url).context
+
+        grows = {r["ep_id"]: r for r in ctx["guest_rows"]}
+        self.assertTrue(grows[g.id]["withdrawn"])  # 過去イベントのゲストはグレー
+        # 固定メンバー（現役）はグレーにしない
+        self.assertTrue(all(not r["withdrawn"] for r in ctx["fixed_rows"]))
+
+    def test_future_event_guest_not_grayed(self):
+        # 未来イベントの通常ゲストはグレーにしない（setUp の event は未来日）
+        ctx = self._get_public().context
+        grows = {r["ep_id"]: r for r in ctx["guest_rows"]}
+        self.assertFalse(grows[self.guest.id]["withdrawn"])
+
     def test_fixed_and_guest_rows(self):
         ctx = self._get_public().context
         fixed = {r["member_id"]: r for r in ctx["fixed_rows"]}
