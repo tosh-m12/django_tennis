@@ -71,6 +71,9 @@
 /* 名前タップで編集できる見た目（設定ページの .member-name に合わせて下線） */
 .tb-player-card-sm.editable-name {
     cursor: pointer;
+}
+/* 下線は名前部分だけ（* マークには付けない） */
+.tb-player-card-sm.editable-name .name-text {
     text-decoration: underline;
 }
 
