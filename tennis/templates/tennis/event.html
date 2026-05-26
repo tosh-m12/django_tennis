@@ -160,7 +160,7 @@
 
           <td class="participant-index"><span class="idx">{{ forloop.counter }}</span></td>
 
-          <td><div class="tb-player-card-sm editable-name{% if row.withdrawn %} is-withdrawn{% endif %}" role="button" tabindex="0" title="タップして名前を編集">{{ row.display_name }}</div></td>
+          <td><div class="tb-player-card-sm editable-name" role="button" tabindex="0" title="タップして名前を編集">{{ row.display_name }}</div>{% if row.withdrawn %}<span class="withdrawn-mark" title="退会者・過去のゲスト">*</span>{% endif %}</td>
 
           <td class="attendance-cell">
             <button type="button"
@@ -302,7 +302,7 @@
 
           <td class="participant-index"><span class="idx">{{ fixed_rows|length|add:forloop.counter }}</span></td>
 
-          <td><div class="tb-player-card-sm editable-name{% if row.withdrawn %} is-withdrawn{% endif %}" role="button" tabindex="0" title="タップして名前を編集">{{ row.display_name }}</div></td>
+          <td><div class="tb-player-card-sm editable-name" role="button" tabindex="0" title="タップして名前を編集">{{ row.display_name }}</div>{% if row.withdrawn %}<span class="withdrawn-mark" title="退会者・過去のゲスト">*</span>{% endif %}</td>
 
           <td class="attendance-cell">
             <button type="button"

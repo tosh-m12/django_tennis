@@ -74,11 +74,11 @@
     text-decoration: underline;
 }
 
-/* 退会（メンバー削除）済み：過去イベントの参加表でグレーアウト */
-.tb-player-card-sm.is-withdrawn {
-    color: #aaa;
-    background: #f3f3f3;
-    border-color: #ddd;
+/* 退会者・過去イベントのゲスト：名前の後ろに付けるアスタリスク */
+.withdrawn-mark {
+    margin-left: 3px;
+    color: #c0392b;
+    font-weight: 700;
 }
 .tb-player-card-sm.editable-name:hover {
     border-color: #1f7a8c;
