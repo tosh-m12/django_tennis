@@ -484,12 +484,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // 非固定メンバーのときだけ削除ボタンを表示し、タイトルを「変更・削除」にする。
         // 固定状態はトグルのライブ状態（is-on）から判定する。
+        // ※ .btn-pill は display:inline-flex を持つため hidden 属性では隠れない。
+        //    style.display で制御する。
         const isFixed = !!tr?.querySelector(".member-fixed-toggle")?.classList.contains("is-on");
-        if (deleteBtn) deleteBtn.hidden = isFixed || !deleteUrl;
+        const canDelete = !isFixed && !!deleteUrl;
+        if (deleteBtn) deleteBtn.style.display = canDelete ? "" : "none";
         if (titleEl) {
-          titleEl.textContent = (isFixed || !deleteUrl)
-            ? "メンバー名変更"
-            : "メンバー名変更・削除";
+          titleEl.textContent = canDelete ? "メンバー名変更・削除" : "メンバー名変更";
         }
 
         modal.classList.add("is-open");
@@ -503,7 +504,7 @@ document.addEventListener("DOMContentLoaded", () => {
         hiddenId.value = "";
         currentNameEl = null;
         currentTr = null;
-        if (deleteBtn) deleteBtn.hidden = true;
+        if (deleteBtn) deleteBtn.style.display = "none";
         if (titleEl) titleEl.textContent = "メンバー名変更";
       }
 

@@ -286,21 +286,30 @@
     box-shadow: none;
 }
 
-/* メンバー削除ボタン（黒赤）：保存ボタンの隣に置く */
+/* メンバー削除ボタン：黒背景・赤文字・赤縁（保存の緑と明確に区別） */
 .member-delete-btn {
     margin-right: 8px;
-    background: linear-gradient(135deg, #2b2b2b, #c0392b);
-    color: #fff;
+    background: #111;
+    color: #e02e2e;
+    border: 1px solid #e02e2e;
+    box-shadow: 0 3px 0 #7a1414;   /* btn-pill の緑影を上書き */
 }
 .member-delete-btn:hover:not(:disabled) {
-    background: linear-gradient(135deg, #3a3a3a, #e04b3a);
+    background: #1c1c1c;
+    color: #ff4d4d;
+    border-color: #ff4d4d;
+    box-shadow: 0 4px 0 #5e0f0f;
+    transform: translateY(-1px);
 }
 .member-delete-btn:active:not(:disabled) {
     transform: translateY(1px);
+    box-shadow: 0 2px 0 #5e0f0f;
 }
 .member-delete-btn:disabled {
     background: #ccc;
     color: #888;
+    border-color: #ccc;
+    box-shadow: none;
 }
 
 .flag-delete-btn {
