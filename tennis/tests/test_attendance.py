@@ -68,6 +68,33 @@ class UpdateAttendanceTests(TestCase):
         self.assertEqual(self.ep.attendance, "no")
         self.assertFalse(self.ep.participates_match)
 
+    def test_reselect_yes_preserves_manual_match_off(self):
+        # 出席のまま再度yesを選んでも、幹事が手動で外した試合参加(False)は維持される。
+        # フロントはこの応答値(participates_match)で表示を同期するため、ここが正の挙動。
+        self.ep.attendance = "yes"
+        self.ep.participates_match = False  # 幹事が手動で「不参加」にした想定
+        self.ep.save()
+
+        resp = self._post(attendance="yes")
+        self.assertEqual(resp.status_code, 200)
+        self.assertFalse(resp.json()["participates_match"])
+
+        self.ep.refresh_from_db()
+        self.assertEqual(self.ep.attendance, "yes")
+        self.assertFalse(self.ep.participates_match)
+
+    def test_reattend_after_absence_recouples_to_join(self):
+        # 欠席→再出席は「最初と同様に参加」へ連動する
+        self.ep.attendance = "no"
+        self.ep.participates_match = False
+        self.ep.save()
+
+        resp = self._post(attendance="yes")
+        self.assertEqual(resp.status_code, 200)
+        self.assertTrue(resp.json()["participates_match"])
+        self.ep.refresh_from_db()
+        self.assertTrue(self.ep.participates_match)
+
     def test_bad_attendance_returns_400(self):
         resp = self._post(attendance="invalid")
         self.assertEqual(resp.status_code, 400)
