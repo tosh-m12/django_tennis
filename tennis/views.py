@@ -796,14 +796,21 @@ def _build_fixed_rows(members, eps_by_member):
             "member_class_id": mc.id if mc else None,
             "member_class_name": (mc.name or "") if mc else "",
 
+            # 退会（メンバー削除）済みEPの印
+            "withdrawn": bool(ep.member_deleted) if ep else False,
+
             # 旧互換
             "class_name": class_name_compat,
         })
     return rows
 
 
-def _build_guest_rows(event, member_ids):
-    """固定メンバー以外（ゲスト/非固定メンバー）の参加者テーブル行を組み立てる。"""
+def _build_guest_rows(event, member_ids, is_past_event=False):
+    """
+    固定メンバー以外（ゲスト/非固定メンバー）の参加者テーブル行を組み立てる。
+    - 退会(member削除)済みEPは常にグレーアウト。
+    - 過去イベント(is_past_event)では、入会しなかったゲスト＝ゲスト行すべてをグレーアウト。
+    """
     guest_eps = (
         EventParticipant.objects
         .filter(event=event)
@@ -832,6 +839,9 @@ def _build_guest_rows(event, member_ids):
 
             "member_class_id": mc.id if mc else None,
             "member_class_name": (mc.name or "") if mc else "",
+
+            # グレーアウト対象：退会済み、または過去イベントのゲスト全員
+            "withdrawn": bool(ep.member_deleted) or is_past_event,
 
             # 旧互換
             "class_name": ep.class_name or "",
@@ -938,8 +948,9 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
     # ============================================================
     # 7) 固定行 / 8) ゲスト行の組み立て
     # ============================================================
+    is_past_event = bool(event.date and event.date < timezone.localdate())
     fixed_rows = _build_fixed_rows(members, eps_by_member)
-    guest_rows = _build_guest_rows(event, member_ids)
+    guest_rows = _build_guest_rows(event, member_ids, is_past_event=is_past_event)
 
     # ============================================================
     # 9) 代打候補（公開済み対戦表がある時だけ）

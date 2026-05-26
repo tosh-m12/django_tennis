@@ -890,7 +890,10 @@
           const epId = String(row.dataset.epId || "").trim();
           const memberId = String(row.dataset.memberId || "").trim();
           if (!epId && !memberId) return;
-          open(nameEl, row, epId, memberId, (nameEl.textContent || "").trim());
+          // 名前は .name-text 内（* マーク等を拾わないため）
+          const nameText = nameEl.querySelector(".name-text");
+          const cur = ((nameText ? nameText.textContent : nameEl.textContent) || "").trim();
+          open(nameEl, row, epId, memberId, cur);
         });
 
         closeBtn?.addEventListener("click", close);
@@ -930,7 +933,11 @@
             const data = await r.json().catch(() => ({}));
             if (!r.ok || !data.ok) throw new Error("not ok");
 
-            if (targetNameEl) targetNameEl.textContent = data.display_name || name;
+            if (targetNameEl) {
+              const nt = targetNameEl.querySelector(".name-text");
+              if (nt) nt.textContent = data.display_name || name;
+              else targetNameEl.textContent = data.display_name || name;
+            }
             if (targetRow && data.ep_id) applyEpIdToRow(targetRow, data.ep_id);
             close();
             safeShowMessage("名前を更新しました", 1600);

@@ -54,6 +54,25 @@ class ClubDeleteMemberTests(TestCase):
         self.assertEqual(ep.attendance, "yes")        # 出欠も残る
         self.assertTrue(EventParticipant.objects.filter(id=ep.id).exists())
 
+    def test_deleted_member_eps_marked_withdrawn(self):
+        # 削除すると、そのメンバーの EP に退会印(member_deleted)が付く
+        m = make_member(self.club, "退会太郎", is_fixed=False, member_no=5)
+        ep = make_ep(self.event, member=m, display_name="退会太郎", attendance="yes")
+        resp = self._post(m)
+        self.assertEqual(resp.status_code, 200)
+        ep.refresh_from_db()
+        self.assertTrue(ep.member_deleted)
+        self.assertIsNone(ep.member_id)
+
+    def test_signal_marks_on_direct_delete(self):
+        # ビュー以外（直接 delete / Django admin 相当）でも pre_delete で印が付く
+        m = make_member(self.club, "直接削除", is_fixed=False, member_no=6)
+        ep = make_ep(self.event, member=m, attendance="yes")
+        m.delete()
+        ep.refresh_from_db()
+        self.assertTrue(ep.member_deleted)
+        self.assertIsNone(ep.member_id)
+
     def test_fixed_member_cannot_be_deleted(self):
         m = make_member(self.club, "固定さん", is_fixed=True, member_no=3)
         resp = self._post(m)

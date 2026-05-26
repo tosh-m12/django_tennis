@@ -113,6 +113,37 @@ class EventViewContextTests(TestCase):
         self.assertEqual([f.id for f in ctx["event_flags"]], [self.ef1.id])
 
     # ---- 参加者行 ----
+    def test_withdrawn_flag_for_deleted_member(self):
+        # 退会（メンバー削除）したEPは guest_rows に withdrawn=True で出る
+        m = make_member(self.club, "退会者", member_no=9, is_fixed=False)
+        ep = make_ep(self.event, member=m, attendance="yes")
+        m.delete()  # pre_delete シグナルで member_deleted=True、member_id=None
+
+        ctx = self._get_public().context
+        rows = {r["ep_id"]: r for r in ctx["guest_rows"]}
+        self.assertIn(ep.id, rows)
+        self.assertTrue(rows[ep.id]["withdrawn"])
+        # 通常ゲスト（未削除）は withdrawn=False
+        self.assertFalse(rows[self.guest.id]["withdrawn"])
+
+    def test_past_event_grays_all_guests(self):
+        # 過去イベント（開催日が今日より前）ではゲスト行を全てグレーアウト
+        past = make_event(self.club, date=timezone.localdate() - datetime.timedelta(days=1))
+        g = make_ep(past, display_name="一見さん", attendance="yes")
+        url = reverse("tennis:event_public", args=[self.club.public_token, past.id])
+        ctx = self.client.get(url).context
+
+        grows = {r["ep_id"]: r for r in ctx["guest_rows"]}
+        self.assertTrue(grows[g.id]["withdrawn"])  # 過去イベントのゲストはグレー
+        # 固定メンバー（現役）はグレーにしない
+        self.assertTrue(all(not r["withdrawn"] for r in ctx["fixed_rows"]))
+
+    def test_future_event_guest_not_grayed(self):
+        # 未来イベントの通常ゲストはグレーにしない（setUp の event は未来日）
+        ctx = self._get_public().context
+        grows = {r["ep_id"]: r for r in ctx["guest_rows"]}
+        self.assertFalse(grows[self.guest.id]["withdrawn"])
+
     def test_fixed_and_guest_rows(self):
         ctx = self._get_public().context
         fixed = {r["member_id"]: r for r in ctx["fixed_rows"]}
