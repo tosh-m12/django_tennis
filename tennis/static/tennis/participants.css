@@ -80,7 +80,7 @@
 /* 退会者・過去イベントのゲスト：名前の後ろに付けるアスタリスク */
 .withdrawn-mark {
     margin-left: 3px;
-    color: #c0392b;
+    color: #000;
     font-weight: 700;
 }
 .tb-player-card-sm.editable-name:hover {
