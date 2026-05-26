@@ -650,13 +650,18 @@
 }
 
 /* =========================================
-   Attendance modal – 二重枠の完全排除（最終勝ち）
+   Attendance / Flag modal – 二重枠の完全排除（最終勝ち）
+   フラグ用モーダルも出欠モーダルと同じ見た目に揃える
    ========================================= */
-#attendance-modal .attendance-choice{
+#attendance-modal .attendance-choice,
+#club-flag-toggle-modal .attendance-choice,
+#event-flag-toggle-modal .attendance-choice{
   border: 1px solid #e5e7eb;   /* 外枠は残す */
 }
 
-#attendance-modal .attendance-choice .attendance-icon{
+#attendance-modal .attendance-choice .attendance-icon,
+#club-flag-toggle-modal .attendance-choice .attendance-icon,
+#event-flag-toggle-modal .attendance-choice .attendance-icon{
   border: none !important;
   background: transparent !important;
   box-shadow: none !important;

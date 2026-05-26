@@ -91,6 +91,59 @@
 </div>
 
 {% comment %}
+[3b] フラグ設定モーダル（event：共通フラグ用）— 出欠モーダルのデザインを継承
+- 誤操作防止のため、フラグもクリック直操作ではなくモーダルでON/OFFを選ぶ
+{% endcomment %}
+{% if event %}
+<div id="club-flag-toggle-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content event-modal modal-has-topbar"
+       role="dialog" aria-modal="true" aria-labelledby="club-flag-toggle-modal-title">
+    <div class="modal-topbar">
+      <div class="modal-topbar-title" id="club-flag-toggle-modal-title">フラグを選択</div>
+      <button type="button" class="modal-topbar-btn"
+              id="close-club-flag-toggle-modal" aria-label="閉じる">×</button>
+    </div>
+    <div class="modal-form" style="padding-top:14px;">
+      <div class="attendance-choice-row">
+        <button type="button" class="attendance-choice flag-choice" data-flag-state="on">
+          <span class="attendance-icon attendance-yes">✓</span>
+        </button>
+        <button type="button" class="attendance-choice flag-choice" data-flag-state="off">
+          <span class="attendance-icon attendance-no">×</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% comment %}
+[3c] フラグ設定モーダル（event：イベント固有フラグ用）— 共通フラグとは別モーダル
+{% endcomment %}
+{% if event %}
+<div id="event-flag-toggle-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content event-modal modal-has-topbar"
+       role="dialog" aria-modal="true" aria-labelledby="event-flag-toggle-modal-title">
+    <div class="modal-topbar">
+      <div class="modal-topbar-title" id="event-flag-toggle-modal-title">固有フラグを選択</div>
+      <button type="button" class="modal-topbar-btn"
+              id="close-event-flag-toggle-modal" aria-label="閉じる">×</button>
+    </div>
+    <div class="modal-form" style="padding-top:14px;">
+      <div class="attendance-choice-row">
+        <button type="button" class="attendance-choice flag-choice" data-flag-state="on">
+          <span class="attendance-icon attendance-yes">✓</span>
+        </button>
+        <button type="button" class="attendance-choice flag-choice" data-flag-state="off">
+          <span class="attendance-icon attendance-no">×</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% comment %}
 [4] 参加登録モーダル（eventのみ）
 - event.js が open/close/submit
 {% endcomment %}
