@@ -336,46 +336,19 @@
       btn.classList.toggle("is-hidden", !visible);
     }
 
-    async function setParticipatesMatchForRow(row, checked) {
-      if (!row || !urls.setParticipatesMatch) return false;
-
+    // 試合参加チェックの「見た目」だけ更新する（POSTはしない）。
+    // 出欠変更時は update_attendance が試合参加も確定・返却するため、
+    // ここでは応答値に合わせて表示を同期するだけにする（二重POST防止）。
+    function setMatchToggleUI(row, on) {
+      if (!row) return;
       const btn = row.querySelector('.toggle-check[data-kind="match"]');
-      if (!btn) return false;
-
-      const isOn = btn.classList.contains("is-on");
-      if ((checked && isOn) || (!checked && !isOn)) return true;
-
-      btn.classList.toggle("is-on", checked);
+      if (!btn) return;
+      const isOn = !!on;
+      btn.classList.toggle("is-on", isOn);
       const icon = btn.querySelector(".check-icon");
       if (icon) {
-        icon.classList.toggle("check-on", checked);
-        icon.classList.toggle("check-off", !checked);
-      }
-
-      const ids = getIdsFromEl(btn);
-      const fd = new FormData();
-      fd.append("event_id", eventId);
-      appendParticipant(fd, ids, row);
-      fd.append("checked", checked ? "1" : "0");
-
-      try {
-        const r = await fetch(urls.setParticipatesMatch, {
-          method: "POST",
-          credentials: "include",
-          headers: { "X-CSRFToken": csrftoken },
-          body: fd,
-        });
-        const data = await r.json().catch(() => ({}));
-        if (!r.ok || !data.ok) throw new Error("not ok");
-        if (data.ep_id) applyEpIdToRow(row, data.ep_id);
-        return true;
-      } catch (e) {
-        btn.classList.toggle("is-on", !checked);
-        if (icon) {
-          icon.classList.toggle("check-on", !checked);
-          icon.classList.toggle("check-off", checked);
-        }
-        return false;
+        icon.classList.toggle("check-on", isOn);
+        icon.classList.toggle("check-off", !isOn);
       }
     }
 
@@ -771,10 +744,10 @@
                 const willShowMatch = attendance === "yes";
                 setMatchVisible(row, willShowMatch);
 
-                const ok = await setParticipatesMatchForRow(row, willShowMatch);
-                if (!ok) {
-                  safeShowMessage("試合参加の更新に失敗しました（再試行してください）", 2600);
-                }
+                // update_attendance が試合参加も確定・返却済み。
+                // 2回目のPOSTはせず、応答値で見た目だけ同期する。
+                // （出席のまま再選択しても、手動で外した不参加が維持される）
+                setMatchToggleUI(row, !!data.participates_match);
 
                 markChangedIfPublishedExists();
                 updateSettingsPillsLive();
