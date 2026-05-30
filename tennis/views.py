@@ -292,6 +292,87 @@ def _merge_scores_into_schedule(schedule_json, score_map):
     return out
 
 
+def _build_player_stats(schedule_json, ep_name_map):
+    """
+    対戦表(schedule_json)から各参加者の試合数・休憩数・最大連続記録を集計。
+    幹事モードでイベントページ下部に出すサマリー用。
+
+    Returns: List[Dict]
+      [{"name": str, "matches": int, "rests": int,
+        "max_play_streak": int, "max_rest_streak": int}, ...]
+      初登場順で並べる（schedule_json 順）
+    """
+    if not schedule_json:
+        return []
+
+    def _coerce(p):
+        try:
+            return int(p)
+        except Exception:
+            return p  # 旧互換：名前文字列
+
+    # 1) 登場順に参加者を集める（dict は挿入順）
+    order = {}
+    for r in schedule_json:
+        for m in (r.get("matches") or []):
+            for p in (m.get("team1") or []) + (m.get("team2") or []):
+                pid = _coerce(p)
+                if pid not in order:
+                    order[pid] = None
+        for p in (r.get("rests") or []):
+            pid = _coerce(p)
+            if pid not in order:
+                order[pid] = None
+
+    # 2) 各ラウンドで「試合中」「休憩」を判定して集計
+    stats = []
+    for pid in order.keys():
+        matches = 0
+        rests = 0
+        max_play = 0
+        max_rest = 0
+        cur_play = 0
+        cur_rest = 0
+
+        for r in schedule_json:
+            in_match = False
+            for m in (r.get("matches") or []):
+                team = [_coerce(x) for x in ((m.get("team1") or []) + (m.get("team2") or []))]
+                if pid in team:
+                    in_match = True
+                    break
+
+            if in_match:
+                matches += 1
+                cur_play += 1
+                cur_rest = 0
+                if cur_play > max_play:
+                    max_play = cur_play
+            else:
+                rest_ids = [_coerce(x) for x in (r.get("rests") or [])]
+                if pid in rest_ids:
+                    rests += 1
+                    cur_rest += 1
+                    cur_play = 0
+                    if cur_rest > max_rest:
+                        max_rest = cur_rest
+                # どちらにもいないラウンドは streak リセットだけ
+                else:
+                    cur_play = 0
+                    cur_rest = 0
+
+        name = ep_name_map.get(pid, ep_name_map.get(str(pid), str(pid)))
+        stats.append({
+            "name": name,
+            "matches": matches,
+            "rests": rests,
+            "max_play_streak": max_play,
+            "max_rest_streak": max_rest,
+        })
+
+    return stats
+
+
 # ============================================================
 # publish_state
 # ============================================================
@@ -1544,6 +1625,11 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         score_map = _build_score_map(ms)
         schedule_for_view = _merge_scores_into_schedule(ms.schedule_json, score_map)
         schedule_json_for_publish = None
+        # 幹事モードのみ：試合数・休憩回数サマリーを集計
+        if is_admin:
+            stats = _build_player_stats(ms.schedule_json, _build_ep_name_map(event))
+        else:
+            stats = None
     else:
         game_type = GameType.DOUBLES
         num_rounds = 8
@@ -1556,6 +1642,7 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         publish_state = "no_schedule"
         schedule_for_view = []
         schedule_json_for_publish = None
+        stats = None
 
     # ============================================================
     # 11) context（JSが読む値は必ず入れる）
@@ -1605,6 +1692,7 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         "pill_match_count": match_count,
 
         "ep_name_map": _build_ep_name_map(event),
+        "stats": stats,
         "sub_candidates": sub_candidates,
         "show_topbar": True,
         "cleanup_warnings": _run_member_auto_cleanup(club) if is_admin else [],
@@ -2446,12 +2534,13 @@ def ajax_generate_schedule(request, event_id):
         defaults={"draft_json": schedule, "params_json": params_json},
     )
 
+    ep_name_map = _build_ep_name_map(event)
     ctx = {
         "event": event,
         "schedule": schedule,
         "schedule_json": schedule,  # publish用（json_script化）
-        "stats": None,
-        "ep_name_map": _build_ep_name_map(event),
+        "stats": _build_player_stats(schedule, ep_name_map),
+        "ep_name_map": ep_name_map,
 
         "show_controls": True,
         "pill_game_type": game_type,
