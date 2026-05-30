@@ -80,9 +80,15 @@
 }
 .period-filter {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: wrap;             /* ※リセットリンクが出る時のみ2行目に回す */
     align-items: flex-end;
-    gap: 10px;
+    gap: 8px;
+}
+/* 開始日/終了日/適用ボタン は常に1行で揃える */
+.period-filter > label,
+.period-filter > button[type="submit"] {
+    flex: 0 1 auto;
+    min-width: 0;
 }
 .period-filter label {
     display: flex;
@@ -91,20 +97,29 @@
     color: #555;
 }
 .period-filter input[type="date"] {
+    width: 100%;                 /* ラベル幅いっぱい */
+    min-width: 0;                /* スマホで縮められるように */
     padding: 6px 8px;
     border: 1px solid #ccc;
     border-radius: 6px;
     font-size: 1rem;
     box-sizing: border-box;
 }
+.period-filter > button[type="submit"] {
+    align-self: flex-end;
+    flex-shrink: 0;
+}
+/* 全期間に戻す は次の行に流して、適用ボタンを期間ボックス右に保つ */
 .period-filter .period-reset {
+    flex: 1 0 100%;
     color: #1f7a8c;
     font-size: 0.9rem;
     text-decoration: underline;
     background: none;
     border: none;
     cursor: pointer;
-    padding: 6px 0;
+    padding: 6px 0 0;
+    text-align: left;
 }
 
 /* 戦績集計 */
