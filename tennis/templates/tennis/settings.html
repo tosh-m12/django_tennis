@@ -91,11 +91,12 @@
         <tr data-member-id="{{ m.id }}" data-member-no="{{ m.member_no }}">
           <td>{{ m.member_no }}</td>
           <td>
-            <span class="member-name"
-                  style="cursor:pointer; text-decoration:underline; font-weight:700;"
-                  title="クリックして変更">
+            <a class="member-name"
+               href="{% url 'tennis:member_detail_admin' club.public_token club.admin_token m.id %}"
+               style="text-decoration:underline; font-weight:700; color:inherit;"
+               title="個人ページを開く">
               {{ m.display_name }}
-            </span>
+            </a>
           </td>
           <td>
             <button type="button"

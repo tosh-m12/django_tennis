@@ -180,43 +180,7 @@
 </div>
 {% endif %}
 
-{% comment %}
-[4b] 名前編集モーダル（event：一般/幹事どちらも・名前タップで開く）
-{% endcomment %}
-{% if event %}
-<div id="event-name-edit-modal" class="modal-backdrop" aria-hidden="true">
-  <div class="modal-content event-modal modal-has-topbar"
-       role="dialog" aria-modal="true" aria-labelledby="event-name-edit-modal-title">
-
-    <div class="modal-topbar">
-      <div class="modal-topbar-title" id="event-name-edit-modal-title">メンバー名変更</div>
-      <button type="button"
-              id="close-event-name-edit-modal"
-              class="modal-topbar-btn"
-              aria-label="閉じる">×</button>
-    </div>
-
-    <form class="modal-form" id="event-name-edit-form">
-      {% csrf_token %}
-      <input type="hidden" id="event-name-edit-ep-id" value="">
-      <input type="hidden" id="event-name-edit-member-id" value="">
-
-      <div class="field-group">
-        <label for="event-name-edit-input">メンバー名</label>
-        <input type="text"
-               id="event-name-edit-input"
-               class="event-title-input"
-               maxlength="100"
-               autocomplete="off">
-      </div>
-
-      <div class="modal-actions">
-        <button type="submit" class="btn btn-pill btn-primary">保存</button>
-      </div>
-    </form>
-  </div>
-</div>
-{% endif %}
+{# 名前編集モーダルは廃止：event ページの名前タップは個人ページ(member_detail)へ遷移する #}
 
 {% comment %}
 [5] 対戦表条件モーダル（event + adminのみ）
@@ -537,44 +501,7 @@
 </div>
 {% endif %}
 
-{% if club and is_admin %}
-<div id="member-rename-modal" class="modal-backdrop" aria-hidden="true">
-  <div class="modal-content event-modal modal-has-topbar"
-       role="dialog" aria-modal="true" aria-labelledby="member-rename-modal-title">
-
-    <div class="modal-topbar">
-      <div class="modal-topbar-title" id="member-rename-modal-title">メンバー名変更</div>
-      <button type="button"
-              id="close-member-rename-modal"
-              class="modal-topbar-btn"
-              aria-label="閉じる">×</button>
-    </div>
-
-    <form class="modal-form" id="member-rename-form">
-      {% csrf_token %}
-      <input type="hidden" id="member-rename-member-id" value="">
-
-      <div class="field-group">
-        <label for="member-rename-input">メンバー名</label>
-        <input type="text"
-               id="member-rename-input"
-               class="event-title-input"
-               maxlength="80"
-               autocomplete="off">
-      </div>
-
-      <div class="modal-actions">
-        {# 非固定メンバーのときだけ JS で表示（固定メンバーは保存のみ） #}
-        <button type="button"
-                id="member-delete-btn"
-                class="btn btn-pill member-delete-btn"
-                style="display:none;">削除</button>
-        <button type="submit" class="btn btn-pill btn-primary">保存</button>
-      </div>
-    </form>
-  </div>
-</div>
-{% endif %}
+{# member-rename-modal は廃止：設定ページの名前タップは個人ページ(member_detail)へ遷移する #}
 
 
 <div id="substitute-modal" class="modal-backdrop" aria-hidden="true">

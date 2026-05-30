@@ -1,0 +1,150 @@
+/* tennis/static/tennis/member_detail.css
+   メンバー個人ページ
+*/
+
+.member-page {
+    padding: 16px 12px 40px;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.member-header {
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 14px;
+}
+.member-back {
+    color: #1f7a8c;
+    font-size: 0.95rem;
+    text-decoration: none;
+}
+.member-back:hover { text-decoration: underline; }
+.member-name {
+    font-size: 1.6rem;
+    margin: 0;
+}
+
+.member-section-title {
+    font-size: 1.1rem;
+    border-left: 4px solid #1f7a8c;
+    padding-left: 8px;
+    margin: 18px 0 10px;
+}
+
+/* 名前編集 */
+.member-edit {
+    background: #f7f7f7;
+    padding: 14px 16px;
+    border-radius: 8px;
+    margin-bottom: 18px;
+}
+.member-form label {
+    display: block;
+    font-size: 0.85rem;
+    color: #555;
+    margin-bottom: 6px;
+}
+.member-form input[type="text"] {
+    width: 100%;
+    max-width: 360px;
+    padding: 8px 10px;
+    font-size: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    margin-bottom: 10px;
+}
+.member-edit-actions {
+    display: flex;
+    gap: 10px;
+}
+/* 削除ボタン（黒赤、既存設定モーダルと同じ印象） */
+.member-delete-btn {
+    background: #111;
+    color: #e02e2e;
+    border: 1px solid #e02e2e;
+    box-shadow: 0 3px 0 #7a1414;
+}
+.member-delete-btn:hover:not(:disabled) {
+    background: #1c1c1c;
+    color: #ff4d4d;
+    border-color: #ff4d4d;
+    box-shadow: 0 4px 0 #5e0f0f;
+    transform: translateY(-1px);
+}
+.member-delete-btn:active:not(:disabled) {
+    transform: translateY(1px);
+    box-shadow: 0 2px 0 #5e0f0f;
+}
+
+/* 戦績集計 */
+.member-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 14px;
+    margin-bottom: 14px;
+}
+.stats-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 12px 16px;
+}
+.stats-card h3 {
+    margin: 0 0 8px;
+    font-size: 1rem;
+    color: #1f7a8c;
+}
+.stats-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.92rem;
+}
+.stats-table th,
+.stats-table td {
+    padding: 4px 6px;
+    text-align: left;
+}
+.stats-table th {
+    color: #666;
+    font-weight: normal;
+    width: 5em;
+}
+.stats-table td {
+    text-align: right;
+    font-weight: 600;
+}
+.stats-empty {
+    color: #888;
+    font-size: 0.9rem;
+}
+
+/* 試合履歴 */
+.history-wrap {
+    overflow-x: auto;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    background: #fff;
+}
+.history-table {
+    width: max-content;
+    min-width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    font-size: 0.9rem;
+}
+.history-table th,
+.history-table td {
+    border-right: 1px solid #e5e7eb;
+    border-bottom: 1px solid #e5e7eb;
+    padding: 6px 10px;
+    white-space: nowrap;
+}
+.history-table thead th {
+    background: #f0f4f6;
+    text-align: left;
+    font-weight: 600;
+}
+.history-row.history-勝 td:last-child { color: #1f7a8c; font-weight: 700; }
+.history-row.history-負 td:last-child { color: #c0392b; font-weight: 700; }
+.history-row.history-分 td:last-child { color: #888; font-weight: 700; }

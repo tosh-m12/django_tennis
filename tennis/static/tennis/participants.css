@@ -68,13 +68,15 @@
     white-space: nowrap;
 }
 
-/* 名前タップで編集できる見た目（設定ページの .member-name に合わせて下線） */
-.tb-player-card-sm.editable-name {
+/* 名前部分（個人ページへのリンク）：下線・色は親に合わせる */
+.tb-player-card-sm a.name-link,
+.tb-player-card-sm a.name-link:visited {
+    color: inherit;
+    text-decoration: underline;
     cursor: pointer;
 }
-/* 下線は名前部分だけ（* マークには付けない） */
-.tb-player-card-sm.editable-name .name-text {
-    text-decoration: underline;
+.tb-player-card-sm a.name-link:hover {
+    color: #1f7a8c;
 }
 
 /* 退会者・過去イベントのゲスト：名前の後ろに付けるアスタリスク */
@@ -83,11 +85,8 @@
     color: #000;
     font-weight: 700;
 }
-.tb-player-card-sm.editable-name:hover {
-    border-color: #1f7a8c;
-    box-shadow: 0 0 0 2px rgba(31, 122, 140, 0.15);
-}
-.tb-player-card-sm.editable-name:focus-visible {
+/* 名前カード自体のホバー枠（リンク化に伴う視覚補助） */
+.tb-player-card-sm:focus-within {
     outline: 2px solid #1f7a8c;
     outline-offset: 1px;
 }
