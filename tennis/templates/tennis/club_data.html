@@ -26,12 +26,17 @@
 
   {% if not events %}
     <p class="data-empty">この期間にはイベントがありません。</p>
-  {% endif %}
+  {% else %}
 
-  {# 1. 出欠表 #}
-  <section class="data-section">
-    <h2 class="data-section-title">出欠</h2>
-    {% if events %}
+    {# タブナビ #}
+    <div class="data-tabs" role="tablist">
+      <button type="button" class="data-tab is-active" data-tab="attendance" role="tab">出欠</button>
+      <button type="button" class="data-tab" data-tab="club-flags" role="tab">共通フラグ</button>
+      <button type="button" class="data-tab" data-tab="event-flags" role="tab">固有フラグ</button>
+    </div>
+
+    {# パネル1: 出欠（ドロップダウン無し・表は1つだけ） #}
+    <section class="data-tab-panel" data-panel="attendance" role="tabpanel">
       <div class="data-matrix-wrap">
         <table class="data-matrix-table">
           <thead>
@@ -59,86 +64,98 @@
           </tbody>
         </table>
       </div>
-    {% endif %}
-  </section>
+    </section>
 
-  {# 2. 共通フラグ表（フラグごと） #}
-  <section class="data-section">
-    <h2 class="data-section-title">共通フラグ</h2>
-    {% if not club_flag_tables %}
-      <p class="data-empty">該当する共通フラグはありません。</p>
-    {% endif %}
-    {% for t in club_flag_tables %}
-      <div class="data-subblock">
-        <h3 class="data-sub-title">
-          {{ t.flag.name }}
-          <span class="data-meta">[{{ t.flag.input_mode }}]</span>
-          {% if not t.is_active %}<span class="data-meta data-meta-inactive">（削除済み・履歴）</span>{% endif %}
-        </h3>
-        {% if events %}
-          <div class="data-matrix-wrap">
-            <table class="data-matrix-table">
-              <thead>
-                <tr>
-                  <th class="name-col">メンバー</th>
-                  {% for ev in events %}
-                    <th>{{ ev.date|date:'n/j' }}</th>
-                  {% endfor %}
-                </tr>
-              </thead>
-              <tbody>
-                {% for r in t.rows %}
+    {# パネル2: 共通フラグ（ドロップダウンでフラグ選択） #}
+    <section class="data-tab-panel" data-panel="club-flags" role="tabpanel" hidden>
+      {% if club_flag_tables %}
+        <div class="data-dropdown">
+          <label>フラグ：
+            <select id="club-flag-select">
+              {% for t in club_flag_tables %}
+                <option value="{{ t.flag.id }}">{{ t.flag.name }}{% if not t.is_active %}（削除済み・履歴）{% endif %}（{{ t.flag.input_mode }}）</option>
+              {% endfor %}
+            </select>
+          </label>
+        </div>
+        {% for t in club_flag_tables %}
+          <div class="club-flag-table" data-flag-id="{{ t.flag.id }}" {% if not forloop.first %}hidden{% endif %}>
+            <div class="data-matrix-wrap">
+              <table class="data-matrix-table">
+                <thead>
                   <tr>
-                    <td class="name-col">{{ r.row.display_name }}{% if r.row.withdrawn %}<span class="withdrawn-mark">*</span>{% endif %}</td>
-                    {% for cell in r.cells %}
-                      <td>{{ cell.text }}</td>
+                    <th class="name-col">メンバー</th>
+                    {% for ev in events %}
+                      <th>{{ ev.date|date:'n/j' }}</th>
                     {% endfor %}
                   </tr>
-                {% endfor %}
-              </tbody>
-            </table>
-          </div>
-        {% endif %}
-      </div>
-    {% endfor %}
-  </section>
-
-  {# 3. 固有フラグ表（イベントごと） #}
-  <section class="data-section">
-    <h2 class="data-section-title">固有フラグ</h2>
-    {% if not event_flag_blocks %}
-      <p class="data-empty">該当する固有フラグはありません。</p>
-    {% endif %}
-    {% for b in event_flag_blocks %}
-      <div class="data-subblock">
-        <h3 class="data-sub-title">
-          {{ b.event.date|date:'n/j' }}
-          {% if b.event.title %}<span class="ev-title">{{ b.event.title }}</span>{% endif %}
-        </h3>
-        <div class="data-matrix-wrap">
-          <table class="data-matrix-table">
-            <thead>
-              <tr>
-                <th class="name-col">メンバー</th>
-                {% for f in b.flags %}
-                  <th>{{ f.name }}<br><span class="data-meta">[{{ f.input_mode }}]</span></th>
-                {% endfor %}
-              </tr>
-            </thead>
-            <tbody>
-              {% for r in b.rows %}
-                <tr>
-                  <td class="name-col">{{ r.row.display_name }}{% if r.row.withdrawn %}<span class="withdrawn-mark">*</span>{% endif %}</td>
-                  {% for cell in r.cells %}
-                    <td>{{ cell.text }}</td>
+                </thead>
+                <tbody>
+                  {% for r in t.rows %}
+                    <tr>
+                      <td class="name-col">{{ r.row.display_name }}{% if r.row.withdrawn %}<span class="withdrawn-mark">*</span>{% endif %}</td>
+                      {% for cell in r.cells %}
+                        <td>{{ cell.text }}</td>
+                      {% endfor %}
+                    </tr>
                   {% endfor %}
-                </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p class="data-empty">該当する共通フラグはありません。</p>
+      {% endif %}
+    </section>
+
+    {# パネル3: 固有フラグ（ドロップダウンでイベント選択） #}
+    <section class="data-tab-panel" data-panel="event-flags" role="tabpanel" hidden>
+      {% if event_flag_blocks %}
+        <div class="data-dropdown">
+          <label>イベント：
+            <select id="event-flag-select">
+              {% for b in event_flag_blocks %}
+                <option value="{{ b.event.id }}">{{ b.event.date|date:'n/j' }}{% if b.event.title %} {{ b.event.title }}{% endif %}</option>
               {% endfor %}
-            </tbody>
-          </table>
+            </select>
+          </label>
         </div>
-      </div>
-    {% endfor %}
-  </section>
+        {% for b in event_flag_blocks %}
+          <div class="event-flag-block" data-event-id="{{ b.event.id }}" {% if not forloop.first %}hidden{% endif %}>
+            <div class="data-matrix-wrap">
+              <table class="data-matrix-table">
+                <thead>
+                  <tr>
+                    <th class="name-col">メンバー</th>
+                    {% for f in b.flags %}
+                      <th>{{ f.name }}<br><span class="data-meta">[{{ f.input_mode }}]</span></th>
+                    {% endfor %}
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for r in b.rows %}
+                    <tr>
+                      <td class="name-col">{{ r.row.display_name }}{% if r.row.withdrawn %}<span class="withdrawn-mark">*</span>{% endif %}</td>
+                      {% for cell in r.cells %}
+                        <td>{{ cell.text }}</td>
+                      {% endfor %}
+                    </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        {% endfor %}
+      {% else %}
+        <p class="data-empty">該当する固有フラグはありません。</p>
+      {% endif %}
+    </section>
+
+  {% endif %}
 </div>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script src="{% static 'tennis/club_data.js' %}" defer></script>
 {% endblock %}
