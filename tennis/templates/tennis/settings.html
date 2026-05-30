@@ -133,6 +133,32 @@
 {% endif %}
 
 <hr>
+<h3>デフォルト表示設定</h3>
+
+<small style="color:#666; display:block; margin-bottom:10px;">
+  ※ 新規イベントや個別に表示設定をしていないイベントで使われる初期値です。<br>
+  ※ 各イベントページで個別に上書きできます。
+</small>
+
+<form id="club-display-settings-form"
+      data-club-id="{{ club.id }}"
+      data-admin-token="{{ club.admin_token }}"
+      data-save-url="{{ save_club_display_setting_url }}"
+      data-current-settings='{{ default_display_settings_json|escapejs }}'
+      style="margin:0 0 12px;">
+  <div style="display:flex; flex-wrap:wrap; gap:14px; align-items:center;">
+    <label><input type="checkbox" name="common_flags" {% if default_display_settings.common_flags %}checked{% endif %}> 共通フラグ</label>
+    <label><input type="checkbox" name="event_flags" {% if default_display_settings.event_flags %}checked{% endif %}> 固有フラグ</label>
+    <label><input type="checkbox" name="class" {% if default_display_settings.class %}checked{% endif %}> チーム</label>
+    <label><input type="checkbox" name="schedule" {% if default_display_settings.schedule %}checked{% endif %}> 対戦表</label>
+  </div>
+  <div style="margin-top:10px;">
+    <button type="submit" class="btn btn-pill btn-primary">保存</button>
+    <span id="club-display-settings-status" style="margin-left:10px; font-size:0.9rem;"></span>
+  </div>
+</form>
+
+<hr>
 <h3>チーム分け設定</h3>
 
 <div id="class-hooks"

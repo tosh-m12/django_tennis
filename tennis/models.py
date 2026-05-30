@@ -234,6 +234,30 @@ class EventDisplaySetting(models.Model):
 
 
 # ============================================================
+# Club display setting (per-club default)
+# - 行が無いクラブはコード側ハードコードのデフォルトにフォールバック
+# ============================================================
+
+class ClubDisplaySetting(models.Model):
+    club = models.OneToOneField("Club", on_delete=models.CASCADE, related_name="display_setting")
+
+    show_flags = models.BooleanField(default=True)
+    show_event_flags = models.BooleanField(default=False)
+    show_class = models.BooleanField(default=True)
+    show_schedule = models.BooleanField(default=True)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def as_dict(self):
+        return {
+            "common_flags": bool(self.show_flags),
+            "event_flags": bool(self.show_event_flags),
+            "class": bool(self.show_class),
+            "schedule": bool(self.show_schedule),
+        }
+
+
+# ============================================================
 # Event-specific flag definitions (per-event)
 # ============================================================
 

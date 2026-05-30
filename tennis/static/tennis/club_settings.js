@@ -15,6 +15,60 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // ============================================================
+  // [Z] デフォルト表示設定（クラブ単位）
+  // ============================================================
+  (function initClubDisplaySettings() {
+    const form = document.getElementById("club-display-settings-form");
+    if (!form) return;
+
+    const status = document.getElementById("club-display-settings-status");
+    const clubId = (form.dataset.clubId || "").trim();
+    const adminToken = (form.dataset.adminToken || "").trim();
+    const saveUrl = (form.dataset.saveUrl || "").trim();
+    if (!clubId || !adminToken || !saveUrl) return;
+
+    function setStatus(text, ok) {
+      if (!status) return;
+      status.textContent = text;
+      status.style.color = ok ? "#0a7a3a" : "#a00";
+    }
+
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const payload = {
+        common_flags: !!form.querySelector('input[name="common_flags"]')?.checked,
+        event_flags:  !!form.querySelector('input[name="event_flags"]')?.checked,
+        class:        !!form.querySelector('input[name="class"]')?.checked,
+        schedule:     !!form.querySelector('input[name="schedule"]')?.checked,
+      };
+
+      const fd = new FormData();
+      fd.append("club_id", clubId);
+      fd.append("admin_token", adminToken);
+      fd.append("settings_json", JSON.stringify(payload));
+
+      setStatus("保存中…", true);
+      try {
+        const resp = await fetch(saveUrl, {
+          method: "POST",
+          headers: { "X-CSRFToken": csrftoken || "" },
+          body: fd,
+        });
+        const data = await resp.json();
+        if (!resp.ok || !data?.ok) {
+          throw new Error(data?.error || "save_failed");
+        }
+        form.dataset.currentSettings = JSON.stringify(data.settings);
+        setStatus("保存しました", true);
+      } catch (err) {
+        console.error("[club display settings] save failed", err);
+        setStatus("保存に失敗しました", false);
+      }
+    });
+  })();
+
+  // ============================================================
   // [A] クラブ名変更（保存あり）
   // ============================================================
   (function initClubRenameModal() {
