@@ -185,9 +185,9 @@
     background: #e0f2fe;
     color: #1e40af;
 }
-/* 負け：薄いグレー背景・黒文字 */
+/* 負け：薄い赤背景・濃い赤文字 */
 .history-row.history-負 td {
-    background: #f3f4f6;
-    color: #111;
+    background: #fee2e2;
+    color: #b91c1c;
 }
 /* 分け：素の表示（背景・文字色の指定なし） */
