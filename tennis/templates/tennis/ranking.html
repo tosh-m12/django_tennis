@@ -11,7 +11,6 @@
 <div class="ranking-page">
   <header class="ranking-header">
     <h1 class="ranking-title">戦績表</h1>
-    <a class="ranking-back" href="{{ back_url }}">← ホームへ戻る</a>
   </header>
 
   {# 集計期間（個人ページと統一意匠） #}
@@ -25,10 +24,10 @@
         <input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}">
       </label>
       <button type="submit" class="btn btn-pill btn-primary">適用</button>
-      {% if request.GET.start or request.GET.end %}
-        <a class="period-reset" href="{{ request.path }}">今月に戻す</a>
-      {% endif %}
     </form>
+    {% if request.GET.start or request.GET.end %}
+      <a class="period-reset" href="{{ request.path }}">今月に戻す</a>
+    {% endif %}
   </section>
 
   {% with has_doubles=ranking_doubles.ranked|length has_singles=ranking_singles.ranked|length %}

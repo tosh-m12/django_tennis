@@ -1231,6 +1231,7 @@ def ranking_page(request, club_public_token, club_admin_token=None):
         "ranking_singles": ranking_singles,
         "back_url": back_url,
         "show_topbar": True,
+        "current_page": "ranking",
         "cleanup_warnings": _run_member_auto_cleanup(club) if is_admin else [],
     })
 
