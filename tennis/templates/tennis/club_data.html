@@ -15,15 +15,19 @@
   </header>
 
 
-  <form method="get" class="data-filter">
-    <label>開始日
-      <input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}">
-    </label>
-    <label>終了日
-      <input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}">
-    </label>
-    <button type="submit" class="btn btn-pill btn-primary">適用</button>
-  </form>
+  {# 集計期間（クラブ戦績ページと同じデザイン） #}
+  <section class="data-period">
+    <h2 class="data-section-title">集計期間</h2>
+    <form method="get" class="period-filter">
+      <label>開始日
+        <input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}">
+      </label>
+      <label>終了日
+        <input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}">
+      </label>
+      <button type="submit" class="btn btn-pill btn-primary">適用</button>
+    </form>
+  </section>
 
   {% if not events %}
     <p class="data-empty">この期間にはイベントがありません。</p>

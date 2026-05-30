@@ -160,6 +160,7 @@ th {
   background: linear-gradient(180deg, #2fc972, #25a95a);
   box-shadow: 0 4px 0 #1a783f;
   transform: translateY(-1px);
+  color: #ffffff;  /* admin の a:hover 赤(--accent-dark)に上書きさせない */
 }
 
 .btn-pill:active {
