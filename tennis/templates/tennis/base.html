@@ -63,6 +63,23 @@
 
             {% endif %}
 
+            {# 戦績表（一般・幹事どちらでも） #}
+              {% if club %}
+                {% if is_admin %}
+                  <a href="{% url 'tennis:ranking_admin' club.public_token club.admin_token %}"
+                     class="topbar-link"
+                     id="topbar-ranking-link">
+                    戦績
+                  </a>
+                {% else %}
+                  <a href="{% url 'tennis:ranking' club.public_token %}"
+                     class="topbar-link"
+                     id="topbar-ranking-link">
+                    戦績
+                  </a>
+                {% endif %}
+              {% endif %}
+
             {# 幹事のみ「設定」 #}
               {% if is_admin and club %}
                 <a href="{% url 'tennis:club_settings' club.public_token club.admin_token %}"
