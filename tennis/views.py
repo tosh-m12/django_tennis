@@ -610,6 +610,209 @@ def club_settings(request, club_public_token, club_admin_token):
     )
 
 
+@require_http_methods(["GET"])
+def club_data(request, club_public_token, club_admin_token):
+    """
+    幹事専用：出欠・共通フラグ・固有フラグのデータ集計表ページ。
+    期間内のイベントを対象に、メンバー×イベントの3種のマトリクスを構築する。
+    """
+    club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
+    if club.admin_token != club_admin_token:
+        return HttpResponseBadRequest("admin token mismatch")
+
+    # 期間：デフォルトは今月の1日〜末日
+    today = timezone.localdate()
+    default_start = today.replace(day=1)
+    next_month = (default_start + dt.timedelta(days=32)).replace(day=1)
+    default_end = next_month - dt.timedelta(days=1)
+
+    start_d = _parse_date_yyyy_mm_dd((request.GET.get("start") or "").strip()) or default_start
+    end_d = _parse_date_yyyy_mm_dd((request.GET.get("end") or "").strip()) or default_end
+    if end_d < start_d:
+        end_d = start_d
+
+    # 期間内イベントとEPを一括取得
+    events = list(
+        Event.objects.filter(club=club, date__gte=start_d, date__lte=end_d)
+        .order_by("date", "start_time", "id")
+    )
+    eps = list(
+        EventParticipant.objects
+        .filter(event__in=events)
+        .select_related("member")
+        .order_by("id")
+    )
+    ep_ids = [ep.id for ep in eps]
+
+    # 全メンバー（固定→非固定、member_no/displayname順）
+    all_members = list(
+        Member.objects.filter(club=club).order_by("-is_fixed", "member_no", "id")
+    )
+
+    # 行を構築：先に全メンバー、次に期間内に登場した退会者/純ゲスト（display_nameで集約）
+    rows = []
+    member_key_set = set()
+    for m in all_members:
+        rows.append({
+            "key": f"m{m.id}",
+            "display_name": m.display_name,
+            "withdrawn": False,
+            "is_fixed": m.is_fixed,
+        })
+        member_key_set.add(("m", m.id))
+
+    seen_guest_names = set()
+    guest_rows = []
+    for ep in eps:
+        if ep.member_id and ("m", ep.member_id) in member_key_set:
+            continue
+        name = (ep.display_name or "").strip() or f"#{ep.id}"
+        if name in seen_guest_names:
+            continue
+        seen_guest_names.add(name)
+        guest_rows.append({
+            "key": f"g_{name}",
+            "display_name": name,
+            "withdrawn": bool(ep.member_deleted),
+            "is_fixed": False,
+        })
+    guest_rows.sort(key=lambda r: r["display_name"])
+    rows.extend(guest_rows)
+
+    # EP参照表：row_key -> event_id -> ep
+    ep_lookup: dict = {}
+    for ep in eps:
+        if ep.member_id and ("m", ep.member_id) in member_key_set:
+            row_key = f"m{ep.member_id}"
+        else:
+            name = (ep.display_name or "").strip() or f"#{ep.id}"
+            row_key = f"g_{name}"
+        ep_lookup.setdefault(row_key, {}).setdefault(ep.event_id, ep)
+
+    # 1) 出欠表
+    attendance_table = []
+    for row in rows:
+        cells = []
+        per_ev = ep_lookup.get(row["key"], {})
+        for event in events:
+            ep = per_ev.get(event.id)
+            cells.append({"attendance": (ep.attendance if ep else None)})
+        attendance_table.append({"row": row, "cells": cells})
+
+    # 2) 共通フラグ表（フラグごと）
+    #    アクティブ ∪ 期間内にデータ有るもの（削除済みでも履歴を表示）
+    all_club_flags = list(
+        ClubFlagDefinition.objects.filter(club=club).order_by("display_order", "id")
+    )
+    club_flag_ids_with_data: set = set()
+    if ep_ids and all_club_flags:
+        club_flag_ids_with_data = set(
+            ParticipantFlag.objects
+            .filter(
+                event_participant_id__in=ep_ids,
+                club_flag_definition_id__in=[f.id for f in all_club_flags],
+            )
+            .values_list("club_flag_definition_id", flat=True)
+            .distinct()
+        )
+    club_flags = [
+        f for f in all_club_flags
+        if f.is_active or f.id in club_flag_ids_with_data
+    ]
+
+    pf_club: dict = {}
+    if ep_ids and club_flags:
+        for pf in ParticipantFlag.objects.filter(
+            event_participant_id__in=ep_ids,
+            club_flag_definition_id__in=[f.id for f in club_flags],
+        ).values("event_participant_id", "club_flag_definition_id", "is_on", "value"):
+            pf_club.setdefault(pf["club_flag_definition_id"], {})[
+                pf["event_participant_id"]
+            ] = (bool(pf["is_on"]), pf["value"])
+
+    def _cell_text(input_mode, pf_tuple):
+        if not pf_tuple:
+            return ""
+        is_on, value = pf_tuple
+        if input_mode == "digit":
+            return "" if value is None else str(value)
+        return "✓" if is_on else ""
+
+    club_flag_tables = []
+    for f in club_flags:
+        f_rows = []
+        for row in rows:
+            cells = []
+            per_ev = ep_lookup.get(row["key"], {})
+            for event in events:
+                ep = per_ev.get(event.id)
+                pf_tuple = pf_club.get(f.id, {}).get(ep.id) if ep else None
+                cells.append({"text": _cell_text(f.input_mode, pf_tuple)})
+            f_rows.append({"row": row, "cells": cells})
+        club_flag_tables.append({
+            "flag": f,
+            "is_active": f.is_active,
+            "rows": f_rows,
+        })
+
+    # 3) 固有フラグ表（イベントごとに1ブロック）
+    event_flag_defs = list(
+        EventFlagDefinition.objects
+        .filter(event__in=events, is_active=True)
+        .order_by("event_id", "display_order", "id")
+    )
+    efs_by_event: dict = defaultdict(list)
+    for f in event_flag_defs:
+        efs_by_event[f.event_id].append(f)
+
+    pf_event: dict = {}
+    if ep_ids and event_flag_defs:
+        for pf in ParticipantFlag.objects.filter(
+            event_participant_id__in=ep_ids,
+            event_flag_definition_id__in=[f.id for f in event_flag_defs],
+        ).values("event_participant_id", "event_flag_definition_id", "is_on", "value"):
+            pf_event.setdefault(pf["event_flag_definition_id"], {})[
+                pf["event_participant_id"]
+            ] = (bool(pf["is_on"]), pf["value"])
+
+    event_flag_blocks = []
+    for event in events:
+        efs = efs_by_event.get(event.id) or []
+        if not efs:
+            continue
+        block_rows = []
+        for row in rows:
+            cells = []
+            ep = ep_lookup.get(row["key"], {}).get(event.id)
+            for f in efs:
+                pf_tuple = pf_event.get(f.id, {}).get(ep.id) if ep else None
+                cells.append({"text": _cell_text(f.input_mode, pf_tuple)})
+            block_rows.append({"row": row, "cells": cells})
+        event_flag_blocks.append({
+            "event": event,
+            "flags": efs,
+            "rows": block_rows,
+        })
+
+    settings_url = reverse("tennis:club_settings", args=[club.public_token, club.admin_token])
+
+    return render(request, "tennis/club_data.html", {
+        "club": club,
+        "club_public_token": club_public_token,
+        "club_admin_token": club_admin_token,
+        "start_date": start_d,
+        "end_date": end_d,
+        "events": events,
+        "rows": rows,
+        "attendance_table": attendance_table,
+        "club_flag_tables": club_flag_tables,
+        "event_flag_blocks": event_flag_blocks,
+        "settings_url": settings_url,
+        "is_admin": True,
+        "show_topbar": True,
+    })
+
+
 def club_home(request, club_public_token, club_admin_token=None):
     """
     共通ホーム（メンバー/幹事）

@@ -1,0 +1,144 @@
+{% extends "tennis/base.html" %}
+{% load static %}
+
+{% block title %}データ集計表 - {{ club.name }}{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'tennis/club_data.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="data-page">
+  <header class="data-header">
+    <h1 class="data-title">データ集計表</h1>
+    <a class="data-back-link" href="{{ settings_url }}">← 設定ページへ戻る</a>
+  </header>
+
+  <form method="get" class="data-filter">
+    <label>開始日
+      <input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}">
+    </label>
+    <label>終了日
+      <input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}">
+    </label>
+    <button type="submit" class="btn btn-pill btn-primary">適用</button>
+  </form>
+
+  {% if not events %}
+    <p class="data-empty">この期間にはイベントがありません。</p>
+  {% endif %}
+
+  {# 1. 出欠表 #}
+  <section class="data-section">
+    <h2 class="data-section-title">出欠</h2>
+    {% if events %}
+      <div class="data-matrix-wrap">
+        <table class="data-matrix-table">
+          <thead>
+            <tr>
+              <th class="name-col">メンバー</th>
+              {% for ev in events %}
+                <th>{{ ev.date|date:'n/j' }}{% if ev.title %}<br><span class="ev-title">{{ ev.title }}</span>{% endif %}</th>
+              {% endfor %}
+            </tr>
+          </thead>
+          <tbody>
+            {% for row in attendance_table %}
+              <tr>
+                <td class="name-col">{{ row.row.display_name }}{% if row.row.withdrawn %}<span class="withdrawn-mark">*</span>{% endif %}</td>
+                {% for cell in row.cells %}
+                  <td>
+                    {% if cell.attendance == 'yes' %}<span class="attendance-icon attendance-yes">✓</span>
+                    {% elif cell.attendance == 'no' %}<span class="attendance-icon attendance-no">×</span>
+                    {% elif cell.attendance == 'maybe' %}<span class="attendance-icon attendance-maybe">?</span>
+                    {% endif %}
+                  </td>
+                {% endfor %}
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% endif %}
+  </section>
+
+  {# 2. 共通フラグ表（フラグごと） #}
+  <section class="data-section">
+    <h2 class="data-section-title">共通フラグ</h2>
+    {% if not club_flag_tables %}
+      <p class="data-empty">該当する共通フラグはありません。</p>
+    {% endif %}
+    {% for t in club_flag_tables %}
+      <div class="data-subblock">
+        <h3 class="data-sub-title">
+          {{ t.flag.name }}
+          <span class="data-meta">[{{ t.flag.input_mode }}]</span>
+          {% if not t.is_active %}<span class="data-meta data-meta-inactive">（削除済み・履歴）</span>{% endif %}
+        </h3>
+        {% if events %}
+          <div class="data-matrix-wrap">
+            <table class="data-matrix-table">
+              <thead>
+                <tr>
+                  <th class="name-col">メンバー</th>
+                  {% for ev in events %}
+                    <th>{{ ev.date|date:'n/j' }}</th>
+                  {% endfor %}
+                </tr>
+              </thead>
+              <tbody>
+                {% for r in t.rows %}
+                  <tr>
+                    <td class="name-col">{{ r.row.display_name }}{% if r.row.withdrawn %}<span class="withdrawn-mark">*</span>{% endif %}</td>
+                    {% for cell in r.cells %}
+                      <td>{{ cell.text }}</td>
+                    {% endfor %}
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% endif %}
+      </div>
+    {% endfor %}
+  </section>
+
+  {# 3. 固有フラグ表（イベントごと） #}
+  <section class="data-section">
+    <h2 class="data-section-title">固有フラグ</h2>
+    {% if not event_flag_blocks %}
+      <p class="data-empty">該当する固有フラグはありません。</p>
+    {% endif %}
+    {% for b in event_flag_blocks %}
+      <div class="data-subblock">
+        <h3 class="data-sub-title">
+          {{ b.event.date|date:'n/j' }}
+          {% if b.event.title %}<span class="ev-title">{{ b.event.title }}</span>{% endif %}
+        </h3>
+        <div class="data-matrix-wrap">
+          <table class="data-matrix-table">
+            <thead>
+              <tr>
+                <th class="name-col">メンバー</th>
+                {% for f in b.flags %}
+                  <th>{{ f.name }}<br><span class="data-meta">[{{ f.input_mode }}]</span></th>
+                {% endfor %}
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in b.rows %}
+                <tr>
+                  <td class="name-col">{{ r.row.display_name }}{% if r.row.withdrawn %}<span class="withdrawn-mark">*</span>{% endif %}</td>
+                  {% for cell in r.cells %}
+                    <td>{{ cell.text }}</td>
+                  {% endfor %}
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endfor %}
+  </section>
+</div>
+{% endblock %}

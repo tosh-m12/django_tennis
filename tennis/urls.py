@@ -32,6 +32,11 @@ urlpatterns = [
         views.club_settings,
         name="club_settings",
     ),
+    path(
+        "c/<str:club_public_token>/admin/<str:club_admin_token>/data/",
+        views.club_data,
+        name="club_data",
+    ),
 
     # ============================================================
     # Event pages (token-based = club token)
