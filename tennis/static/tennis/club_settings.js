@@ -16,15 +16,17 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ============================================================
   // [Z] デフォルト表示設定（クラブ単位）
+  //   - チェックトグルで即保存（保存ボタン無し）
+  //   - イベントページの「表示設定」モーダルと同じ ds-toggle UI を流用
   // ============================================================
   (function initClubDisplaySettings() {
-    const form = document.getElementById("club-display-settings-form");
-    if (!form) return;
+    const root = document.getElementById("club-display-settings-form");
+    if (!root) return;
 
     const status = document.getElementById("club-display-settings-status");
-    const clubId = (form.dataset.clubId || "").trim();
-    const adminToken = (form.dataset.adminToken || "").trim();
-    const saveUrl = (form.dataset.saveUrl || "").trim();
+    const clubId = (root.dataset.clubId || "").trim();
+    const adminToken = (root.dataset.adminToken || "").trim();
+    const saveUrl = (root.dataset.saveUrl || "").trim();
     if (!clubId || !adminToken || !saveUrl) return;
 
     function setStatus(text, ok) {
@@ -33,38 +35,84 @@ document.addEventListener("DOMContentLoaded", () => {
       status.style.color = ok ? "#0a7a3a" : "#a00";
     }
 
-    form.addEventListener("submit", async (e) => {
-      e.preventDefault();
+    function readToggleState(btn) {
+      return !!btn?.classList.contains("is-on");
+    }
 
-      const payload = {
-        common_flags: !!form.querySelector('input[name="common_flags"]')?.checked,
-        event_flags:  !!form.querySelector('input[name="event_flags"]')?.checked,
-        class:        !!form.querySelector('input[name="class"]')?.checked,
-        schedule:     !!form.querySelector('input[name="schedule"]')?.checked,
+    function setToggleState(btn, on) {
+      if (!btn) return;
+      btn.classList.toggle("is-on", !!on);
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+      const icon = btn.querySelector(".check-icon");
+      if (icon) {
+        icon.classList.toggle("check-on", !!on);
+        icon.classList.toggle("check-off", !on);
+      }
+    }
+
+    function collectSettings() {
+      const get = (key) => {
+        const btn = root.querySelector(`.ds-toggle[data-key="${key}"]`);
+        return readToggleState(btn);
       };
+      return {
+        common_flags: get("common_flags"),
+        event_flags:  get("event_flags"),
+        class:        get("class"),
+        schedule:     get("schedule"),
+      };
+    }
 
+    async function save(payload) {
       const fd = new FormData();
       fd.append("club_id", clubId);
       fd.append("admin_token", adminToken);
       fd.append("settings_json", JSON.stringify(payload));
 
+      const resp = await fetch(saveUrl, {
+        method: "POST",
+        headers: { "X-CSRFToken": csrftoken || "" },
+        body: fd,
+      });
+      const data = await resp.json().catch(() => null);
+      if (!resp.ok || !data?.ok) {
+        throw new Error(data?.error || "save_failed");
+      }
+      return data.settings;
+    }
+
+    let saving = false;
+    async function onToggle(btn) {
+      if (saving) return;
+      const prevState = readToggleState(btn);
+      const newState = !prevState;
+      setToggleState(btn, newState);
+
+      saving = true;
       setStatus("保存中…", true);
       try {
-        const resp = await fetch(saveUrl, {
-          method: "POST",
-          headers: { "X-CSRFToken": csrftoken || "" },
-          body: fd,
-        });
-        const data = await resp.json();
-        if (!resp.ok || !data?.ok) {
-          throw new Error(data?.error || "save_failed");
-        }
-        form.dataset.currentSettings = JSON.stringify(data.settings);
+        const saved = await save(collectSettings());
+        root.dataset.currentSettings = JSON.stringify(saved);
         setStatus("保存しました", true);
       } catch (err) {
         console.error("[club display settings] save failed", err);
+        // 失敗時は UI を元に戻す
+        setToggleState(btn, prevState);
         setStatus("保存に失敗しました", false);
+      } finally {
+        saving = false;
       }
+    }
+
+    // ボタン本体／行どこを押しても反応
+    root.addEventListener("click", (e) => {
+      const toggleBtn = e.target.closest(".ds-toggle[data-key]");
+      const row = e.target.closest(".ds-row");
+      if (!toggleBtn && !row) return;
+      const btn = toggleBtn || row.querySelector(".ds-toggle[data-key]");
+      if (!btn) return;
+      e.preventDefault();
+      onToggle(btn);
     });
   })();
 

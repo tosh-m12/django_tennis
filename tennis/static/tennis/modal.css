@@ -846,6 +846,41 @@
   z-index: 3500; /* ui-message(3000)より上でもOK。好みで 3200〜4000 */
 }
 
+/* ============================================================
+   設定ページ「デフォルト表示設定」フォーム（モーダル外でも ds-list を流用）
+   - 表示設定モーダルと意匠を統一（フォント・アイコン）
+   ============================================================ */
+#club-display-settings-form .ds-list{
+  width: 100%;
+  max-width: 260px;
+}
+#club-display-settings-form .ds-row{
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 12px;
+  padding: 8px 0;
+  cursor: pointer;
+}
+#club-display-settings-form .ds-label{
+  white-space: nowrap;
+  font-size: 0.98rem;
+  font-weight: 700;
+}
+#club-display-settings-form .check-btn.ds-toggle{
+  width: 34px;
+  height: 34px;
+  min-width: 34px;
+  padding: 0;
+  box-sizing: border-box;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+#club-display-settings-form .check-btn.ds-toggle .check-icon{
+  line-height: 1;
+}
+
 .event-modal .event-flag-name-input {
   width: 100%;
   max-width: 180px;
