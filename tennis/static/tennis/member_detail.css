@@ -38,7 +38,8 @@
 .member-edit {
     margin-bottom: 14px;
 }
-/* 入力欄＋保存(＋削除)ボタンを1行に並べる */
+/* 入力欄＋保存(＋削除)ボタンを1行に並べる
+   保存ボタンを行の右端に寄せて、下の「適用」ボタンと縦位置を揃える */
 .name-edit-row {
     display: flex;
     flex-wrap: wrap;
@@ -54,6 +55,9 @@
     border: 1px solid #ccc;
     border-radius: 6px;
     box-sizing: border-box;
+}
+.name-edit-row > button[type="submit"] {
+    margin-left: auto;          /* 行の右端に寄せる */
 }
 /* 削除ボタン（黒赤、既存設定モーダルと同じ印象） */
 .member-delete-btn {
@@ -108,6 +112,7 @@
 .period-filter > button[type="submit"] {
     align-self: flex-end;
     flex-shrink: 0;
+    margin-left: auto;          /* 行の右端に寄せて、上の保存ボタンと縦位置を揃える */
 }
 /* 全期間に戻す は次の行に流して、適用ボタンを期間ボックス右に保つ */
 .period-filter .period-reset {
