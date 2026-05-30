@@ -429,3 +429,21 @@ th {
 .topbar-admin-badge {
   font-weight: normal !important;
 }
+
+/* =========================================
+   自動削除予告バナー（幹事モード時に表示）
+   ========================================= */
+.cleanup-warning-banner {
+  background: #fdecec;          /* 薄い赤 */
+  border: 1px solid #f5b7b7;
+  border-left: 4px solid #c0392b;
+  border-radius: 4px;
+  padding: 10px 14px;
+  margin: 10px 0 14px;
+  color: #6e1414;
+  font-size: 0.92rem;
+  line-height: 1.55;
+}
+.cleanup-warning-line + .cleanup-warning-line {
+  margin-top: 2px;
+}
