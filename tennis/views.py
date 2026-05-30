@@ -1147,27 +1147,26 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
         args=[club.public_token, club.admin_token] if is_admin else [club.public_token],
     )
 
-    # 戦績は記録のある種別だけ残す（空ブロックは出さない）
+    # 戦績：※確認用に S / D どちらが空でも枠を表示する（後で空除外に戻す予定）
     stats_blocks = [
-        b for b in (
-            ("singles", "シングルス", stats["singles"]),
-            ("doubles", "ダブルス", stats["doubles"]),
-        ) if b[2]["matches"] > 0
+        ("singles", "シングルス", stats["singles"]),
+        ("doubles", "ダブルス", stats["doubles"]),
     ]
 
-    # 試合履歴は S / D で分割
+    # 試合履歴は S / D で分割、空の種別は除外（元仕様）
     singles_history = [h for h in matches_history if h["game_type"] == "singles"]
     doubles_history = [h for h in matches_history if h["game_type"] == "doubles"]
-    # ※確認用：シングルス／ダブルスのどちらかが空でも枠を表示する（後で空除外に戻す予定）
     history_blocks = [
-        ("singles", "シングルス", singles_history),
-        ("doubles", "ダブルス", doubles_history),
+        b for b in (
+            ("singles", "シングルス", singles_history),
+            ("doubles", "ダブルス", doubles_history),
+        ) if b[2]
     ]
 
     no_records = (
-        not stats_blocks
-        and not singles_history
-        and not doubles_history
+        stats["singles"]["matches"] == 0
+        and stats["doubles"]["matches"] == 0
+        and not history_blocks
     )
 
     # 期間表示用ラベル

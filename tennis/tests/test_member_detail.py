@@ -176,31 +176,34 @@ class MemberDetailStatsTests(TestCase):
         self.assertIsNone(ctx["end_date"])
 
     def test_singles_only_member_doubles_block_absent(self):
-        """シングルスにしか記録が無いメンバーは、戦績のダブルスカードは出さない。"""
+        """シングルスにしか記録が無いメンバーは、試合履歴のダブルスは出さない。戦績は確認用に両方表示。"""
         url = reverse("tennis:member_detail", args=[self.club.public_token, self.a.id])
         ctx = self.client.get(url).context
-        # 戦績は空ブロックを除外（現状仕様）
+        # 戦績：確認用に S/D の枠を常に表示（後で空除外に戻す予定）
         keys_stats = [k for (k, _, _) in ctx["stats_blocks"]]
-        self.assertEqual(keys_stats, ["singles"])
-        # 試合履歴：確認用に S/D の枠を常に表示（後で空除外に戻す予定）
+        self.assertEqual(keys_stats, ["singles", "doubles"])
+        sb = {k: st for (k, _, st) in ctx["stats_blocks"]}
+        self.assertEqual(sb["singles"]["matches"], 3)
+        self.assertEqual(sb["doubles"]["matches"], 0)
+        # 試合履歴は空を除外（元仕様）
         keys_hist = [k for (k, _, _) in ctx["history_blocks"]]
-        self.assertEqual(keys_hist, ["singles", "doubles"])
-        hb = {k: hist for (k, _, hist) in ctx["history_blocks"]}
-        self.assertEqual(len(hb["singles"]), 3)
-        self.assertEqual(hb["doubles"], [])
+        self.assertEqual(keys_hist, ["singles"])
         self.assertFalse(ctx["no_records"])
 
     def test_no_records_flag_for_member_outside_period(self):
-        """期間内に記録ゼロなら no_records=True、stats_blocks は空・history_blocks の中身も空。"""
+        """期間内に記録ゼロなら no_records=True、history_blocks は空・stats_blocks は枠だけ表示。"""
         url = reverse("tennis:member_detail", args=[self.club.public_token, self.a.id])
         # 試合は 2026/4 のみ → 1月で絞ると全て対象外
         resp = self.client.get(url, {"start": "2026-01-01", "end": "2026-01-31"})
         ctx = resp.context
-        self.assertEqual(ctx["stats_blocks"], [])
-        # 履歴枠は表示されるが中身は空
-        hb = {k: hist for (k, _, hist) in ctx["history_blocks"]}
-        self.assertEqual(hb["singles"], [])
-        self.assertEqual(hb["doubles"], [])
+        # 戦績枠は表示されるが中身は 0
+        keys_stats = [k for (k, _, _) in ctx["stats_blocks"]]
+        self.assertEqual(keys_stats, ["singles", "doubles"])
+        sb = {k: st for (k, _, st) in ctx["stats_blocks"]}
+        self.assertEqual(sb["singles"]["matches"], 0)
+        self.assertEqual(sb["doubles"]["matches"], 0)
+        # 履歴は空除外で空
+        self.assertEqual(ctx["history_blocks"], [])
         self.assertTrue(ctx["no_records"])
 
 

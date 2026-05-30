@@ -115,13 +115,10 @@
     .member-stats-grid { grid-template-columns: 1fr; }
 }
 .stats-card {
-    background: #fff;
-    border-radius: 8px;
-    padding: 12px 16px;
-    /* 外枠なし（クラブ戦績ページの表と揃える） */
+    /* カード装飾なし：history-subblock と揃えて左端を一致させる */
 }
 .stats-card h3 {
-    margin: 0 0 8px;
+    margin: 8px 0;
     font-size: 1rem;
     color: #1f7a8c;
 }
@@ -132,7 +129,7 @@
 }
 .stats-table th,
 .stats-table td {
-    padding: 4px 6px;
+    padding: 6px 10px;   /* history-table と統一 */
     text-align: left;
 }
 .stats-table th {
