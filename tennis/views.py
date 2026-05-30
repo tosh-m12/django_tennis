@@ -365,38 +365,56 @@ DELETION_DAYS = 21     # 自動削除（登録からの日数）
 
 def _run_member_auto_cleanup(club):
     """
-    幹事ページ表示時に呼ぶ。クラブ内の非固定・EP=0・未使用な Member について：
-      - 登録から DELETION_DAYS 以上経過 → 削除（AuditLog 記録）
-      - 登録から INACTIVITY_DAYS 以上 DELETION_DAYS 未満 → 警告対象として返す
+    幹事ページ表示時に呼ぶ。クラブ内の非固定メンバーについて：
 
-    Returns: List[Dict]（警告対象）
+    永続セーフ条件：EPのうち1つでも attendance="yes" があるメンバーは削除されない。
+    削除対象：上記以外の非固定メンバー（出欠が yes 以外のみ、または EP が無い）。
+
+    「最後の操作タイミング」= max(Member.updated_at, 関連EPのupdated_at, 関連PFのupdated_at)
+      - 出欠を「欠席」「未定」にした、フラグON/OFF、コメント編集 等の操作で更新される
+      - これら全てが「削除延長」要因（操作なら何でもカウントダウンを延ばす）
+
+    - 最後の操作から DELETION_DAYS 以上経過 → 削除（AuditLog 記録）
+    - 最後の操作から INACTIVITY_DAYS 以上 DELETION_DAYS 未満 → 警告
+
+    Returns: List[Dict]
       [{"display_name": str, "days_left": int}, ...]
-      days_left = DELETION_DAYS - days_since_creation（1〜7のいずれか）
     """
     today = timezone.localdate()
     cutoff_delete = today - dt.timedelta(days=DELETION_DAYS)
     cutoff_warn = today - dt.timedelta(days=INACTIVITY_DAYS)
 
-    # 候補抽出（クラブ・非固定・EPゼロ）— 一度に取得して2フェーズで判定
+    # 候補：非固定 かつ 一度も「出欠=yes」を付けていない（永続セーフから除外）
     candidates = list(
         Member.objects
-        .filter(club=club, is_fixed=False, event_participants__isnull=True)
+        .filter(club=club, is_fixed=False)
+        .exclude(event_participants__attendance="yes")
+        .annotate(
+            latest_ep_updated=Max("event_participants__updated_at"),
+            latest_pf_updated=Max("event_participants__flags__updated_at"),
+        )
         .order_by("created_at", "id")
     )
 
     warnings = []
     for m in candidates:
-        created_date = m.created_at.date() if m.created_at else None
-        if created_date is None:
+        # 最後の操作タイミング（Member自身・EP・PF の updated_at の最大値）
+        ts_list = [m.updated_at]
+        if m.latest_ep_updated:
+            ts_list.append(m.latest_ep_updated)
+        if m.latest_pf_updated:
+            ts_list.append(m.latest_pf_updated)
+        last_activity = max(ts_list)
+        last_activity_date = last_activity.date() if last_activity else None
+        if last_activity_date is None:
             continue
 
-        if created_date <= cutoff_delete:
-            # 削除対象：race対策で削除直前にEP=0を再確認、トランザクション内で実行
+        if last_activity_date <= cutoff_delete:
+            # 削除対象：race対策として直前に yes EP の有無を再確認
             try:
                 with transaction.atomic():
-                    still_empty = not EventParticipant.objects.filter(member=m).exists()
-                    if not still_empty:
-                        continue  # 直前にEPが付いたので保護
+                    if EventParticipant.objects.filter(member=m, attendance="yes").exists():
+                        continue  # 直前に yes EP が付いたので保護
                     AuditLog.objects.create(
                         club=club,
                         event=None,
@@ -405,8 +423,8 @@ def _run_member_auto_cleanup(club):
                         payload_json={
                             "member_id": m.id,
                             "display_name": m.display_name,
-                            "created_at": m.created_at.isoformat() if m.created_at else None,
-                            "days_inactive": (today - created_date).days,
+                            "last_activity": last_activity.isoformat(),
+                            "days_inactive": (today - last_activity_date).days,
                         },
                     )
                     m.delete()
@@ -414,8 +432,8 @@ def _run_member_auto_cleanup(club):
                 log.warning("auto_cleanup_member delete failed: member_id=%s err=%s", m.id, e)
             continue
 
-        if created_date <= cutoff_warn:
-            days_left = DELETION_DAYS - (today - created_date).days
+        if last_activity_date <= cutoff_warn:
+            days_left = DELETION_DAYS - (today - last_activity_date).days
             if 1 <= days_left <= (DELETION_DAYS - INACTIVITY_DAYS):
                 warnings.append({
                     "display_name": m.display_name,
