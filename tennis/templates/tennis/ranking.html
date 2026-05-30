@@ -1,0 +1,128 @@
+{% extends "tennis/base.html" %}
+{% load static %}
+
+{% block title %}戦績表 - {{ club.name }}{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'tennis/ranking.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="ranking-page">
+  <header class="ranking-header">
+    <h1 class="ranking-title">戦績表</h1>
+    <a class="ranking-back" href="{{ back_url }}">← ホームへ戻る</a>
+  </header>
+
+  {# 集計期間（個人ページと統一意匠） #}
+  <section class="ranking-period">
+    <h2 class="ranking-section-title">集計期間（{{ period_label }}）</h2>
+    <form method="get" class="period-filter">
+      <label>開始日
+        <input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}">
+      </label>
+      <label>終了日
+        <input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}">
+      </label>
+      <button type="submit" class="btn btn-pill btn-primary">適用</button>
+      {% if request.GET.start or request.GET.end %}
+        <a class="period-reset" href="{{ request.path }}">今月に戻す</a>
+      {% endif %}
+    </form>
+  </section>
+
+  {% with has_doubles=ranking_doubles.ranked|length has_singles=ranking_singles.ranked|length %}
+
+    {% if has_doubles or has_singles %}
+
+      {% if has_doubles %}
+        <section class="ranking-section">
+          <h2 class="ranking-section-title">ダブルス</h2>
+          <div class="rank-table-wrap">
+            <table class="rank-table">
+              <thead>
+                <tr>
+                  <th>順位</th>
+                  <th>名前</th>
+                  <th style="width:70px;">試合</th>
+                  <th style="width:60px;">勝</th>
+                  <th style="width:60px;">負</th>
+                  <th style="width:60px;">分</th>
+                  <th style="width:90px;">勝率</th>
+                  <th style="width:90px;">GF</th>
+                  <th style="width:90px;">GA</th>
+                  <th style="width:90px;">ゲーム率</th>
+                  <th style="width:90px;">得失点</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in ranking_doubles.ranked %}
+                  <tr>
+                    <td>{{ row.rank }}</td>
+                    <td style="text-align:left;">{{ row.name }}</td>
+                    <td>{{ row.matches }}</td>
+                    <td>{{ row.wins }}</td>
+                    <td>{{ row.losses }}</td>
+                    <td>{{ row.draws }}</td>
+                    <td>{{ row.win_pct }}%</td>
+                    <td>{{ row.gf }}</td>
+                    <td>{{ row.ga }}</td>
+                    <td>{{ row.gp_pct }}%</td>
+                    <td>{{ row.diff }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      {% endif %}
+
+      {% if has_singles %}
+        <section class="ranking-section">
+          <h2 class="ranking-section-title">シングルス</h2>
+          <div class="rank-table-wrap">
+            <table class="rank-table">
+              <thead>
+                <tr>
+                  <th>順位</th>
+                  <th>名前</th>
+                  <th style="width:70px;">試合</th>
+                  <th style="width:60px;">勝</th>
+                  <th style="width:60px;">負</th>
+                  <th style="width:60px;">分</th>
+                  <th style="width:90px;">勝率</th>
+                  <th style="width:90px;">GF</th>
+                  <th style="width:90px;">GA</th>
+                  <th style="width:90px;">ゲーム率</th>
+                  <th style="width:90px;">得失点</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for row in ranking_singles.ranked %}
+                  <tr>
+                    <td>{{ row.rank }}</td>
+                    <td style="text-align:left;">{{ row.name }}</td>
+                    <td>{{ row.matches }}</td>
+                    <td>{{ row.wins }}</td>
+                    <td>{{ row.losses }}</td>
+                    <td>{{ row.draws }}</td>
+                    <td>{{ row.win_pct }}%</td>
+                    <td>{{ row.gf }}</td>
+                    <td>{{ row.ga }}</td>
+                    <td>{{ row.gp_pct }}%</td>
+                    <td>{{ row.diff }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      {% endif %}
+
+    {% else %}
+      <p class="ranking-empty">この期間に戦績はありません（スコア未入力の試合は集計対象外、最低3試合以上が対象）。</p>
+    {% endif %}
+
+  {% endwith %}
+</div>
+{% endblock %}

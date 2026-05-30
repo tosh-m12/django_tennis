@@ -1138,10 +1138,6 @@ def club_home(request, club_public_token, club_admin_token=None):
 
     month_weeks = _build_month_calendar(year, month, events_qs)
 
-    rankings = build_month_rankings(events_qs, [GameType.DOUBLES, GameType.SINGLES])
-    ranking_doubles = rankings[GameType.DOUBLES]
-    ranking_singles = rankings[GameType.SINGLES]
-
     prev_month_date = (first - dt.timedelta(days=1)).replace(day=1)
     prev_year, prev_month = prev_month_date.year, prev_month_date.month
     next_year, next_month = next_month_date.year, next_month_date.month
@@ -1168,8 +1164,6 @@ def club_home(request, club_public_token, club_admin_token=None):
             "next_year": next_year,
             "next_month": next_month,
             "month_weeks": month_weeks,
-            "ranking_doubles": ranking_doubles,
-            "ranking_singles": ranking_singles,
             "is_admin": is_admin,
             "admin_token": admin_token,
             "settings_url": settings_url,
@@ -1179,6 +1173,66 @@ def club_home(request, club_public_token, club_admin_token=None):
             "cleanup_warnings": _run_member_auto_cleanup(club) if is_admin else [],
         },
     )
+
+
+@require_http_methods(["GET"])
+def ranking_page(request, club_public_token, club_admin_token=None):
+    """
+    戦績表（ランキング）ページ。一般・幹事どちらでもアクセス可。
+    - 期間：GET start/end（YYYY-MM-DD）。デフォルトは今月の1日〜末日。
+    - 対象：当該クラブの公開済み MatchSchedule を期間で絞り、build_month_rankings で集計。
+    """
+    club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
+    is_admin = False
+    if club_admin_token is not None:
+        if club.admin_token != club_admin_token:
+            return HttpResponseBadRequest("admin token mismatch")
+        is_admin = True
+
+    today = timezone.localdate()
+    default_start = today.replace(day=1)
+    next_month_date = (default_start + dt.timedelta(days=32)).replace(day=1)
+    default_end = next_month_date - dt.timedelta(days=1)
+
+    start_d = _parse_date_yyyy_mm_dd((request.GET.get("start") or "").strip()) or default_start
+    end_d = _parse_date_yyyy_mm_dd((request.GET.get("end") or "").strip()) or default_end
+    if end_d < start_d:
+        end_d = start_d
+
+    events_qs = (
+        Event.objects
+        .filter(club=club, date__gte=start_d, date__lte=end_d)
+        .order_by("date", "start_time", "id")
+    )
+
+    rankings = build_month_rankings(events_qs, [GameType.DOUBLES, GameType.SINGLES])
+    ranking_doubles = rankings[GameType.DOUBLES]
+    ranking_singles = rankings[GameType.SINGLES]
+
+    # 期間ラベル（個人ページと統一）
+    is_default_month = (start_d == default_start and end_d == default_end)
+    if is_default_month:
+        period_label = f"{start_d.year}年{start_d.month}月"
+    else:
+        period_label = f"{start_d.strftime('%Y/%-m/%-d')} 〜 {end_d.strftime('%Y/%-m/%-d')}"
+
+    back_url = reverse(
+        "tennis:club_home_admin" if is_admin else "tennis:club_home",
+        args=[club.public_token, club.admin_token] if is_admin else [club.public_token],
+    )
+
+    return render(request, "tennis/ranking.html", {
+        "club": club,
+        "is_admin": is_admin,
+        "start_date": start_d,
+        "end_date": end_d,
+        "period_label": period_label,
+        "ranking_doubles": ranking_doubles,
+        "ranking_singles": ranking_singles,
+        "back_url": back_url,
+        "show_topbar": True,
+        "cleanup_warnings": _run_member_auto_cleanup(club) if is_admin else [],
+    })
 
 
 # ============================================================
