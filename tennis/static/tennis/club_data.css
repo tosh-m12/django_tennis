@@ -16,6 +16,7 @@
 .data-header {
     display: flex;
     align-items: baseline;
+    justify-content: space-between;   /* タイトル=左、戻る=右 */
     gap: 16px;
     margin-bottom: 12px;
 }
@@ -29,6 +30,7 @@
     color: #1f7a8c;
     font-size: 0.95rem;
     text-decoration: none;
+    margin-left: auto;
 }
 .data-back-link:hover { text-decoration: underline; }
 
