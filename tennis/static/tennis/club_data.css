@@ -32,29 +32,39 @@
     text-decoration: none;
     margin-left: auto;
 }
-.data-back-link:hover { text-decoration: underline; }
-
-.data-filter {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 12px;
-    align-items: center;
-    background: #f7f7f7;
-    padding: 10px 14px;
-    border-radius: 8px;
-    margin-bottom: 18px;
+.data-back-link:hover {
+    text-decoration: underline;
+    color: #1f7a8c;   /* admin の a:hover 赤(--accent-dark)に上書きさせない */
 }
-.data-filter label {
+
+/* 集計期間（クラブ戦績ページと同じ構造：section-title バー + 左寄せコンパクト） */
+.data-period {
+    margin-bottom: 14px;
+}
+.period-filter {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: flex-end;
+    justify-content: flex-start;
+    gap: 8px;
+}
+.period-filter > label {
     display: flex;
     flex-direction: column;
     font-size: 0.85rem;
     color: #555;
+    flex: 0 0 auto;
 }
-.data-filter input[type="date"] {
+.period-filter input[type="date"] {
     padding: 6px 8px;
     border: 1px solid #ccc;
     border-radius: 6px;
     font-size: 1rem;
+    box-sizing: border-box;
+}
+.period-filter > button[type="submit"] {
+    align-self: flex-end;
+    flex: 0 0 auto;
 }
 
 .data-empty {
