@@ -13,9 +13,9 @@
     <h1 class="ranking-title">戦績表</h1>
   </header>
 
-  {# 集計期間（個人ページと統一意匠） #}
+  {# 集計期間 #}
   <section class="ranking-period">
-    <h2 class="ranking-section-title">集計期間（{{ period_label }}）</h2>
+    <h2 class="ranking-section-title">集計期間</h2>
     <form method="get" class="period-filter">
       <label>開始日
         <input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}">
@@ -25,9 +25,6 @@
       </label>
       <button type="submit" class="btn btn-pill btn-primary">適用</button>
     </form>
-    {% if request.GET.start or request.GET.end %}
-      <a class="period-reset" href="{{ request.path }}">今月に戻す</a>
-    {% endif %}
   </section>
 
   {% with has_doubles=ranking_doubles.ranked|length has_singles=ranking_singles.ranked|length %}
