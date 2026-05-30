@@ -18,6 +18,8 @@ from django.template.loader import render_to_string
 
 from .utils import generate_doubles_schedule, generate_singles_schedule
 from .models import (
+    ActorTokenKind,
+    AuditLog,
     Club,
     Event,
     Member,
@@ -354,6 +356,94 @@ def _require_club_admin_token(request, club):
 
 
 # ============================================================
+# 自動メンバー整理（未使用の非固定メンバーを期限到来で削除）
+# ============================================================
+
+INACTIVITY_DAYS = 14   # 警告開始（登録からの日数）
+DELETION_DAYS = 21     # 自動削除（登録からの日数）
+
+
+def _run_member_auto_cleanup(club):
+    """
+    幹事ページ表示時に呼ぶ。クラブ内の非固定メンバーについて：
+
+    永続セーフ条件：EPのうち1つでも attendance="yes" があるメンバーは削除されない。
+    削除対象：上記以外の非固定メンバー（出欠が yes 以外のみ、または EP が無い）。
+
+    「最後の操作タイミング」= max(Member.updated_at, 関連EPのupdated_at, 関連PFのupdated_at)
+      - 出欠を「欠席」「未定」にした、フラグON/OFF、コメント編集 等の操作で更新される
+      - これら全てが「削除延長」要因（操作なら何でもカウントダウンを延ばす）
+
+    - 最後の操作から DELETION_DAYS 以上経過 → 削除（AuditLog 記録）
+    - 最後の操作から INACTIVITY_DAYS 以上 DELETION_DAYS 未満 → 警告
+
+    Returns: List[Dict]
+      [{"display_name": str, "days_left": int}, ...]
+    """
+    today = timezone.localdate()
+    cutoff_delete = today - dt.timedelta(days=DELETION_DAYS)
+    cutoff_warn = today - dt.timedelta(days=INACTIVITY_DAYS)
+
+    # 候補：非固定 かつ 一度も「出欠=yes」を付けていない（永続セーフから除外）
+    candidates = list(
+        Member.objects
+        .filter(club=club, is_fixed=False)
+        .exclude(event_participants__attendance="yes")
+        .annotate(
+            latest_ep_updated=Max("event_participants__updated_at"),
+            latest_pf_updated=Max("event_participants__flags__updated_at"),
+        )
+        .order_by("created_at", "id")
+    )
+
+    warnings = []
+    for m in candidates:
+        # 最後の操作タイミング（Member自身・EP・PF の updated_at の最大値）
+        ts_list = [m.updated_at]
+        if m.latest_ep_updated:
+            ts_list.append(m.latest_ep_updated)
+        if m.latest_pf_updated:
+            ts_list.append(m.latest_pf_updated)
+        last_activity = max(ts_list)
+        last_activity_date = last_activity.date() if last_activity else None
+        if last_activity_date is None:
+            continue
+
+        if last_activity_date <= cutoff_delete:
+            # 削除対象：race対策として直前に yes EP の有無を再確認
+            try:
+                with transaction.atomic():
+                    if EventParticipant.objects.filter(member=m, attendance="yes").exists():
+                        continue  # 直前に yes EP が付いたので保護
+                    AuditLog.objects.create(
+                        club=club,
+                        event=None,
+                        actor_token_kind=ActorTokenKind.ADMIN,
+                        action="auto_cleanup_member",
+                        payload_json={
+                            "member_id": m.id,
+                            "display_name": m.display_name,
+                            "last_activity": last_activity.isoformat(),
+                            "days_inactive": (today - last_activity_date).days,
+                        },
+                    )
+                    m.delete()
+            except Exception as e:
+                log.warning("auto_cleanup_member delete failed: member_id=%s err=%s", m.id, e)
+            continue
+
+        if last_activity_date <= cutoff_warn:
+            days_left = DELETION_DAYS - (today - last_activity_date).days
+            if 1 <= days_left <= (DELETION_DAYS - INACTIVITY_DAYS):
+                warnings.append({
+                    "display_name": m.display_name,
+                    "days_left": days_left,
+                })
+
+    return warnings
+
+
+# ============================================================
 # Ranking（現行踏襲）
 # ============================================================
 
@@ -606,6 +696,7 @@ def club_settings(request, club_public_token, club_admin_token):
             "classes": classes,
             "is_admin": True,
             "show_topbar": True,
+            "cleanup_warnings": _run_member_auto_cleanup(club),
         },
     )
 
@@ -810,6 +901,7 @@ def club_data(request, club_public_token, club_admin_token):
         "settings_url": settings_url,
         "is_admin": True,
         "show_topbar": True,
+        "cleanup_warnings": _run_member_auto_cleanup(club),
     })
 
 
@@ -880,6 +972,7 @@ def club_home(request, club_public_token, club_admin_token=None):
             "member_url": member_url,
             "admin_url": admin_url,
             "show_topbar": True,
+            "cleanup_warnings": _run_member_auto_cleanup(club) if is_admin else [],
         },
     )
 
@@ -1255,6 +1348,7 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
         "ep_name_map": _build_ep_name_map(event),
         "sub_candidates": sub_candidates,
         "show_topbar": True,
+        "cleanup_warnings": _run_member_auto_cleanup(club) if is_admin else [],
     }
 
     return render(request, "tennis/event.html", ctx)
