@@ -1570,6 +1570,13 @@
       const form = document.getElementById("club-event-form");
 
       const cancelToggleBtn = document.getElementById("club-event-cancel-toggle");
+      const deleteBtn = document.getElementById("club-event-delete-btn");
+      const deleteUrl =
+        (hooks?.dataset?.deleteUrl || "").trim() ||
+        (metaBar?.dataset?.deleteUrl || "").trim();
+      const clubHomeUrl =
+        (hooks?.dataset?.clubHomeUrl || "").trim() ||
+        (metaBar?.dataset?.clubHomeUrl || "").trim();
       const submitBtn =
         document.getElementById("club-event-submit-btn") ||
         form?.querySelector?.('button[type="submit"]');
@@ -1610,6 +1617,11 @@
         }
         function hideEditOnlyButtonsSafe() {
           if (cancelToggleBtn) cancelToggleBtn.style.display = "none";
+          if (deleteBtn) deleteBtn.style.display = "none";
+        }
+        function setDeleteBtnVisibility(cancelled) {
+          if (!deleteBtn) return;
+          deleteBtn.style.display = cancelled ? "inline-flex" : "none";
         }
 
         function openModal() {
@@ -1638,6 +1650,8 @@
           if (!cancelToggleBtn) return;
           cancelToggleBtn.dataset.cancelled = cancelled ? "1" : "0";
           cancelToggleBtn.textContent = cancelled ? "中止を取り消す（復活）" : "イベントを中止";
+          // 削除ボタンは中止中のときだけ表示
+          setDeleteBtnVisibility(!!cancelled);
         }
 
         function fillTimeSelects() {
@@ -1824,6 +1838,71 @@
             } catch (err) {
               console.error(err);
               safeShowMessage("中止状態の更新に失敗しました", 2600);
+              openModal();
+            } finally {
+              btn.disabled = prevDisabled;
+            }
+          },
+          true
+        );
+
+        // ============================================================
+        // イベント削除：先に close → confirm → okなら DELETE → クラブホームへ
+        // ============================================================
+        modal.addEventListener(
+          "click",
+          async (ev) => {
+            const btn = ev.target.closest("#club-event-delete-btn");
+            if (!btn) return;
+
+            ev.preventDefault();
+            ev.stopPropagation();
+
+            if (!deleteUrl) {
+              console.warn("[event-edit] deleteUrl missing");
+              return;
+            }
+
+            closeModal();
+
+            const ok = await safeConfirm(
+              "このイベントを削除しますか？\n削除すると関連するデータ（出欠・スコア・フラグ等）も全て消え、元に戻せません。",
+              {
+                title: "確認",
+                okText: "削除する",
+                cancelText: "やめる",
+              }
+            );
+
+            if (!ok) {
+              openModal();
+              return;
+            }
+
+            const prevDisabled = btn.disabled;
+            btn.disabled = true;
+
+            const fd = new FormData();
+            fd.set("event_id", String(eventId));
+            fd.set("admin_token", adminToken);
+
+            try {
+              const r = await fetch(deleteUrl, {
+                method: "POST",
+                credentials: "include",
+                headers: { "X-CSRFToken": csrftoken },
+                body: fd,
+              });
+              const data = await r.json().catch(() => ({}));
+              if (!r.ok || !data.ok) throw new Error("not ok");
+
+              safeShowMessage("イベントを削除しました", 1400);
+              setTimeout(() => {
+                window.location.href = clubHomeUrl || "/";
+              }, 1400);
+            } catch (err) {
+              console.error(err);
+              safeShowMessage("イベント削除に失敗しました", 2600);
               openModal();
             } finally {
               btn.disabled = prevDisabled;
