@@ -92,8 +92,8 @@
                 <tr>
                   <th>日付</th>
                   {% if gt_key == "doubles" %}<th>パートナー</th>{% endif %}
-                  <th>対戦相手</th>
                   <th>スコア</th>
+                  <th>対戦相手</th>
                   <th>結果</th>
                 </tr>
               </thead>
@@ -102,12 +102,12 @@
                   <tr class="history-row history-{{ h.result }}">
                     <td>{{ h.date|date:'Y/n/j' }}</td>
                     {% if gt_key == "doubles" %}<td>{{ h.partners|join:"・" }}</td>{% endif %}
-                    <td>{{ h.opponents|join:"・" }}</td>
                     <td>
                       {% if h.has_score %}
                         {{ h.my_score }} - {{ h.opp_score }}
                       {% else %}―{% endif %}
                     </td>
+                    <td>{{ h.opponents|join:"・" }}</td>
                     <td>{{ h.result }}</td>
                   </tr>
                 {% endfor %}

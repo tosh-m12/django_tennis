@@ -177,7 +177,7 @@
 }
 .history-table thead th {
     background: #f0f4f6;
-    text-align: left;
+    text-align: center;
     font-weight: 600;
 }
 .history-row.history-勝 td:last-child { color: #1f7a8c; font-weight: 700; }
