@@ -1,8 +1,12 @@
 /* tennis/static/tennis/club_data.css
    データ集計表ページ（幹事専用）
+   - タブ + ドロップダウン構造
    - メンバー名列を sticky-left で固定
    - マトリクス罫線・横スクロール対応
 */
+
+/* hidden セーフティネット（.btn-pill のような display を持つ要素以外には効くが、念のため強制） */
+[hidden] { display: none !important; }
 
 .data-page {
     padding: 16px 12px 40px;
@@ -54,6 +58,54 @@
 .data-empty {
     color: #888;
     padding: 8px 4px;
+}
+
+/* タブナビ */
+.data-tabs {
+    display: flex;
+    gap: 2px;
+    margin: 16px 0 14px;
+    border-bottom: 2px solid #ddd;
+    flex-wrap: wrap;
+}
+.data-tab {
+    background: none;
+    border: none;
+    padding: 8px 18px;
+    font-size: 1rem;
+    color: #555;
+    cursor: pointer;
+    border-bottom: 3px solid transparent;
+    margin-bottom: -2px;
+    transition: color 0.15s, border-color 0.15s;
+}
+.data-tab:hover { color: #1f7a8c; }
+.data-tab.is-active {
+    color: #1f7a8c;
+    border-bottom-color: #1f7a8c;
+    font-weight: 700;
+}
+
+.data-tab-panel {
+    margin-top: 8px;
+}
+
+/* タブ内ドロップダウン */
+.data-dropdown {
+    margin-bottom: 12px;
+}
+.data-dropdown label {
+    font-size: 0.9rem;
+    color: #444;
+}
+.data-dropdown select {
+    margin-left: 6px;
+    padding: 6px 10px;
+    font-size: 1rem;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    background: #fff;
+    min-width: 220px;
 }
 
 .data-section {
