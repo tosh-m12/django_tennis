@@ -63,8 +63,8 @@
 
             {% endif %}
 
-            {# 戦績表（一般・幹事どちらでも） #}
-              {% if club %}
+            {# 戦績表（一般・幹事どちらでも・戦績ページ自身では表示しない） #}
+              {% if club and current_page != "ranking" %}
                 {% if is_admin %}
                   <a href="{% url 'tennis:ranking_admin' club.public_token club.admin_token %}"
                      class="topbar-link"

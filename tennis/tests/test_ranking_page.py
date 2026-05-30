@@ -47,6 +47,21 @@ class RankingPageAccessTests(TestCase):
         url = reverse("tennis:ranking_admin", args=[self.club.public_token, "wrongtoken"])
         self.assertEqual(self.client.get(url).status_code, 400)
 
+    def test_ranking_page_does_not_show_ranking_link_in_topbar(self):
+        """戦績ページ自身のトップバーには「戦績」リンクを表示しない。"""
+        url = reverse("tennis:ranking", args=[self.club.public_token])
+        resp = self.client.get(url)
+        # context に current_page="ranking" が入っている
+        self.assertEqual(resp.context.get("current_page"), "ranking")
+        # 戻る/設定リンクは出るが、自身への戦績リンクは出ない
+        self.assertNotContains(resp, 'id="topbar-ranking-link"')
+
+    def test_home_shows_ranking_link_in_topbar(self):
+        """ホームのトップバーには「戦績」リンクを表示する。"""
+        url = reverse("tennis:club_home", args=[self.club.public_token])
+        resp = self.client.get(url)
+        self.assertContains(resp, 'id="topbar-ranking-link"')
+
 
 @_NO_MANIFEST_STORAGES
 class RankingPagePeriodTests(TestCase):

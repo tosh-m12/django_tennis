@@ -45,23 +45,20 @@
     padding: 12px 4px;
 }
 
-/* 期間フィルタ（個人ページと同じ・1行に並べる） */
+/* 期間フィルタ：常に1行で並べる（適用ボタンを期間ボックス右側に保つ） */
 .period-filter {
     display: flex;
-    flex-wrap: wrap;
+    flex-wrap: nowrap;
     align-items: flex-end;
     gap: 8px;
 }
-.period-filter > label,
-.period-filter > button[type="submit"] {
-    flex: 0 1 auto;
-    min-width: 0;
-}
-.period-filter label {
+.period-filter > label {
     display: flex;
     flex-direction: column;
     font-size: 0.85rem;
     color: #555;
+    flex: 1 1 0;            /* 縮める／伸ばす */
+    min-width: 0;
 }
 .period-filter input[type="date"] {
     width: 100%;
@@ -74,17 +71,16 @@
 }
 .period-filter > button[type="submit"] {
     align-self: flex-end;
-    flex-shrink: 0;
+    flex: 0 0 auto;          /* 縮めない */
     margin-left: auto;
 }
-.period-filter .period-reset {
-    flex: 1 0 100%;
+
+/* リセットリンクはフォームの外、別行に表示 */
+.period-reset {
+    display: inline-block;
+    margin-top: 8px;
     color: #1f7a8c;
     font-size: 0.9rem;
     text-decoration: underline;
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 6px 0 0;
-    text-align: left;
+    padding: 4px 0;
 }
