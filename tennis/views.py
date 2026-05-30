@@ -1155,17 +1155,20 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
         ) if b[2]["matches"] > 0
     ]
 
-    # 試合履歴は S / D で分割、空の種別は除外
+    # 試合履歴は S / D で分割
     singles_history = [h for h in matches_history if h["game_type"] == "singles"]
     doubles_history = [h for h in matches_history if h["game_type"] == "doubles"]
+    # ※確認用：シングルス／ダブルスのどちらかが空でも枠を表示する（後で空除外に戻す予定）
     history_blocks = [
-        b for b in (
-            ("singles", "シングルス", singles_history),
-            ("doubles", "ダブルス", doubles_history),
-        ) if b[2]
+        ("singles", "シングルス", singles_history),
+        ("doubles", "ダブルス", doubles_history),
     ]
 
-    no_records = not stats_blocks and not history_blocks
+    no_records = (
+        not stats_blocks
+        and not singles_history
+        and not doubles_history
+    )
 
     # 期間表示用ラベル
     if start_d or end_d:
