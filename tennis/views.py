@@ -966,8 +966,6 @@ def club_data(request, club_public_token, club_admin_token):
             "rows": block_rows,
         })
 
-    settings_url = reverse("tennis:club_settings", args=[club.public_token, club.admin_token])
-
     return render(request, "tennis/club_data.html", {
         "club": club,
         "club_public_token": club_public_token,
@@ -979,7 +977,6 @@ def club_data(request, club_public_token, club_admin_token):
         "attendance_table": attendance_table,
         "club_flag_tables": club_flag_tables,
         "event_flag_blocks": event_flag_blocks,
-        "settings_url": settings_url,
         "is_admin": True,
         "show_topbar": True,
         "cleanup_warnings": _run_member_auto_cleanup(club),
