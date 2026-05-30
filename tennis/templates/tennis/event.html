@@ -65,7 +65,9 @@
          data-club-id="{{ club.id }}"
          data-public-token="{{ club.public_token }}"
          data-admin-token="{{ club.admin_token }}"
-         data-update-url="{% url 'tennis:ajax_update_event' %}">
+         data-update-url="{% url 'tennis:ajax_update_event' %}"
+         data-delete-url="{% url 'tennis:club_delete_event' %}"
+         data-club-home-url="{% url 'tennis:club_home_admin' club.public_token club.admin_token %}">
     </div>
   {% endif %}
 

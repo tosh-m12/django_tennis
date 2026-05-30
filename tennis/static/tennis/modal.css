@@ -490,10 +490,12 @@
    イベント中止 / 復活 専用ボタン
    ========================================================= */
 
-/* ラッパー：中央寄せ & 更新ボタンと距離を取る */
+/* ラッパー：中央寄せ & 更新ボタンと距離を取る（中止/削除を縦並び） */
 .club-event-cancel-wrap {
   display: flex;
-  justify-content: center;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
   margin-top: 18px;
 }
 
@@ -547,6 +549,51 @@
   box-shadow:
     0 0 0 3px rgba(255, 77, 77, 0.35),
     0 6px 16px rgba(255, 77, 77, 0.25);
+}
+
+/* =========================================================
+   イベント削除ボタン（白×赤）
+   ・btn-cancel-special と同サイズ
+   ・中止中イベントのみ表示
+   ========================================================= */
+.btn-delete-special {
+  position: relative;
+
+  padding: 10px 26px;
+  border-radius: 999px;
+
+  background: #ffffff;
+  color: #dc2626;
+  border: 2px solid #dc2626;
+
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+
+  cursor: pointer;
+  transition: all 0.18s ease;
+
+  box-shadow: none !important;
+}
+.btn-delete-special::before,
+.btn-delete-special::after {
+  content: none !important;
+}
+.btn-delete-special:hover {
+  background: #fff5f5;
+  color: #dc2626;          /* admin の a:hover で上書きされても固定 */
+  border-color: #dc2626;
+  box-shadow: 0 6px 16px rgba(220, 38, 38, 0.18);
+}
+.btn-delete-special:active {
+  transform: translateY(1px);
+  box-shadow: 0 3px 8px rgba(220, 38, 38, 0.18);
+}
+.btn-delete-special:focus-visible {
+  outline: none;
+  box-shadow:
+    0 0 0 3px rgba(220, 38, 38, 0.30),
+    0 6px 16px rgba(220, 38, 38, 0.18);
 }
 
 /* =========================================================
