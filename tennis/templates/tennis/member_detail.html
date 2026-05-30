@@ -19,42 +19,43 @@
      {% endif %}>
 
   <header class="member-header">
-    <a class="member-back" href="{{ back_url }}">← 戻る</a>
     <h1 class="member-name" id="member-name-display">{{ member.display_name }}</h1>
+    <a class="member-back" href="{{ back_url }}">← 戻る</a>
   </header>
 
-  {# 名前編集 + 削除 #}
+  {# 表示名編集 #}
   <section class="member-edit">
-    <form id="member-name-form" class="member-form">
-      <label for="member-name-input">表示名編集</label>
+    <h2 class="member-section-title">表示名編集</h2>
+    <form id="member-name-form" class="member-form name-edit-row">
       <input type="text"
              id="member-name-input"
              name="display_name"
              value="{{ member.display_name }}"
              maxlength="100"
              autocomplete="off">
-      <div class="member-edit-actions">
-        <button type="submit" class="btn btn-pill btn-primary">保存</button>
-        {% if is_admin and not member.is_fixed %}
-          <button type="button" id="member-delete-btn" class="btn btn-pill member-delete-btn">削除</button>
-        {% endif %}
-      </div>
+      <button type="submit" class="btn btn-pill btn-primary">保存</button>
+      {% if is_admin and not member.is_fixed %}
+        <button type="button" id="member-delete-btn" class="btn btn-pill member-delete-btn">削除</button>
+      {% endif %}
     </form>
   </section>
 
-  {# 集計期間フィルタ #}
-  <form method="get" class="period-filter">
-    <label>開始日
-      <input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}">
-    </label>
-    <label>終了日
-      <input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}">
-    </label>
-    <button type="submit" class="btn btn-pill btn-primary">適用</button>
-    {% if start_date or end_date %}
-      <a class="period-reset" href="{{ request.path }}">全期間に戻す</a>
-    {% endif %}
-  </form>
+  {# 集計期間 #}
+  <section class="member-period">
+    <h2 class="member-section-title">集計期間（{{ period_label }}）</h2>
+    <form method="get" class="period-filter">
+      <label>開始日
+        <input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}">
+      </label>
+      <label>終了日
+        <input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}">
+      </label>
+      <button type="submit" class="btn btn-pill btn-primary">適用</button>
+      {% if start_date or end_date %}
+        <a class="period-reset" href="{{ request.path }}">全期間に戻す</a>
+      {% endif %}
+    </form>
+  </section>
 
   {# 戦績集計 #}
   <section class="member-stats">
@@ -95,8 +96,6 @@
               <thead>
                 <tr>
                   <th>日付</th>
-                  <th>イベント</th>
-                  <th>R/C</th>
                   {% if gt_key == "doubles" %}<th>パートナー</th>{% endif %}
                   <th>対戦相手</th>
                   <th>スコア</th>
@@ -107,8 +106,6 @@
                 {% for h in hist %}
                   <tr class="history-row history-{{ h.result }}">
                     <td>{{ h.date|date:'Y/n/j' }}</td>
-                    <td>{{ h.event_title }}</td>
-                    <td>{{ h.round_no }}/{{ h.court_no }}</td>
                     {% if gt_key == "doubles" %}<td>{{ h.partners|join:"・" }}</td>{% endif %}
                     <td>{{ h.opponents|join:"・" }}</td>
                     <td>
