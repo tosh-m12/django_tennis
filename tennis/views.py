@@ -31,6 +31,7 @@ from .models import (
     MatchScheduleDraft,
     MatchScore,
     GameType,
+    ClubDisplaySetting,
     EventDisplaySetting,
     ClubMemberClass,
 )
@@ -750,6 +751,8 @@ def club_settings(request, club_public_token, club_admin_token):
         .order_by("display_order", "id")
     )
 
+    default_display_settings = _resolve_club_display_settings(club)
+
     prev_year = year - 1 if month == 1 else year
     prev_month = 12 if month == 1 else month - 1
     next_year = year + 1 if month == 12 else year
@@ -775,6 +778,9 @@ def club_settings(request, club_public_token, club_admin_token):
             "max_flags": MAX_FLAGS,
             "members": members,
             "classes": classes,
+            "default_display_settings": default_display_settings,
+            "default_display_settings_json": json.dumps(default_display_settings, ensure_ascii=False),
+            "save_club_display_setting_url": reverse("tennis:save_club_display_setting"),
             "is_admin": True,
             "show_topbar": True,
             "cleanup_warnings": _run_member_auto_cleanup(club),
@@ -1322,21 +1328,41 @@ def ranking_page(request, club_public_token, club_admin_token=None):
 
 
 
+HARDCODED_DISPLAY_SETTINGS_DEFAULT = {
+    "common_flags": True,
+    "event_flags": False,
+    "class": True,
+    "schedule": True,
+}
+
+
+def _resolve_club_display_settings(club):
+    """
+    クラブのデフォルト表示設定を返す。
+    ClubDisplaySetting があれば as_dict()、無ければハードコードのデフォルト。
+    """
+    try:
+        return club.display_setting.as_dict()
+    except ClubDisplaySetting.DoesNotExist:
+        return dict(HARDCODED_DISPLAY_SETTINGS_DEFAULT)
+
+
 def _resolve_event_display_settings(event):
     """
     イベント表示設定を (display_settings: dict, source: str) で返す。
-    DB に EventDisplaySetting があれば as_dict()/"db"、無ければデフォルト/"default"。
+
+    優先順位：
+    1. EventDisplaySetting あり → as_dict() / source="db"
+    2. クラブの ClubDisplaySetting あり → クラブのデフォルト / source="default"
+    3. どちらも無し → ハードコードのデフォルト / source="default"
+
+    ※ 既存テスト互換のため source は "db" / "default" の2値を維持
+       （クラブ default かハードコード default かは source からは区別しない）。
     """
-    default = {
-        "common_flags": True,
-        "event_flags": False,
-        "class": True,
-        "schedule": True,
-    }
     try:
         return event.display_setting.as_dict(), "db"  # OneToOne 想定
     except EventDisplaySetting.DoesNotExist:
-        return default, "default"
+        return _resolve_club_display_settings(event.club), "default"
 
 
 def _load_participant_flag_states(event, club, event_flags):
@@ -2459,6 +2485,45 @@ def save_event_display_setting(request):
     obj.show_event_flags = event_flags
     obj.show_class = show_class
     obj.show_schedule = show_schedule
+    obj.save(update_fields=["show_flags", "show_event_flags", "show_class", "show_schedule", "updated_at"])
+
+    return JsonResponse({"ok": True, "settings": obj.as_dict()})
+
+
+@require_POST
+def save_club_display_setting(request):
+    """
+    クラブのデフォルト表示設定を保存。
+    認可：admin_token 必須。POST keys: club_id, admin_token, settings_json(4キー)。
+    """
+    club_id = (request.POST.get("club_id") or "").strip()
+    if not club_id:
+        return JsonResponse({"ok": False, "error": "missing_club_id"}, status=400)
+
+    club = get_object_or_404(Club, id=int(club_id))
+
+    deny = _require_club_admin_token(request, club)
+    if deny:
+        return deny
+
+    raw = (request.POST.get("settings_json") or "").strip()
+    if not raw:
+        return JsonResponse({"ok": False, "error": "missing_settings_json"}, status=400)
+
+    try:
+        s = json.loads(raw)
+    except Exception:
+        return JsonResponse({"ok": False, "error": "bad_json"}, status=400)
+
+    required_keys = ("common_flags", "event_flags", "class", "schedule")
+    if not isinstance(s, dict) or any(k not in s for k in required_keys):
+        return JsonResponse({"ok": False, "error": "bad_settings_keys"}, status=400)
+
+    obj, _ = ClubDisplaySetting.objects.get_or_create(club=club)
+    obj.show_flags = bool(s.get("common_flags"))
+    obj.show_event_flags = bool(s.get("event_flags"))
+    obj.show_class = bool(s.get("class"))
+    obj.show_schedule = bool(s.get("schedule"))
     obj.save(update_fields=["show_flags", "show_event_flags", "show_class", "show_schedule", "updated_at"])
 
     return JsonResponse({"ok": True, "settings": obj.as_dict()})

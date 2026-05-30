@@ -136,8 +136,9 @@ urlpatterns = [
     # event meta update (title/place/time/cancelled)
     path("api/update_event/", views.ajax_update_event, name="ajax_update_event"),
 
-    # display settings (event)
+    # display settings (event / club default)
     path("ajax/save_event_display_setting/", views.save_event_display_setting, name="save_event_display_setting"),
+    path("ajax/save_club_display_setting/", views.save_club_display_setting, name="save_club_display_setting"),
 
     # ============================================================
     # Score
