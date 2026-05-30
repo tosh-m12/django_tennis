@@ -45,12 +45,12 @@
     padding: 12px 4px;
 }
 
-/* 期間フィルタ：右寄せ＋コンパクト（必要最小限の幅） */
+/* 期間フィルタ：左寄せ＋コンパクト（必要最小限の幅） */
 .period-filter {
     display: flex;
     flex-wrap: nowrap;
     align-items: flex-end;
-    justify-content: flex-end;   /* 右寄せ */
+    justify-content: flex-start;   /* 左寄せ */
     gap: 8px;
 }
 .period-filter > label {
