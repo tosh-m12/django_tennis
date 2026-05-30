@@ -176,33 +176,23 @@ class MemberDetailStatsTests(TestCase):
         self.assertIsNone(ctx["end_date"])
 
     def test_singles_only_member_doubles_block_absent(self):
-        """シングルスにしか記録が無いメンバーは、試合履歴のダブルスは出さない。戦績は確認用に両方表示。"""
+        """シングルスにしか記録が無いメンバーは、ダブルスのカードや履歴を出さない。"""
         url = reverse("tennis:member_detail", args=[self.club.public_token, self.a.id])
         ctx = self.client.get(url).context
-        # 戦績：確認用に S/D の枠を常に表示（後で空除外に戻す予定）
+        # シングルスのみ
         keys_stats = [k for (k, _, _) in ctx["stats_blocks"]]
-        self.assertEqual(keys_stats, ["singles", "doubles"])
-        sb = {k: st for (k, _, st) in ctx["stats_blocks"]}
-        self.assertEqual(sb["singles"]["matches"], 3)
-        self.assertEqual(sb["doubles"]["matches"], 0)
-        # 試合履歴は空を除外（元仕様）
         keys_hist = [k for (k, _, _) in ctx["history_blocks"]]
+        self.assertEqual(keys_stats, ["singles"])
         self.assertEqual(keys_hist, ["singles"])
         self.assertFalse(ctx["no_records"])
 
     def test_no_records_flag_for_member_outside_period(self):
-        """期間内に記録ゼロなら no_records=True、history_blocks は空・stats_blocks は枠だけ表示。"""
+        """期間内に記録ゼロなら no_records=True、stats/history_blocks は空。"""
         url = reverse("tennis:member_detail", args=[self.club.public_token, self.a.id])
         # 試合は 2026/4 のみ → 1月で絞ると全て対象外
         resp = self.client.get(url, {"start": "2026-01-01", "end": "2026-01-31"})
         ctx = resp.context
-        # 戦績枠は表示されるが中身は 0
-        keys_stats = [k for (k, _, _) in ctx["stats_blocks"]]
-        self.assertEqual(keys_stats, ["singles", "doubles"])
-        sb = {k: st for (k, _, st) in ctx["stats_blocks"]}
-        self.assertEqual(sb["singles"]["matches"], 0)
-        self.assertEqual(sb["doubles"]["matches"], 0)
-        # 履歴は空除外で空
+        self.assertEqual(ctx["stats_blocks"], [])
         self.assertEqual(ctx["history_blocks"], [])
         self.assertTrue(ctx["no_records"])
 
