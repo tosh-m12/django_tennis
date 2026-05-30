@@ -26,17 +26,6 @@
     margin: 0;
 }
 
-.data-back-link {
-    color: #1f7a8c;
-    font-size: 0.95rem;
-    text-decoration: none;
-    margin-left: auto;
-}
-.data-back-link:hover {
-    text-decoration: underline;
-    color: #1f7a8c;   /* admin の a:hover 赤(--accent-dark)に上書きさせない */
-}
-
 /* 集計期間（クラブ戦績ページと同じ構造：section-title バー + 左寄せコンパクト） */
 .data-period {
     margin-bottom: 14px;
