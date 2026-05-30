@@ -180,6 +180,14 @@
     text-align: center;
     font-weight: 600;
 }
-.history-row.history-勝 td:last-child { color: #1f7a8c; font-weight: 700; }
-.history-row.history-負 td:last-child { color: #c0392b; font-weight: 700; }
-.history-row.history-分 td:last-child { color: #888; font-weight: 700; }
+/* 勝ち：薄い青背景・濃い青文字 */
+.history-row.history-勝 td {
+    background: #e0f2fe;
+    color: #1e40af;
+}
+/* 負け：薄いグレー背景・黒文字 */
+.history-row.history-負 td {
+    background: #f3f4f6;
+    color: #111;
+}
+/* 分け：素の表示（背景・文字色の指定なし） */
