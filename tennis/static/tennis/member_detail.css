@@ -104,14 +104,13 @@
     flex: 0 0 auto;              /* 自然な幅・入力欄のすぐ右 */
 }
 
-/* 戦績集計：右寄せ・ページ約半分の幅 */
+/* 戦績集計：左寄せ・ページ約半分の幅 */
 .member-stats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 14px;
     margin-bottom: 14px;
     max-width: 50%;
-    margin-left: auto;
 }
 @media (max-width: 700px) {
     .member-stats-grid { max-width: 100%; }
