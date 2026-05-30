@@ -104,16 +104,15 @@
     flex: 0 0 auto;              /* 自然な幅・入力欄のすぐ右 */
 }
 
-/* 戦績集計：左寄せ・ページ約半分の幅 */
+/* 戦績集計：常に2列均等で全幅（試合履歴表の左右と揃える） */
 .member-stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    grid-template-columns: 1fr 1fr;
     gap: 14px;
     margin-bottom: 14px;
-    max-width: 50%;
 }
 @media (max-width: 700px) {
-    .member-stats-grid { max-width: 100%; }
+    .member-stats-grid { grid-template-columns: 1fr; }
 }
 .stats-card {
     background: #fff;
