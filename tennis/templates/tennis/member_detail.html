@@ -42,7 +42,7 @@
 
   {# 集計期間 #}
   <section class="member-period">
-    <h2 class="member-section-title">集計期間（{{ period_label }}）</h2>
+    <h2 class="member-section-title">集計期間</h2>
     <form method="get" class="period-filter">
       <label>開始日
         <input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}">
@@ -51,16 +51,13 @@
         <input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}">
       </label>
       <button type="submit" class="btn btn-pill btn-primary">適用</button>
-      {% if start_date or end_date %}
-        <a class="period-reset" href="{{ request.path }}">全期間に戻す</a>
-      {% endif %}
     </form>
   </section>
 
   {# 戦績集計（記録のある種別だけ表示） #}
   {% if stats_blocks %}
     <section class="member-stats">
-      <h2 class="member-section-title">戦績（{{ period_label }}）</h2>
+      <h2 class="member-section-title">戦績</h2>
       <div class="member-stats-grid">
         {% for gt_key, gt_label, st in stats_blocks %}
           <div class="stats-card">
@@ -85,7 +82,7 @@
   {# 試合履歴（記録のある種別だけ表示） #}
   {% if history_blocks %}
     <section class="member-history">
-      <h2 class="member-section-title">試合履歴（{{ period_label }}）</h2>
+      <h2 class="member-section-title">試合履歴</h2>
       {% for gt_key, gt_label, hist in history_blocks %}
         <div class="history-subblock">
           <h3 class="history-sub-title">{{ gt_label }}</h3>

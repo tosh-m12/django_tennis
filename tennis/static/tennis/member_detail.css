@@ -38,8 +38,7 @@
 .member-edit {
     margin-bottom: 14px;
 }
-/* 入力欄＋保存(＋削除)ボタンを1行に並べる
-   保存ボタンを行の右端に寄せて、下の「適用」ボタンと縦位置を揃える */
+/* 入力欄＋保存(＋削除)ボタンを1行に並べる（コンパクト・左寄せ） */
 .name-edit-row {
     display: flex;
     flex-wrap: wrap;
@@ -47,17 +46,14 @@
     gap: 10px;
 }
 .member-form input[type="text"] {
-    flex: 1 1 220px;            /* 親に合わせて伸縮 */
-    min-width: 0;               /* スマホで右側を見切れさせない */
-    max-width: 360px;
+    flex: 0 1 220px;            /* コンパクト：自然な幅 */
+    min-width: 0;
+    max-width: 280px;
     padding: 8px 10px;
     font-size: 1rem;
     border: 1px solid #ccc;
     border-radius: 6px;
     box-sizing: border-box;
-}
-.name-edit-row > button[type="submit"] {
-    margin-left: auto;          /* 行の右端に寄せる */
 }
 /* 削除ボタン（黒赤、既存設定モーダルと同じ印象） */
 .member-delete-btn {
@@ -78,31 +74,25 @@
     box-shadow: 0 2px 0 #5e0f0f;
 }
 
-/* 集計期間（section-title バー付き・背景なし） */
+/* 集計期間（section-title バー付き・背景なし・左寄せコンパクト） */
 .member-period {
     margin-bottom: 14px;
 }
 .period-filter {
     display: flex;
-    flex-wrap: wrap;             /* ※リセットリンクが出る時のみ2行目に回す */
+    flex-wrap: nowrap;
     align-items: flex-end;
+    justify-content: flex-start;  /* 左寄せ */
     gap: 8px;
 }
-/* 開始日/終了日/適用ボタン は常に1行で揃える */
-.period-filter > label,
-.period-filter > button[type="submit"] {
-    flex: 0 1 auto;
-    min-width: 0;
-}
-.period-filter label {
+.period-filter > label {
     display: flex;
     flex-direction: column;
     font-size: 0.85rem;
     color: #555;
+    flex: 0 0 auto;              /* 自然な幅 */
 }
 .period-filter input[type="date"] {
-    width: 100%;                 /* ラベル幅いっぱい */
-    min-width: 0;                /* スマホで縮められるように */
     padding: 6px 8px;
     border: 1px solid #ccc;
     border-radius: 6px;
@@ -111,34 +101,26 @@
 }
 .period-filter > button[type="submit"] {
     align-self: flex-end;
-    flex-shrink: 0;
-    margin-left: auto;          /* 行の右端に寄せて、上の保存ボタンと縦位置を揃える */
-}
-/* 全期間に戻す は次の行に流して、適用ボタンを期間ボックス右に保つ */
-.period-filter .period-reset {
-    flex: 1 0 100%;
-    color: #1f7a8c;
-    font-size: 0.9rem;
-    text-decoration: underline;
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 6px 0 0;
-    text-align: left;
+    flex: 0 0 auto;              /* 自然な幅・入力欄のすぐ右 */
 }
 
-/* 戦績集計 */
+/* 戦績集計：右寄せ・ページ約半分の幅 */
 .member-stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 14px;
     margin-bottom: 14px;
+    max-width: 50%;
+    margin-left: auto;
+}
+@media (max-width: 700px) {
+    .member-stats-grid { max-width: 100%; }
 }
 .stats-card {
     background: #fff;
-    border: 1px solid #ddd;
     border-radius: 8px;
     padding: 12px 16px;
+    /* 外枠なし（クラブ戦績ページの表と揃える） */
 }
 .stats-card h3 {
     margin: 0 0 8px;
@@ -179,11 +161,9 @@
     color: #1f7a8c;
 }
 
-/* 試合履歴 */
+/* 試合履歴：外枠なし（クラブ戦績ページの表と揃える） */
 .history-wrap {
     overflow-x: auto;
-    border: 1px solid #ddd;
-    border-radius: 6px;
     background: #fff;
 }
 .history-table {

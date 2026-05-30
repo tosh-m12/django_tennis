@@ -144,11 +144,9 @@
     font-weight: normal;
 }
 
-/* マトリクステーブル本体 */
+/* マトリクステーブル本体（外枠なし：クラブ戦績ページの表と揃える） */
 .data-matrix-wrap {
     overflow-x: auto;
-    border: 1px solid #ddd;
-    border-radius: 6px;
     background: #fff;
 }
 .data-matrix-table {
