@@ -824,6 +824,44 @@
   outline: none;
 }
 
+/* ============================
+   イベント削除ボタン：中止取り消しと同じ形状（四角・全幅）に揃える
+   ・色：白背景 / 赤枠 / 赤文字（btn-delete-special を維持）
+   ・枠は表示するため border-radius は 0、枠は維持
+   ============================ */
+#club-event-modal #club-event-delete-btn{
+  width: 100%;
+  box-sizing: border-box;
+
+  /* 形状：中止取り消しボタンと統一 */
+  border-radius: 0px;
+  padding: 10px 0;
+
+  background: #ffffff;
+  color: #dc2626;
+  border: 2px solid #dc2626;
+  box-shadow: none !important;
+
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, transform 0.08s ease;
+}
+#club-event-modal #club-event-delete-btn:hover{
+  background: #fff5f5;
+  color: #dc2626;
+  border-color: #dc2626;
+  box-shadow: 0 8px 18px rgba(220,38,38,0.18);
+}
+#club-event-modal #club-event-delete-btn:active{
+  transform: translateY(1px);
+}
+#club-event-modal #club-event-delete-btn:focus-visible{
+  outline: none;
+}
+
 /* =========================================
    Display Settings Modal - FIX (button toggle version)
    ========================================= */
