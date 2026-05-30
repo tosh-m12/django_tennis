@@ -273,4 +273,33 @@
 .cal-event.is-cancelled.is-public-lock {
   cursor: default !important;
   pointer-events: auto; /* JSで止めるのでautoのまま */
+}
+
+/* ===============================
+   ランキング表（戦績表）の列幅最適化
+   - 順位は内容に応じた最小幅
+   - 名前はセル内で折り返さない（長い名前でもそのまま表示）
+   - 全体は必要なら横スクロール
+   =============================== */
+.rank-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 順位列：最小幅・中央寄せ・折り返し禁止
+   （モバイルの !important ルールに負けないようこちらも !important） */
+.rank-table th:first-child,
+.rank-table td:first-child {
+  width: 1% !important;
+  min-width: 0 !important;
+  white-space: nowrap !important;
+  text-align: center;
+  padding-left: 8px;
+  padding-right: 8px;
+}
+
+/* 名前列：折り返し禁止（長い名前でも縦に積まれない） */
+.rank-table th:nth-child(2),
+.rank-table td:nth-child(2) {
+  white-space: nowrap !important;
 } 
