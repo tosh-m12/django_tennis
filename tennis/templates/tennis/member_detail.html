@@ -57,14 +57,14 @@
     </form>
   </section>
 
-  {# 戦績集計 #}
-  <section class="member-stats">
-    <h2 class="member-section-title">戦績（{{ period_label }}）</h2>
-    <div class="member-stats-grid">
-      {% for gt_key, gt_label, st in stats_blocks %}
-        <div class="stats-card">
-          <h3>{{ gt_label }}</h3>
-          {% if st.matches %}
+  {# 戦績集計（記録のある種別だけ表示） #}
+  {% if stats_blocks %}
+    <section class="member-stats">
+      <h2 class="member-section-title">戦績（{{ period_label }}）</h2>
+      <div class="member-stats-grid">
+        {% for gt_key, gt_label, st in stats_blocks %}
+          <div class="stats-card">
+            <h3>{{ gt_label }}</h3>
             <table class="stats-table">
               <tr><th>試合</th><td>{{ st.matches }}</td></tr>
               <tr><th>勝</th><td>{{ st.wins }}</td></tr>
@@ -76,21 +76,19 @@
               <tr><th>ゲーム率</th><td>{{ st.gp_pct }}%</td></tr>
               <tr><th>得失点</th><td>{{ st.diff }}</td></tr>
             </table>
-          {% else %}
-            <p class="stats-empty">記録なし</p>
-          {% endif %}
-        </div>
-      {% endfor %}
-    </div>
-  </section>
+          </div>
+        {% endfor %}
+      </div>
+    </section>
+  {% endif %}
 
-  {# 試合履歴（シングルス / ダブルス で分割表示） #}
-  <section class="member-history">
-    <h2 class="member-section-title">試合履歴（{{ period_label }}）</h2>
-    {% for gt_key, gt_label, hist in history_blocks %}
-      <div class="history-subblock">
-        <h3 class="history-sub-title">{{ gt_label }}</h3>
-        {% if hist %}
+  {# 試合履歴（記録のある種別だけ表示） #}
+  {% if history_blocks %}
+    <section class="member-history">
+      <h2 class="member-section-title">試合履歴（{{ period_label }}）</h2>
+      {% for gt_key, gt_label, hist in history_blocks %}
+        <div class="history-subblock">
+          <h3 class="history-sub-title">{{ gt_label }}</h3>
           <div class="history-wrap">
             <table class="history-table">
               <thead>
@@ -119,12 +117,17 @@
               </tbody>
             </table>
           </div>
-        {% else %}
-          <p class="stats-empty">{{ gt_label }}の試合履歴はありません。</p>
-        {% endif %}
-      </div>
-    {% endfor %}
-  </section>
+        </div>
+      {% endfor %}
+    </section>
+  {% endif %}
+
+  {# どちらにも記録がない場合だけ、控えめなメッセージを出す #}
+  {% if no_records %}
+    <p class="stats-empty" style="text-align:center; margin-top:24px;">
+      この期間に試合の記録はありません。
+    </p>
+  {% endif %}
 </div>
 {% endblock %}
 
