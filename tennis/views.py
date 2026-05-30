@@ -1144,13 +1144,15 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
         args=[club.public_token, club.admin_token] if is_admin else [club.public_token],
     )
 
-    # 戦績：※確認用に S / D どちらが空でも枠を表示する（後で空除外に戻す予定）
+    # 戦績は記録のある種別だけ残す（空ブロックは出さない）
     stats_blocks = [
-        ("singles", "シングルス", stats["singles"]),
-        ("doubles", "ダブルス", stats["doubles"]),
+        b for b in (
+            ("singles", "シングルス", stats["singles"]),
+            ("doubles", "ダブルス", stats["doubles"]),
+        ) if b[2]["matches"] > 0
     ]
 
-    # 試合履歴は S / D で分割、空の種別は除外（元仕様）
+    # 試合履歴は S / D で分割、空の種別は除外
     singles_history = [h for h in matches_history if h["game_type"] == "singles"]
     doubles_history = [h for h in matches_history if h["game_type"] == "doubles"]
     history_blocks = [
@@ -1160,11 +1162,7 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
         ) if b[2]
     ]
 
-    no_records = (
-        stats["singles"]["matches"] == 0
-        and stats["doubles"]["matches"] == 0
-        and not history_blocks
-    )
+    no_records = not stats_blocks and not history_blocks
 
     # 期間表示用ラベル
     if start_d or end_d:
