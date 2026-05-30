@@ -53,6 +53,7 @@
     border: 1px solid #ccc;
     border-radius: 6px;
     margin-bottom: 10px;
+    box-sizing: border-box; /* スマホで親幅をはみ出さない */
 }
 .member-edit-actions {
     display: flex;
@@ -75,6 +76,40 @@
 .member-delete-btn:active:not(:disabled) {
     transform: translateY(1px);
     box-shadow: 0 2px 0 #5e0f0f;
+}
+
+/* 集計期間フィルタ */
+.period-filter {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 10px;
+    background: #f7f7f7;
+    padding: 10px 14px;
+    border-radius: 8px;
+    margin-bottom: 16px;
+}
+.period-filter label {
+    display: flex;
+    flex-direction: column;
+    font-size: 0.85rem;
+    color: #555;
+}
+.period-filter input[type="date"] {
+    padding: 6px 8px;
+    border: 1px solid #ccc;
+    border-radius: 6px;
+    font-size: 1rem;
+    box-sizing: border-box;
+}
+.period-filter .period-reset {
+    color: #1f7a8c;
+    font-size: 0.9rem;
+    text-decoration: underline;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 6px 0;
 }
 
 /* 戦績集計 */
@@ -117,6 +152,16 @@
 .stats-empty {
     color: #888;
     font-size: 0.9rem;
+}
+
+/* 試合履歴 サブブロック（シングルス / ダブルス） */
+.history-subblock {
+    margin: 8px 0 16px;
+}
+.history-sub-title {
+    font-size: 1rem;
+    margin: 8px 0;
+    color: #1f7a8c;
 }
 
 /* 試合履歴 */

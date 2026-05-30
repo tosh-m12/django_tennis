@@ -26,7 +26,7 @@
   {# 名前編集 + 削除 #}
   <section class="member-edit">
     <form id="member-name-form" class="member-form">
-      <label for="member-name-input">名前</label>
+      <label for="member-name-input">表示名編集</label>
       <input type="text"
              id="member-name-input"
              name="display_name"
@@ -42,9 +42,23 @@
     </form>
   </section>
 
+  {# 集計期間フィルタ #}
+  <form method="get" class="period-filter">
+    <label>開始日
+      <input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}">
+    </label>
+    <label>終了日
+      <input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}">
+    </label>
+    <button type="submit" class="btn btn-pill btn-primary">適用</button>
+    {% if start_date or end_date %}
+      <a class="period-reset" href="{{ request.path }}">全期間に戻す</a>
+    {% endif %}
+  </form>
+
   {# 戦績集計 #}
   <section class="member-stats">
-    <h2 class="member-section-title">戦績（全期間）</h2>
+    <h2 class="member-section-title">戦績（{{ period_label }}）</h2>
     <div class="member-stats-grid">
       {% for gt_key, gt_label, st in stats_blocks %}
         <div class="stats-card">
@@ -69,47 +83,50 @@
     </div>
   </section>
 
-  {# 試合履歴 #}
+  {# 試合履歴（シングルス / ダブルス で分割表示） #}
   <section class="member-history">
-    <h2 class="member-section-title">試合履歴</h2>
-    {% if matches_history %}
-      <div class="history-wrap">
-        <table class="history-table">
-          <thead>
-            <tr>
-              <th>日付</th>
-              <th>イベント</th>
-              <th>種別</th>
-              <th>R/C</th>
-              <th>パートナー</th>
-              <th>対戦相手</th>
-              <th>スコア</th>
-              <th>結果</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for h in matches_history %}
-              <tr class="history-row history-{{ h.result }}">
-                <td>{{ h.date|date:'Y/n/j' }}</td>
-                <td>{{ h.event_title }}</td>
-                <td>{% if h.game_type == "singles" %}S{% else %}D{% endif %}</td>
-                <td>{{ h.round_no }}/{{ h.court_no }}</td>
-                <td>{{ h.partners|join:"・" }}</td>
-                <td>{{ h.opponents|join:"・" }}</td>
-                <td>
-                  {% if h.has_score %}
-                    {{ h.my_score }} - {{ h.opp_score }}
-                  {% else %}―{% endif %}
-                </td>
-                <td>{{ h.result }}</td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+    <h2 class="member-section-title">試合履歴（{{ period_label }}）</h2>
+    {% for gt_key, gt_label, hist in history_blocks %}
+      <div class="history-subblock">
+        <h3 class="history-sub-title">{{ gt_label }}</h3>
+        {% if hist %}
+          <div class="history-wrap">
+            <table class="history-table">
+              <thead>
+                <tr>
+                  <th>日付</th>
+                  <th>イベント</th>
+                  <th>R/C</th>
+                  {% if gt_key == "doubles" %}<th>パートナー</th>{% endif %}
+                  <th>対戦相手</th>
+                  <th>スコア</th>
+                  <th>結果</th>
+                </tr>
+              </thead>
+              <tbody>
+                {% for h in hist %}
+                  <tr class="history-row history-{{ h.result }}">
+                    <td>{{ h.date|date:'Y/n/j' }}</td>
+                    <td>{{ h.event_title }}</td>
+                    <td>{{ h.round_no }}/{{ h.court_no }}</td>
+                    {% if gt_key == "doubles" %}<td>{{ h.partners|join:"・" }}</td>{% endif %}
+                    <td>{{ h.opponents|join:"・" }}</td>
+                    <td>
+                      {% if h.has_score %}
+                        {{ h.my_score }} - {{ h.opp_score }}
+                      {% else %}―{% endif %}
+                    </td>
+                    <td>{{ h.result }}</td>
+                  </tr>
+                {% endfor %}
+              </tbody>
+            </table>
+          </div>
+        {% else %}
+          <p class="stats-empty">{{ gt_label }}の試合履歴はありません。</p>
+        {% endif %}
       </div>
-    {% else %}
-      <p class="stats-empty">試合履歴はありません。</p>
-    {% endif %}
+    {% endfor %}
   </section>
 </div>
 {% endblock %}
