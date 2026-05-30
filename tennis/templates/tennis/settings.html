@@ -257,5 +257,16 @@
   <div class="participant-empty">フラグがまだ登録されていません。</div>
 {% endif %}
 
+{# データ集計表への導線 #}
+<div class="data-link-area" style="margin-top:24px;">
+  <a class="btn btn-pill btn-primary"
+     href="{% url 'tennis:club_data' club.public_token club.admin_token %}">
+    データ集計表を開く
+  </a>
+  <small class="flag-note" style="display:block; margin-top:6px;">
+    出欠・共通フラグ・固有フラグの履歴を期間で絞って一覧できます（幹事のみ）。
+  </small>
+</div>
+
 
 {% endblock %}
