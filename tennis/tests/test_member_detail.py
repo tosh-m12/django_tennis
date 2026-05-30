@@ -120,6 +120,61 @@ class MemberDetailStatsTests(TestCase):
         self.assertEqual(s["losses"], 3)
         self.assertEqual(s["win_pct"], 0.0)
 
+    def test_history_split_singles_doubles(self):
+        # ダブルスのイベントを追加して履歴が分かれることを確認
+        ev_d = make_event(self.club, date=datetime.date(2026, 5, 1))
+        ep_a_d = make_ep(ev_d, member=self.a, attendance="yes")
+        ep_b_d = make_ep(ev_d, member=self.b, attendance="yes")
+        ep_c_d = make_ep(ev_d, display_name="C", attendance="yes")
+        ep_d_d = make_ep(ev_d, display_name="D", attendance="yes")
+        ms_d = make_published_schedule(
+            ev_d,
+            [{"round": 1, "matches": [{"court": 1,
+                                       "team1": [ep_a_d.id, ep_c_d.id],
+                                       "team2": [ep_b_d.id, ep_d_d.id]}],
+              "rests": []}],
+            game_type="doubles", court_count=1, round_count=1,
+        )
+        make_score(ms_d, 1, 1, 6, 3)
+
+        url = reverse("tennis:member_detail", args=[self.club.public_token, self.a.id])
+        ctx = self.client.get(url).context
+        hb = {k: hist for (k, _, hist) in ctx["history_blocks"]}
+        self.assertEqual(len(hb["singles"]), 3)
+        self.assertEqual(len(hb["doubles"]), 1)
+        # ダブルスの方はパートナーが入っている
+        self.assertEqual(hb["doubles"][0]["partners"], ["C"])
+
+    def test_period_filter_limits_history(self):
+        # ダブルス試合（5/1）を追加
+        ev_may = make_event(self.club, date=datetime.date(2026, 5, 1))
+        ep_a2 = make_ep(ev_may, member=self.a, attendance="yes")
+        ep_b2 = make_ep(ev_may, member=self.b, attendance="yes")
+        ms_may = make_published_schedule(
+            ev_may,
+            [{"round": 1, "matches": [{"court": 1, "team1": [ep_a2.id], "team2": [ep_b2.id]}], "rests": []}],
+            game_type="singles", court_count=1, round_count=1,
+        )
+        make_score(ms_may, 1, 1, 6, 0)
+
+        url = reverse("tennis:member_detail", args=[self.club.public_token, self.a.id])
+        # 4月のみに絞る
+        resp = self.client.get(url, {"start": "2026-04-01", "end": "2026-04-30"})
+        ctx = resp.context
+        # シングルスは4月の3試合のみ（5月は除外）
+        hb = {k: hist for (k, _, hist) in ctx["history_blocks"]}
+        self.assertEqual(len(hb["singles"]), 3)
+        # 期間ラベルが反映されている
+        self.assertIn("2026", ctx["period_label"])
+        self.assertNotEqual(ctx["period_label"], "全期間")
+
+    def test_default_period_is_all_time(self):
+        url = reverse("tennis:member_detail", args=[self.club.public_token, self.a.id])
+        ctx = self.client.get(url).context
+        self.assertEqual(ctx["period_label"], "全期間")
+        self.assertIsNone(ctx["start_date"])
+        self.assertIsNone(ctx["end_date"])
+
 
 class UpdateMemberDisplayNameTests(TestCase):
     def setUp(self):

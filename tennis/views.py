@@ -930,17 +930,25 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
 
     member = get_object_or_404(Member, id=int(member_id), club=club)
 
+    # 集計期間（GET パラメータ。空欄は全期間）
+    start_str = (request.GET.get("start") or "").strip()
+    end_str = (request.GET.get("end") or "").strip()
+    start_d = _parse_date_yyyy_mm_dd(start_str)
+    end_d = _parse_date_yyyy_mm_dd(end_str)
+
     # このメンバーの EP id 集合
     my_ep_ids = set(
         EventParticipant.objects.filter(member=member).values_list("id", flat=True)
     )
 
-    # クラブの公開済み MatchSchedule を新しい順に
+    # クラブの公開済み MatchSchedule を新しい順に（期間絞り込み）
+    schedules_qs = MatchSchedule.objects.filter(event__club=club, published=True)
+    if start_d:
+        schedules_qs = schedules_qs.filter(event__date__gte=start_d)
+    if end_d:
+        schedules_qs = schedules_qs.filter(event__date__lte=end_d)
     schedules = list(
-        MatchSchedule.objects
-        .filter(event__club=club, published=True)
-        .select_related("event")
-        .order_by("-event__date", "-event__id")
+        schedules_qs.select_related("event").order_by("-event__date", "-event__id")
     )
 
     # 試合一覧から出てくる全 EP id を収集（対戦相手・パートナー名解決用）
@@ -1063,12 +1071,31 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
         ("doubles", "ダブルス", stats["doubles"]),
     ]
 
+    # 試合履歴は S / D で分割
+    singles_history = [h for h in matches_history if h["game_type"] == "singles"]
+    doubles_history = [h for h in matches_history if h["game_type"] == "doubles"]
+
+    history_blocks = [
+        ("singles", "シングルス", singles_history),
+        ("doubles", "ダブルス", doubles_history),
+    ]
+
+    # 期間表示用ラベル
+    if start_d or end_d:
+        period_label = f"{start_d.strftime('%Y/%-m/%-d') if start_d else '?'} 〜 {end_d.strftime('%Y/%-m/%-d') if end_d else '?'}"
+    else:
+        period_label = "全期間"
+
     return render(request, "tennis/member_detail.html", {
         "club": club,
         "member": member,
         "is_admin": is_admin,
         "stats_blocks": stats_blocks,
+        "history_blocks": history_blocks,
         "matches_history": matches_history,
+        "start_date": start_d,
+        "end_date": end_d,
+        "period_label": period_label,
         "back_url": back_url,
         "show_topbar": True,
         "cleanup_warnings": _run_member_auto_cleanup(club) if is_admin else [],
