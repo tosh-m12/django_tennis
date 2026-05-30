@@ -37,6 +37,16 @@ urlpatterns = [
         views.club_data,
         name="club_data",
     ),
+    path(
+        "c/<str:club_public_token>/member/<int:member_id>/",
+        views.member_detail,
+        name="member_detail",
+    ),
+    path(
+        "c/<str:club_public_token>/admin/<str:club_admin_token>/member/<int:member_id>/",
+        views.member_detail,
+        name="member_detail_admin",
+    ),
 
     # ============================================================
     # Event pages (token-based = club token)
@@ -101,6 +111,7 @@ urlpatterns = [
     path("api/event/update_attendance/", views.update_attendance, name="update_attendance"),
     path("api/event/update_comment/", views.update_comment, name="update_comment"),
     path("api/event/update_name/", views.update_participant_display_name, name="update_participant_display_name"),
+    path("api/member/update_name/", views.update_member_display_name, name="update_member_display_name"),
     path("api/event/toggle_flag/", views.toggle_participant_flag, name="toggle_participant_flag"),
     path("api/event/set_participates_match/", views.set_participates_match, name="set_participates_match"),
     path("api/event/add_guest/", views.add_guest_participant, name="add_guest_participant"),

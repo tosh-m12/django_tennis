@@ -1,0 +1,119 @@
+{% extends "tennis/base.html" %}
+{% load static %}
+
+{% block title %}{{ member.display_name }} - {{ club.name }}{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'tennis/member_detail.css' %}">
+  <meta name="csrf-token" content="{{ csrf_token }}">
+{% endblock %}
+
+{% block content %}
+<div class="member-page"
+     data-club-id="{{ club.id }}"
+     data-member-id="{{ member.id }}"
+     data-update-url="{% url 'tennis:update_member_display_name' %}"
+     {% if is_admin %}data-delete-url="{% url 'tennis:club_delete_member' %}"
+     data-admin-token="{{ club.admin_token }}"
+     data-home-url="{% url 'tennis:club_home_admin' club.public_token club.admin_token %}"
+     {% endif %}>
+
+  <header class="member-header">
+    <a class="member-back" href="{{ back_url }}">← 戻る</a>
+    <h1 class="member-name" id="member-name-display">{{ member.display_name }}</h1>
+  </header>
+
+  {# 名前編集 + 削除 #}
+  <section class="member-edit">
+    <form id="member-name-form" class="member-form">
+      <label for="member-name-input">名前</label>
+      <input type="text"
+             id="member-name-input"
+             name="display_name"
+             value="{{ member.display_name }}"
+             maxlength="100"
+             autocomplete="off">
+      <div class="member-edit-actions">
+        <button type="submit" class="btn btn-pill btn-primary">保存</button>
+        {% if is_admin and not member.is_fixed %}
+          <button type="button" id="member-delete-btn" class="btn btn-pill member-delete-btn">削除</button>
+        {% endif %}
+      </div>
+    </form>
+  </section>
+
+  {# 戦績集計 #}
+  <section class="member-stats">
+    <h2 class="member-section-title">戦績（全期間）</h2>
+    <div class="member-stats-grid">
+      {% for gt_key, gt_label, st in stats_blocks %}
+        <div class="stats-card">
+          <h3>{{ gt_label }}</h3>
+          {% if st.matches %}
+            <table class="stats-table">
+              <tr><th>試合</th><td>{{ st.matches }}</td></tr>
+              <tr><th>勝</th><td>{{ st.wins }}</td></tr>
+              <tr><th>負</th><td>{{ st.losses }}</td></tr>
+              <tr><th>分</th><td>{{ st.draws }}</td></tr>
+              <tr><th>勝率</th><td>{{ st.win_pct }}%</td></tr>
+              <tr><th>GF</th><td>{{ st.gf }}</td></tr>
+              <tr><th>GA</th><td>{{ st.ga }}</td></tr>
+              <tr><th>ゲーム率</th><td>{{ st.gp_pct }}%</td></tr>
+              <tr><th>得失点</th><td>{{ st.diff }}</td></tr>
+            </table>
+          {% else %}
+            <p class="stats-empty">記録なし</p>
+          {% endif %}
+        </div>
+      {% endfor %}
+    </div>
+  </section>
+
+  {# 試合履歴 #}
+  <section class="member-history">
+    <h2 class="member-section-title">試合履歴</h2>
+    {% if matches_history %}
+      <div class="history-wrap">
+        <table class="history-table">
+          <thead>
+            <tr>
+              <th>日付</th>
+              <th>イベント</th>
+              <th>種別</th>
+              <th>R/C</th>
+              <th>パートナー</th>
+              <th>対戦相手</th>
+              <th>スコア</th>
+              <th>結果</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for h in matches_history %}
+              <tr class="history-row history-{{ h.result }}">
+                <td>{{ h.date|date:'Y/n/j' }}</td>
+                <td>{{ h.event_title }}</td>
+                <td>{% if h.game_type == "singles" %}S{% else %}D{% endif %}</td>
+                <td>{{ h.round_no }}/{{ h.court_no }}</td>
+                <td>{{ h.partners|join:"・" }}</td>
+                <td>{{ h.opponents|join:"・" }}</td>
+                <td>
+                  {% if h.has_score %}
+                    {{ h.my_score }} - {{ h.opp_score }}
+                  {% else %}―{% endif %}
+                </td>
+                <td>{{ h.result }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    {% else %}
+      <p class="stats-empty">試合履歴はありません。</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}
+
+{% block extra_scripts %}
+  <script src="{% static 'tennis/member_detail.js' %}" defer></script>
+{% endblock %}

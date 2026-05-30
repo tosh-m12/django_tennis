@@ -905,6 +905,176 @@ def club_data(request, club_public_token, club_admin_token):
     })
 
 
+def _parse_int_or_none(v):
+    try:
+        return int(v)
+    except Exception:
+        return None
+
+
+@require_http_methods(["GET"])
+def member_detail(request, club_public_token, member_id, club_admin_token=None):
+    """
+    メンバー個人ページ（一般・幹事共通）。
+    - 名前編集（一般・幹事とも可。既存の "誰でも編集" 仕様を継承）
+    - 削除ボタン（幹事モード・非固定メンバーのみ表示）
+    - 戦績集計サマリ（シングルス／ダブルス別、全期間）
+    - 試合履歴（公開済み MatchSchedule の schedule_json + MatchScore から構築）
+    """
+    club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
+    is_admin = False
+    if club_admin_token is not None:
+        if club.admin_token != club_admin_token:
+            return HttpResponseBadRequest("admin token mismatch")
+        is_admin = True
+
+    member = get_object_or_404(Member, id=int(member_id), club=club)
+
+    # このメンバーの EP id 集合
+    my_ep_ids = set(
+        EventParticipant.objects.filter(member=member).values_list("id", flat=True)
+    )
+
+    # クラブの公開済み MatchSchedule を新しい順に
+    schedules = list(
+        MatchSchedule.objects
+        .filter(event__club=club, published=True)
+        .select_related("event")
+        .order_by("-event__date", "-event__id")
+    )
+
+    # 試合一覧から出てくる全 EP id を収集（対戦相手・パートナー名解決用）
+    all_ep_ids = set()
+    for ms in schedules:
+        for r in (ms.schedule_json or []):
+            for m in (r.get("matches") or []):
+                for p in (m.get("team1") or []) + (m.get("team2") or []):
+                    pi = _parse_int_or_none(p)
+                    if pi is not None:
+                        all_ep_ids.add(pi)
+
+    ep_map = {
+        ep.id: ep for ep in
+        EventParticipant.objects.filter(id__in=list(all_ep_ids)).select_related("member")
+    }
+
+    def _name_of(p):
+        ep = ep_map.get(_parse_int_or_none(p))
+        if not ep:
+            return str(p)
+        if ep.member_id and ep.member:
+            return ep.member.display_name
+        return ep.display_name or str(p)
+
+    stats = {
+        "singles": {"matches": 0, "wins": 0, "losses": 0, "draws": 0, "gf": 0, "ga": 0},
+        "doubles": {"matches": 0, "wins": 0, "losses": 0, "draws": 0, "gf": 0, "ga": 0},
+    }
+    matches_history = []
+
+    for ms in schedules:
+        score_map = _build_score_map(ms)
+        game_type = ms.game_type or GameType.DOUBLES
+
+        for r in (ms.schedule_json or []):
+            round_no = int(r.get("round") or 0)
+            for m in (r.get("matches") or []):
+                court_no = int(m.get("court") or 0)
+                t1_raw = m.get("team1") or []
+                t2_raw = m.get("team2") or []
+                t1 = [_parse_int_or_none(p) for p in t1_raw]
+                t2 = [_parse_int_or_none(p) for p in t2_raw]
+                t1 = [p for p in t1 if p is not None]
+                t2 = [p for p in t2 if p is not None]
+
+                in_t1 = any(p in my_ep_ids for p in t1)
+                in_t2 = any(p in my_ep_ids for p in t2)
+                if not (in_t1 or in_t2):
+                    continue
+
+                s1, s2 = score_map.get((round_no, court_no), (None, None))
+
+                if in_t1:
+                    my_team = t1
+                    opp_team = t2
+                    my_score, opp_score = s1, s2
+                else:
+                    my_team = t2
+                    opp_team = t1
+                    my_score, opp_score = s2, s1
+
+                # スコア両方ある場合のみ集計
+                if my_score is not None and opp_score is not None:
+                    b = stats.get(game_type)
+                    if b is not None:
+                        b["matches"] += 1
+                        b["gf"] += int(my_score)
+                        b["ga"] += int(opp_score)
+                        if my_score > opp_score:
+                            b["wins"] += 1
+                        elif my_score < opp_score:
+                            b["losses"] += 1
+                        else:
+                            b["draws"] += 1
+
+                partners = [_name_of(p) for p in my_team if p not in my_ep_ids]
+                opponents = [_name_of(p) for p in opp_team]
+
+                if my_score is None or opp_score is None:
+                    result = ""
+                elif my_score > opp_score:
+                    result = "勝"
+                elif my_score < opp_score:
+                    result = "負"
+                else:
+                    result = "分"
+
+                matches_history.append({
+                    "date": ms.event.date,
+                    "event_title": ms.event.title or "練習",
+                    "event_id": ms.event.id,
+                    "game_type": game_type,
+                    "round_no": round_no,
+                    "court_no": court_no,
+                    "partners": partners,
+                    "opponents": opponents,
+                    "my_score": my_score,
+                    "opp_score": opp_score,
+                    "has_score": my_score is not None and opp_score is not None,
+                    "result": result,
+                })
+
+    for gt in ("singles", "doubles"):
+        s = stats[gt]
+        m = s["matches"]
+        s["win_pct"] = round((s["wins"] / m) * 100, 1) if m else 0.0
+        gf, ga = s["gf"], s["ga"]
+        s["gp_pct"] = round((gf / (gf + ga)) * 100, 1) if (gf + ga) else 0.0
+        s["diff"] = gf - ga
+
+    # 戻り先（来た元のページ） — referer があればそれ、無ければクラブホーム
+    back_url = request.META.get("HTTP_REFERER") or reverse(
+        "tennis:club_home_admin" if is_admin else "tennis:club_home",
+        args=[club.public_token, club.admin_token] if is_admin else [club.public_token],
+    )
+
+    stats_blocks = [
+        ("singles", "シングルス", stats["singles"]),
+        ("doubles", "ダブルス", stats["doubles"]),
+    ]
+
+    return render(request, "tennis/member_detail.html", {
+        "club": club,
+        "member": member,
+        "is_admin": is_admin,
+        "stats_blocks": stats_blocks,
+        "matches_history": matches_history,
+        "back_url": back_url,
+        "show_topbar": True,
+        "cleanup_warnings": _run_member_auto_cleanup(club) if is_admin else [],
+    })
+
+
 def club_home(request, club_public_token, club_admin_token=None):
     """
     共通ホーム（メンバー/幹事）
@@ -1774,6 +1944,40 @@ def update_participant_display_name(request):
         "ok": True,
         "ep_id": ep.id,
         "member_id": ep.member_id,
+        "display_name": new_name,
+    })
+
+
+@require_POST
+def update_member_display_name(request):
+    """
+    個人ページからのメンバー名編集（一般/幹事どちらも可）。
+    - 対象: Member.display_name
+    - 副作用: 当該メンバーの全 EventParticipant.display_name にも伝播
+      （クラブ全体に反映する点は update_participant_display_name のメンバー紐付き経路と同じ）
+    - event_id を要求しない点が update_participant_display_name と異なる
+    """
+    club_id = (request.POST.get("club_id") or "").strip()
+    member_id = (request.POST.get("member_id") or "").strip()
+    new_name = (request.POST.get("display_name") or "").strip()
+
+    if not club_id or not member_id:
+        return JsonResponse({"ok": False, "error": "missing_params"}, status=400)
+    if not new_name:
+        return JsonResponse({"ok": False, "error": "empty_name"}, status=400)
+    if len(new_name) > 100:
+        return JsonResponse({"ok": False, "error": "name_too_long"}, status=400)
+
+    club = get_object_or_404(Club, id=int(club_id), is_active=True)
+    member = get_object_or_404(Member, id=int(member_id), club=club)
+
+    member.display_name = new_name
+    member.save(update_fields=["display_name", "updated_at"])
+    EventParticipant.objects.filter(member=member).update(display_name=new_name)
+
+    return JsonResponse({
+        "ok": True,
+        "member_id": member.id,
         "display_name": new_name,
     })
 
