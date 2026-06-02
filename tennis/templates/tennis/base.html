@@ -40,7 +40,19 @@
             {% endif %}
           </div>
 
-          <div class="topbar-actions">
+          {# ハンバーガーボタン：狭幅でのみ表示（CSSで制御） #}
+          <button type="button"
+                  class="topbar-hamburger"
+                  id="topbar-hamburger"
+                  aria-label="メニューを開く"
+                  aria-expanded="false"
+                  aria-controls="topbar-actions">
+            <span class="topbar-hamburger-bar"></span>
+            <span class="topbar-hamburger-bar"></span>
+            <span class="topbar-hamburger-bar"></span>
+          </button>
+
+          <div class="topbar-actions" id="topbar-actions">
             {# club がある場合のみボタン群を出す #}
             {% if club %}
 
@@ -88,6 +100,15 @@
                   設定
                 </a>
               {% endif %}
+
+            {# 幹事のみ「ヘルプ」 #}
+              {% if is_admin and club %}
+                <a href="{% url 'tennis:club_admin_help' club.public_token club.admin_token %}"
+                  class="topbar-link"
+                  id="topbar-help-link">
+                  ヘルプ
+                </a>
+              {% endif %}
           </div>
         </div>
       </div>
@@ -114,6 +135,9 @@
 
   {# topbar の「もどる」URLを直前のカレンダー月に合わせる #}
   <script src="{% static 'tennis/topbar_back.js' %}" defer></script>
+
+  {# ハンバーガーメニュー（狭幅時のみ動作） #}
+  <script src="{% static 'tennis/topbar_hamburger.js' %}" defer></script>
 
   {% block extra_scripts %}{% endblock %}
 </body>

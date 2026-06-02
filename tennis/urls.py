@@ -38,6 +38,11 @@ urlpatterns = [
         name="club_data",
     ),
     path(
+        "c/<str:club_public_token>/admin/<str:club_admin_token>/help/",
+        views.club_admin_help,
+        name="club_admin_help",
+    ),
+    path(
         "c/<str:club_public_token>/ranking/",
         views.ranking_page,
         name="ranking",
