@@ -101,13 +101,21 @@
                 </a>
               {% endif %}
 
-            {# 幹事のみ「ヘルプ」 #}
-              {% if is_admin and club %}
-                <a href="{% url 'tennis:club_admin_help' club.public_token club.admin_token %}"
-                  class="topbar-link"
-                  id="topbar-help-link">
-                  ヘルプ
-                </a>
+            {# ヘルプ（幹事は管理者ヘルプ、一般はユーザヘルプ） #}
+              {% if club %}
+                {% if is_admin %}
+                  <a href="{% url 'tennis:club_admin_help' club.public_token club.admin_token %}"
+                    class="topbar-link"
+                    id="topbar-help-link">
+                    ヘルプ
+                  </a>
+                {% else %}
+                  <a href="{% url 'tennis:club_user_help' club.public_token %}"
+                    class="topbar-link"
+                    id="topbar-help-link">
+                    ヘルプ
+                  </a>
+                {% endif %}
               {% endif %}
           </div>
         </div>

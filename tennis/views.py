@@ -811,6 +811,27 @@ def club_admin_help(request, club_public_token, club_admin_token):
 
 
 @require_http_methods(["GET"])
+def club_user_help(request, club_public_token):
+    """
+    一般メンバー向けヘルプページ：基本的な使い方の説明。
+    """
+    club = get_object_or_404(
+        Club,
+        public_token=club_public_token,
+        is_active=True,
+    )
+    return render(
+        request,
+        "tennis/user_help.html",
+        {
+            "club": club,
+            "is_admin": False,
+            "show_topbar": True,
+        },
+    )
+
+
+@require_http_methods(["GET"])
 def club_data(request, club_public_token, club_admin_token):
     """
     幹事専用：出欠・共通フラグ・固有フラグのデータ集計表ページ。
