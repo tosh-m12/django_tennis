@@ -115,6 +115,37 @@
       <li>期間を指定して絞り込み可能</li>
       <li>勝ち（青）／負け（赤）／引き分け（無色）で色分け</li>
     </ul>
+
+    <h3 class="help-subsection-title">戦績の集計ルール</h3>
+    <p>ランキングと個人戦績は以下のルールで計算されます。</p>
+
+    <p><strong>集計対象になる試合</strong></p>
+    <ul>
+      <li>指定期間内で、対戦表が<strong>公開済み</strong>の試合のみ</li>
+      <li><strong>両者のスコアが入力済み</strong>の試合のみ（スコア未入力は集計されない）</li>
+      <li>シングルスとダブルスは別ランキング</li>
+      <li>ランキングは<strong>3試合以上</strong>参加した人だけが表示される</li>
+    </ul>
+
+    <p><strong>各列の意味</strong></p>
+    <table class="help-table">
+      <thead><tr><th>列</th><th>説明</th></tr></thead>
+      <tbody>
+        <tr><td>試合</td><td>集計対象の試合数</td></tr>
+        <tr><td>勝</td><td>勝った試合数</td></tr>
+        <tr><td>負</td><td>負けた試合数</td></tr>
+        <tr><td>分</td><td>引き分け（同点）</td></tr>
+        <tr><td>勝率</td><td>勝 ÷ 試合 × 100（%）</td></tr>
+        <tr><td>GF</td><td>自分側の合計獲得ゲーム数</td></tr>
+        <tr><td>GA</td><td>相手側の合計獲得ゲーム数</td></tr>
+        <tr><td>ゲーム率</td><td>GF ÷ (GF + GA) × 100（%）</td></tr>
+        <tr><td>得失点</td><td>GF − GA</td></tr>
+      </tbody>
+    </table>
+
+    <p><strong>ランキングのソート順</strong>：勝率 → ゲーム率 → 勝数 → 得失点 → 試合数 → 名前 の順で比較。</p>
+
+    <p><strong>ダブルス</strong>：1試合につきペアの両プレーヤーに同じ結果がカウントされます。</p>
   </section>
 
   <section id="sec-faq" class="help-section">
