@@ -1068,8 +1068,10 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
         EventParticipant.objects.filter(member=member).values_list("id", flat=True)
     )
 
-    # クラブの公開済み MatchSchedule を新しい順に（期間絞り込み）
-    schedules_qs = MatchSchedule.objects.filter(event__club=club, published=True)
+    # クラブの公開済み MatchSchedule を新しい順に（期間絞り込み・中止イベント除外）
+    schedules_qs = MatchSchedule.objects.filter(
+        event__club=club, published=True, event__cancelled=False
+    )
     if start_d:
         schedules_qs = schedules_qs.filter(event__date__gte=start_d)
     if end_d:
@@ -1328,7 +1330,7 @@ def ranking_page(request, club_public_token, club_admin_token=None):
 
     events_qs = (
         Event.objects
-        .filter(club=club, date__gte=start_d, date__lte=end_d)
+        .filter(club=club, date__gte=start_d, date__lte=end_d, cancelled=False)
         .order_by("date", "start_time", "id")
     )
 
