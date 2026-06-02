@@ -43,6 +43,11 @@ urlpatterns = [
         name="club_admin_help",
     ),
     path(
+        "c/<str:club_public_token>/help/",
+        views.club_user_help,
+        name="club_user_help",
+    ),
+    path(
         "c/<str:club_public_token>/ranking/",
         views.ranking_page,
         name="ranking",
