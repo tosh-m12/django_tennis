@@ -224,6 +224,7 @@ th {
 
 /* 中身は topbar の中で詰めるだけ */
 .topbar-inner{
+  position: relative;        /* ハンバーガー時のドロップダウン配置基準 */
   height: 56px;
   display: flex;
   align-items: center;
@@ -247,6 +248,86 @@ th {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+/* ハンバーガーボタン：通常時は非表示、狭幅でだけ表示 */
+.topbar-hamburger{
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 4px;
+
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+.topbar-hamburger-bar{
+  display: block;
+  width: 22px;
+  height: 2px;
+  background: #fff;
+  border-radius: 1px;
+  transition: transform 0.18s ease, opacity 0.18s ease;
+}
+/* 開いてる時の見た目（×に変形） */
+.topbar-hamburger.is-open .topbar-hamburger-bar:nth-child(1){
+  transform: translateY(6px) rotate(45deg);
+}
+.topbar-hamburger.is-open .topbar-hamburger-bar:nth-child(2){
+  opacity: 0;
+}
+.topbar-hamburger.is-open .topbar-hamburger-bar:nth-child(3){
+  transform: translateY(-6px) rotate(-45deg);
+}
+
+/* =========================================================
+   狭幅時：トップバーアクションをドロップダウン化
+   ========================================================= */
+@media (max-width: 720px) {
+  .topbar-hamburger{
+    display: inline-flex;
+  }
+  .topbar-actions{
+    /* 通常は隠す：ハンバーガーで開閉 */
+    display: none;
+
+    position: absolute;
+    top: 100%;
+    right: 8px;
+
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0;
+
+    min-width: 160px;
+    padding: 6px 0;
+
+    background: var(--accent);
+    border-radius: 0 0 8px 8px;
+    box-shadow: 0 6px 16px rgba(0,0,0,0.18);
+
+    z-index: 920;
+  }
+  .topbar-actions.is-open{
+    display: flex;
+  }
+  .topbar-actions .topbar-link{
+    padding: 10px 16px;
+    border-radius: 0;
+    text-align: left;
+  }
+  .topbar-actions .topbar-link:hover{
+    background: rgba(255,255,255,0.12);
+    text-decoration: none;
+  }
+  /* 縦並びリンク間の薄い区切り */
+  .topbar-actions .topbar-link + .topbar-link{
+    border-top: 1px solid rgba(255,255,255,0.18);
+  }
 }
 
 /* =========================================================

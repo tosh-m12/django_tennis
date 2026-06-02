@@ -1,0 +1,248 @@
+{% extends "tennis/base.html" %}
+{% load static %}
+
+{% block title %}ヘルプ - 幹事向け - {{ club.name }}{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'tennis/admin_help.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="help-page">
+
+  <header class="help-header">
+    <h1 class="help-title">幹事向けヘルプ</h1>
+    <p class="help-subtitle">このアプリの機能と使い方</p>
+  </header>
+
+  {# 目次 #}
+  <nav class="help-toc" aria-label="目次">
+    <h2 class="help-toc-title">目次</h2>
+    <ol class="help-toc-list">
+      <li><a href="#sec-intro">1. はじめに</a></li>
+      <li><a href="#sec-urls">2. URLとアクセス権限</a></li>
+      <li><a href="#sec-members">3. メンバー管理</a></li>
+      <li><a href="#sec-events">4. イベント管理</a></li>
+      <li><a href="#sec-participation">5. 参加登録と出欠</a></li>
+      <li><a href="#sec-flags">6. フラグ機能</a></li>
+      <li><a href="#sec-classes">7. クラス／チーム分け</a></li>
+      <li><a href="#sec-schedule">8. 対戦表</a></li>
+      <li><a href="#sec-stats">9. 戦績ページと個人ページ</a></li>
+      <li><a href="#sec-data">10. データ集計表</a></li>
+      <li><a href="#sec-defaults">11. デフォルト表示設定</a></li>
+      <li><a href="#sec-troubleshoot">12. 困ったときは</a></li>
+    </ol>
+  </nav>
+
+  {# 本文 #}
+  <section id="sec-intro" class="help-section">
+    <h2 class="help-section-title">1. はじめに</h2>
+    <p>このアプリはテニスサークルの<strong>出欠管理</strong>、<strong>対戦表作成</strong>、<strong>戦績集計</strong>を一体化したツールです。幹事は専用URLからメンバー・イベント・対戦表を管理でき、メンバーは公開URLから出欠を入力できます。</p>
+    <div class="help-callout">
+      <strong>幹事モードの目印</strong>：画面上部に赤系のバナーと「- 幹事モード」表示があります。
+    </div>
+  </section>
+
+  <section id="sec-urls" class="help-section">
+    <h2 class="help-section-title">2. URLとアクセス権限</h2>
+    <p>クラブには 2 種類の URL があります。</p>
+    <table class="help-table">
+      <thead>
+        <tr><th>URL</th><th>用途</th><th>権限</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>/c/&lt;public_token&gt;/</code></td>
+          <td>一般メンバー用（共有可）</td>
+          <td>閲覧・自分の出欠／フラグ入力のみ</td>
+        </tr>
+        <tr>
+          <td><code>/c/&lt;public_token&gt;/admin/&lt;admin_token&gt;/</code></td>
+          <td>幹事専用</td>
+          <td>全機能（メンバー追加・編集・削除・対戦表編集・データ集計など）</td>
+        </tr>
+      </tbody>
+    </table>
+    <div class="help-callout help-callout-warn">
+      <strong>幹事URLの取り扱い注意</strong>：admin_token が含まれた URL を他人に渡すと幹事権限を渡すことになります。一般メンバーには public_token の URL を共有してください。
+    </div>
+  </section>
+
+  <section id="sec-members" class="help-section">
+    <h2 class="help-section-title">3. メンバー管理</h2>
+    <p>設定ページ（トップバーの「設定」）でメンバーを管理します。メンバーは2種類あります。</p>
+    <table class="help-table">
+      <thead>
+        <tr><th>種類</th><th>意味</th><th>イベントへの表示</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong>固定メンバー</strong></td>
+          <td>常連（会員）</td>
+          <td>新しいイベントを作ると自動で全員が参加者リストに並ぶ</td>
+        </tr>
+        <tr>
+          <td><strong>非固定メンバー</strong></td>
+          <td>お試し参加・友人のお誘いで来た人・大会だけ来た人など</td>
+          <td>自動では並ばない。各イベントで「参加登録」ボタンから追加が必要</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 class="help-subsection-title">メンバー追加</h3>
+    <p>設定ページの「メンバー管理」セクションから新規追加。デフォルトでは非固定として作られるので、必要に応じて「固定メンバー」のチェックボックスを ON にしてください。</p>
+
+    <h3 class="help-subsection-title">名前の変更</h3>
+    <p>設定ページのメンバー名、または個人ページの「表示名編集」から変更できます。変更すると全イベント・戦績の表示が新しい名前に切り替わります。</p>
+
+    <h3 class="help-subsection-title">メンバー削除</h3>
+    <p>主に<strong>二重登録の訂正用</strong>です。削除しても過去イベントの戦績・出欠データは保持されます（参加履歴は「退会者」としてグレー表示）。</p>
+    <div class="help-callout help-callout-warn">
+      <strong>注意</strong>：すでに作成済みのイベントから完全に消すには、当該メンバーの過去参加行（EventParticipant）も個別に削除する必要があります。Django管理画面からメンバーだけ消しても、既存イベントの参加リストには「退会者」として残ります。
+    </div>
+
+    <h3 class="help-subsection-title">自動削除</h3>
+    <p>非固定メンバーで「出欠＝参加(yes)」を一度もつけていない人は、最終操作から<strong>14日以上</strong>無活動になると幹事ページに警告バナーが出て、<strong>20日</strong>を超えると自動削除されます。出欠を1回でも「参加」につけた非固定メンバーは永続セーフ（自動削除されません）。</p>
+  </section>
+
+  <section id="sec-events" class="help-section">
+    <h2 class="help-section-title">4. イベント管理</h2>
+
+    <h3 class="help-subsection-title">イベント作成</h3>
+    <p>ホーム画面のカレンダーから日付をタップしてイベントを作成。作成時点で「固定メンバー」全員分の参加行が自動で並びます。</p>
+
+    <h3 class="help-subsection-title">イベント編集</h3>
+    <p>イベント名・場所・時間の編集は、イベントページ上部のメタ情報バーをタップして編集モーダルを開きます。</p>
+
+    <h3 class="help-subsection-title">イベント中止／復活</h3>
+    <p>編集モーダル下部の「イベントを中止」で中止状態にできます。中止すると赤いバッジが表示され、戦績集計の対象外になります。同じボタンが「中止を取り消す（復活）」に変わるので、いつでも復活可能。</p>
+
+    <h3 class="help-subsection-title">中止イベントの削除</h3>
+    <p>中止状態のイベントだけ、編集モーダルに「イベントを削除」ボタンが現れます。押すと出欠・対戦表・スコア・フラグなど関連データを<strong>完全削除</strong>します（戻せません）。</p>
+  </section>
+
+  <section id="sec-participation" class="help-section">
+    <h2 class="help-section-title">5. 参加登録と出欠</h2>
+
+    <h3 class="help-subsection-title">固定メンバーの出欠</h3>
+    <p>固定メンバーはイベント作成時から参加者リストに並んでいるので、各自が出欠ボタン（✓×?）をタップして回答します。</p>
+
+    <h3 class="help-subsection-title">非固定の参加登録</h3>
+    <p>その回だけ来る人は、「参加登録」ボタンから名前を入力して追加します。追加するとリストに並ぶので、そこから出欠をつけられます。</p>
+
+    <h3 class="help-subsection-title">出欠の意味</h3>
+    <table class="help-table">
+      <thead><tr><th>記号</th><th>意味</th></tr></thead>
+      <tbody>
+        <tr><td>✓</td><td>参加</td></tr>
+        <tr><td>×</td><td>不参加</td></tr>
+        <tr><td>?</td><td>未定</td></tr>
+        <tr><td>（空白）</td><td>未回答</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <section id="sec-flags" class="help-section">
+    <h2 class="help-section-title">6. フラグ機能</h2>
+    <p>「フラグ」は出欠以外に各参加者へ任意の情報を残すための機能です。2 種類あります。</p>
+    <table class="help-table">
+      <thead><tr><th>種類</th><th>用途</th><th>設定場所</th></tr></thead>
+      <tbody>
+        <tr>
+          <td><strong>共通フラグ</strong></td>
+          <td>クラブ全体で使い回す（例：車で来た／コート代の支払い）</td>
+          <td>設定ページ</td>
+        </tr>
+        <tr>
+          <td><strong>固有フラグ</strong></td>
+          <td>そのイベントだけで使う（例：懇親会出席、3 球持参）</td>
+          <td>各イベントの表示設定モーダル「固有フラグ」→「編集」</td>
+        </tr>
+      </tbody>
+    </table>
+
+    <h3 class="help-subsection-title">入力モード</h3>
+    <p>フラグごとに 2 種類の入力モードがあります。</p>
+    <ul>
+      <li><strong>チェック</strong>：ON/OFF の2値</li>
+      <li><strong>数字（1桁）</strong>：0〜9 の数値（例：参加コート数など）</li>
+    </ul>
+  </section>
+
+  <section id="sec-classes" class="help-section">
+    <h2 class="help-section-title">7. クラス／チーム分け</h2>
+    <p>「上級・中級・初級」や「A・B・C」のような区分けを設定して、各メンバーに割り当てできます。設定ページの「チーム分け設定」から追加・編集します。</p>
+    <p>各イベントで参加者の所属クラスを上書きすることも可能です（イベントページのクラス列のドロップダウン）。</p>
+  </section>
+
+  <section id="sec-schedule" class="help-section">
+    <h2 class="help-section-title">8. 対戦表</h2>
+
+    <h3 class="help-subsection-title">対戦表の生成</h3>
+    <p>イベントページの「対戦表」セクションで条件（面数・ラウンド数・シングルス／ダブルス）を設定して自動生成。「試合参加」にチェックを入れた参加者のみが対象です。</p>
+
+    <h3 class="help-subsection-title">対戦表の編集</h3>
+    <p>生成後は各スロットをタップして<strong>代打</strong>（参加者の入れ替え）が可能です。代打候補は「試合参加 ON だが今組み込まれていない人」から選ばれます。</p>
+
+    <h3 class="help-subsection-title">公開</h3>
+    <p>「対戦表を公開」ボタンで公開状態にすると、一般メンバーにも対戦表が見えるようになります。</p>
+
+    <h3 class="help-subsection-title">スコア入力</h3>
+    <p>公開済みの対戦表で、各試合のスコアを入力できます。スコアは個人ページの戦績と戦績ランキングに自動集計されます。</p>
+  </section>
+
+  <section id="sec-stats" class="help-section">
+    <h2 class="help-section-title">9. 戦績ページと個人ページ</h2>
+
+    <h3 class="help-subsection-title">戦績ランキング</h3>
+    <p>トップバーの「戦績」から、クラブ全体の戦績ランキングが見られます。期間を指定して絞り込めます（例：今月だけ・今期だけ）。シングルス・ダブルスで別ランキング。最低 3 試合以上が対象です。</p>
+
+    <h3 class="help-subsection-title">個人ページ</h3>
+    <p>参加者リストの名前をタップすると個人ページが開きます。期間を指定して絞り込み可能。試合履歴は勝ち（青）／負け（赤）／引き分け（無色）で色分け表示されます。</p>
+  </section>
+
+  <section id="sec-data" class="help-section">
+    <h2 class="help-section-title">10. データ集計表</h2>
+    <p>幹事専用機能。設定ページの「データ集計表を開く」から開きます。指定した期間内のイベントを横軸、メンバーを縦軸にした出欠・フラグの一覧表です。</p>
+    <ul>
+      <li><strong>出欠タブ</strong>：誰がどの日に来たか</li>
+      <li><strong>共通フラグタブ</strong>：選んだ共通フラグの ON/OFF or 値</li>
+      <li><strong>固有フラグタブ</strong>：イベントごとの固有フラグ</li>
+    </ul>
+  </section>
+
+  <section id="sec-defaults" class="help-section">
+    <h2 class="help-section-title">11. デフォルト表示設定</h2>
+    <p>設定ページの「デフォルト表示設定」で、新規イベントや個別に設定していないイベントでの<strong>初期表示項目</strong>を選びます。</p>
+    <ul>
+      <li><strong>共通フラグ</strong>：クラブの共通フラグ列を表示するか</li>
+      <li><strong>固有フラグ</strong>：イベント固有フラグ列を表示するか</li>
+      <li><strong>チーム</strong>：クラス／チーム列を表示するか</li>
+      <li><strong>対戦表</strong>：対戦表セクションを表示するか</li>
+    </ul>
+    <p>各イベントの表示設定モーダル（イベントページから開く）で、個別に上書きできます。</p>
+  </section>
+
+  <section id="sec-troubleshoot" class="help-section">
+    <h2 class="help-section-title">12. 困ったときは</h2>
+    <dl class="help-faq">
+      <dt>Q. 名前を間違えて2回登録してしまった</dt>
+      <dd>A. 設定ページのメンバー削除でどちらか一方を削除。ただし既存イベントには「退会者」として残るので、必要に応じて該当イベントの参加行も個別に削除してください。</dd>
+
+      <dt>Q. 退会したメンバーが戻ってきた</dt>
+      <dd>A. メンバー削除していなければそのまま再利用できます。固定メンバーから外して非固定にしていた場合は、再度固定メンバーに戻すか、参加登録から呼び出してください。</dd>
+
+      <dt>Q. 自動削除の警告が出ているメンバーを残したい</dt>
+      <dd>A. 出欠を「参加(✓)」に1回設定すれば永続セーフになります。または固定メンバーに切り替えてください。</dd>
+
+      <dt>Q. 過去のイベントを編集したい</dt>
+      <dd>A. 過去日付のイベントでも、編集モーダルから内容変更・出欠変更が可能です。ただし長期間経過した非固定メンバーが自動削除されていることがあります。</dd>
+
+      <dt>Q. 対戦表をやり直したい</dt>
+      <dd>A. 「対戦表を破棄」で生成前の状態に戻せます。公開済みなら一度非公開に戻してから破棄してください。</dd>
+    </dl>
+  </section>
+
+  <p class="help-back-to-top"><a href="#sec-intro">▲ ページ先頭へ</a></p>
+</div>
+{% endblock %}

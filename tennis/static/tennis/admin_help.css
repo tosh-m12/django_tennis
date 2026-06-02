@@ -1,0 +1,163 @@
+/* tennis/static/tennis/admin_help.css
+   幹事向けヘルプページ
+   ・全体的なデザインは設定ページ／戦績ページと同系統（section-title バー、カード）
+*/
+
+.help-page {
+    padding: 16px 12px 48px;
+    max-width: 920px;
+    margin: 0 auto;
+}
+
+.help-header {
+    margin-bottom: 20px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid #e5e7eb;
+}
+.help-title {
+    font-size: 1.6rem;
+    margin: 0 0 4px;
+}
+.help-subtitle {
+    color: #666;
+    margin: 0;
+    font-size: 0.95rem;
+}
+
+/* 目次：枠付きカード */
+.help-toc {
+    background: #f8fafc;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 14px 18px 10px;
+    margin-bottom: 24px;
+}
+.help-toc-title {
+    font-size: 1.05rem;
+    margin: 0 0 8px;
+    color: #334155;
+}
+.help-toc-list {
+    margin: 0;
+    padding-left: 1.6em;
+    line-height: 1.85;
+}
+.help-toc-list a {
+    color: #1f7a8c;
+    text-decoration: none;
+}
+.help-toc-list a:hover {
+    color: #1f7a8c;
+    text-decoration: underline;
+}
+
+/* セクション */
+.help-section {
+    margin: 28px 0;
+    scroll-margin-top: 72px;  /* 固定トップバー分のオフセット */
+}
+
+.help-section-title {
+    font-size: 1.2rem;
+    border-left: 4px solid #1f7a8c;
+    padding-left: 10px;
+    margin: 0 0 12px;
+}
+
+.help-subsection-title {
+    font-size: 1.02rem;
+    color: #334155;
+    margin: 16px 0 6px;
+}
+
+.help-section p,
+.help-section ul,
+.help-section ol,
+.help-section dl {
+    line-height: 1.75;
+    color: #1f2937;
+    margin: 8px 0;
+}
+
+.help-section ul,
+.help-section ol {
+    padding-left: 1.5em;
+}
+
+.help-section code {
+    background: #f1f5f9;
+    border-radius: 4px;
+    padding: 1px 6px;
+    font-size: 0.92em;
+    color: #0f172a;
+}
+
+/* テーブル */
+.help-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    margin: 10px 0 6px;
+    font-size: 0.95rem;
+    overflow: hidden;
+    border-radius: 6px;
+    border: 1px solid #e5e7eb;
+}
+.help-table th,
+.help-table td {
+    padding: 8px 12px;
+    text-align: left;
+    border-bottom: 1px solid #e5e7eb;
+    vertical-align: top;
+}
+.help-table thead th {
+    background: #f0f4f6;
+    font-weight: 600;
+}
+.help-table tbody tr:last-child th,
+.help-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+/* コールアウト：注意書きや補足 */
+.help-callout {
+    background: #eff6ff;
+    border-left: 4px solid #3b82f6;
+    border-radius: 4px;
+    padding: 10px 14px;
+    margin: 12px 0;
+    color: #1e3a8a;
+    font-size: 0.95rem;
+    line-height: 1.65;
+}
+.help-callout-warn {
+    background: #fef3c7;
+    border-left-color: #d97706;
+    color: #78350f;
+}
+
+/* FAQ */
+.help-faq dt {
+    font-weight: 700;
+    margin-top: 12px;
+    color: #1f7a8c;
+}
+.help-faq dd {
+    margin: 4px 0 0 1em;
+    color: #1f2937;
+    line-height: 1.7;
+}
+
+.help-back-to-top {
+    text-align: right;
+    margin-top: 28px;
+}
+.help-back-to-top a {
+    color: #1f7a8c;
+    text-decoration: none;
+    font-size: 0.92rem;
+}
+.help-back-to-top a:hover {
+    color: #1f7a8c;
+    text-decoration: underline;
+}
