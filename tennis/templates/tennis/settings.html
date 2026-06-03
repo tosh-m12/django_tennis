@@ -6,6 +6,21 @@
 
 {% block extra_head %}
 <script src="{% static 'tennis/club_settings.js' %}" defer></script>
+<style>
+  .cleanup-pill {
+    display: inline-block;
+    padding: 8px 16px;
+    border-radius: 999px;
+    border: 1px solid #cc0000;
+    background: #000;
+    color: #cc0000;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+  .cleanup-pill:hover { background: #1a0000; color: #ff3b3b; }
+  .cleanup-pill:visited { color: #cc0000; }
+</style>
 {% endblock %}
 
 {% block content %}
@@ -56,10 +71,6 @@
   新しくメンバーを追加した際、固定メンバーの場合は✓を入れてください。
 </small>
 
-<p style="margin:0 0 12px; display:flex; gap:8px; flex-wrap:wrap;">
-  <a class="btn btn-pill" href="{% url 'tennis:club_member_cleanup' club.public_token club.admin_token %}">メンバー整理（重複の統合・完全削除）</a>
-  <a class="btn btn-pill" href="{% url 'tennis:club_flag_cleanup' club.public_token club.admin_token %}">フラグ整理（名前変更・削除・統合）</a>
-</p>
 <small style="color:#666; display:block; margin-bottom:10px;">
   ※ チーム分けは、ここで設定したものがイベント新規作成時にデフォルトとして表示されます。<br>
   各イベントページで設定したチーム分けはそのイベント固有の設定となり、クラブ全体の設定には影響しません。
@@ -387,6 +398,16 @@
     出欠・共通フラグ・固有フラグの履歴を期間で絞って一覧できます（幹事のみ）。
   </small>
 </div>
+
+<hr>
+<h3>データ整理</h3>
+<small style="color:#666; display:block; margin-bottom:10px;">
+  ※ 取り消せない操作を含みます。実行前に内容を確認できます。
+</small>
+<p style="margin:0 0 12px; display:flex; gap:8px; flex-wrap:wrap;">
+  <a class="cleanup-pill" href="{% url 'tennis:club_member_cleanup' club.public_token club.admin_token %}">メンバー整理（重複の統合・完全削除）</a>
+  <a class="cleanup-pill" href="{% url 'tennis:club_flag_cleanup' club.public_token club.admin_token %}">フラグ整理（名前変更・削除・統合）</a>
+</p>
 
 
 {% endblock %}
