@@ -90,15 +90,18 @@ class RankingPagePeriodTests(TestCase):
         for i, (s1, s2) in enumerate([(6, 0), (6, 1), (6, 2)], start=1):
             make_score(ms, i, 1, s1, s2)
 
-    def test_default_period_is_current_month(self):
+    def test_default_period_is_past_three_months(self):
         url = reverse("tennis:ranking", args=[self.club.public_token])
         ctx = self.client.get(url).context
         today = timezone.localdate()
-        first = today.replace(day=1)
-        self.assertEqual(ctx["start_date"], first)
-        # period_label = "YYYY年M月"
-        self.assertIn(str(today.year), ctx["period_label"])
-        self.assertIn(f"{today.month}月", ctx["period_label"])
+        # 開始は常に月初の「2ヶ月前の1日」、終了は今日（過去3ヶ月）
+        y, m = today.year, today.month - 2
+        while m <= 0:
+            m += 12
+            y -= 1
+        self.assertEqual(ctx["start_date"], datetime.date(y, m, 1))
+        self.assertEqual(ctx["end_date"], today)
+        self.assertIn("直近3ヶ月", ctx["period_label"])
 
     def test_explicit_period_filters(self):
         url = reverse("tennis:ranking", args=[self.club.public_token])

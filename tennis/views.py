@@ -818,7 +818,7 @@ def club_settings(request, club_public_token, club_admin_token):
             "ranking_setting": ranking_setting,
             "ranking_setting_json": json.dumps(ranking_setting, ensure_ascii=False),
             "ranking_preset_defaults_json": json.dumps(RANKING_PRESET_DEFAULTS, ensure_ascii=False),
-            "ranking_preset_choices": ClubRankingSetting.PRESET_CHOICES,
+            "ranking_preset_options": _ranking_preset_options(),
             "save_club_ranking_setting_url": reverse("tennis:save_club_ranking_setting"),
             "is_admin": True,
             "show_topbar": True,
@@ -866,6 +866,8 @@ def club_user_help(request, club_public_token):
             "club": club,
             "is_admin": False,
             "show_topbar": True,
+            # 一般ヘルプは「今このクラブで使われているルール」だけを説明する
+            "ranking_rule": _ranking_rule_summary(_resolve_club_ranking_config(club)),
         },
     )
 
@@ -1361,9 +1363,14 @@ def ranking_page(request, club_public_token, club_admin_token=None):
         is_admin = True
 
     today = timezone.localdate()
-    default_start = today.replace(day=1)
-    next_month_date = (default_start + dt.timedelta(days=32)).replace(day=1)
-    default_end = next_month_date - dt.timedelta(days=1)
+    # デフォルトは「過去3ヶ月」。開始は常に月初（当月を含む2ヶ月前の1日）、終了は今日。
+    # 例: 今日が 6/3 なら 4/1 〜 6/3。
+    y, m = today.year, today.month - 2
+    while m <= 0:
+        m += 12
+        y -= 1
+    default_start = dt.date(y, m, 1)
+    default_end = today
 
     start_d = _parse_date_yyyy_mm_dd((request.GET.get("start") or "").strip()) or default_start
     end_d = _parse_date_yyyy_mm_dd((request.GET.get("end") or "").strip()) or default_end
@@ -1381,10 +1388,10 @@ def ranking_page(request, club_public_token, club_admin_token=None):
     ranking_doubles = rankings[GameType.DOUBLES]
     ranking_singles = rankings[GameType.SINGLES]
 
-    # 期間ラベル（個人ページと統一）
-    is_default_month = (start_d == default_start and end_d == default_end)
-    if is_default_month:
-        period_label = f"{start_d.year}年{start_d.month}月"
+    # 期間ラベル：デフォルト（過去3ヶ月）なら専用表記、それ以外は範囲表示
+    is_default_period = (start_d == default_start and end_d == default_end)
+    if is_default_period:
+        period_label = f"直近3ヶ月（{start_d.strftime('%Y/%-m/%-d')} 〜 {end_d.strftime('%Y/%-m/%-d')}）"
     else:
         period_label = f"{start_d.strftime('%Y/%-m/%-d')} 〜 {end_d.strftime('%Y/%-m/%-d')}"
 
@@ -1404,6 +1411,7 @@ def ranking_page(request, club_public_token, club_admin_token=None):
         "ranking_config": ranking_config,
         "ranking_preset": ranking_config["preset"],
         "ranking_is_points": ranking_config["preset"] == "points",
+        "ranking_rule": _ranking_rule_summary(ranking_config),
         "back_url": back_url,
         "show_topbar": True,
         "current_page": "ranking",
@@ -1464,6 +1472,49 @@ def _resolve_club_ranking_config(club):
         return club.ranking_setting.as_dict()
     except ClubRankingSetting.DoesNotExist:
         return _ranking_preset_default_config("winrate")
+
+
+# プリセットの短い説明（設定ページのラジオ・戦績ページ・一般ヘルプで共用）
+RANKING_PRESET_DESCRIPTIONS = {
+    "winrate": "勝率の高い順。少ない試合数で上位に来ないよう、最低試合数は多めが既定です。",
+    "points": "勝ち・分・負の配点による勝ち点の合計順。出るほど・勝つほど積み上がります。",
+    "wins": "勝った試合数の多い順。たくさん参加して勝った人が上位になります。",
+}
+
+# プリセット別のソート優先順位（表示用ラベル）
+RANKING_PRESET_SORT_LABELS = {
+    "winrate": "勝率 → ゲーム率 → 勝数 → 得失点 → 試合数 → 名前",
+    "points": "勝ち点 → 得失点 → ゲーム率 → 勝数 → 試合数 → 名前",
+    "wins": "勝数 → 勝率 → 得失点 → ゲーム率 → 試合数 → 名前",
+}
+
+
+def _ranking_preset_options():
+    """設定ページのプリセット選択用 [{value, label, description}] を返す。"""
+    return [
+        {"value": v, "label": label, "description": RANKING_PRESET_DESCRIPTIONS.get(v, "")}
+        for v, label in ClubRankingSetting.PRESET_CHOICES
+    ]
+
+
+def _ranking_rule_summary(config):
+    """
+    現在の集計ルールを人間向けに要約した dict を返す。
+    戦績ページ・一般ヘルプで「今のルール」を説明するために使う。
+    """
+    preset = config.get("preset", "winrate")
+    label = dict(ClubRankingSetting.PRESET_CHOICES).get(preset, "勝率重視型")
+    return {
+        "preset": preset,
+        "label": label,
+        "description": RANKING_PRESET_DESCRIPTIONS.get(preset, ""),
+        "sort": RANKING_PRESET_SORT_LABELS.get(preset, ""),
+        "count_draws": bool(config.get("count_draws", False)),
+        "min_matches": int(config.get("min_matches", 3)),
+        "points_win": config.get("points_win", 3),
+        "points_draw": config.get("points_draw", 1),
+        "points_loss": config.get("points_loss", 0),
+    }
 
 
 def _resolve_event_display_settings(event):

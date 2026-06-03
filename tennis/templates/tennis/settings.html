@@ -199,15 +199,17 @@
      data-club-id="{{ club.id }}"
      data-admin-token="{{ club.admin_token }}"
      data-save-url="{{ save_club_ranking_setting_url }}"
-     data-current-settings='{{ ranking_setting_json|escapejs }}'
-     data-preset-defaults='{{ ranking_preset_defaults_json|escapejs }}'>
+     data-preset-defaults="{{ ranking_preset_defaults_json }}">
 
   <div class="rk-presets">
-    {% for value, label in ranking_preset_choices %}
+    {% for opt in ranking_preset_options %}
     <label class="rk-preset">
-      <input type="radio" name="rk-preset" value="{{ value }}"
-             {% if ranking_setting.preset == value %}checked{% endif %}>
-      <span>{{ label }}</span>
+      <input type="radio" name="rk-preset" value="{{ opt.value }}"
+             {% if ranking_setting.preset == opt.value %}checked{% endif %}>
+      <span class="rk-preset-text">
+        <span class="rk-preset-name">{{ opt.label }}</span>
+        <span class="rk-preset-desc">{{ opt.description }}</span>
+      </span>
     </label>
     {% endfor %}
   </div>
@@ -236,8 +238,6 @@
     <input type="number" data-rk="min_matches" min="0" step="1" value="{{ ranking_setting.min_matches }}">
     <span class="rk-hint">この試合数未満はランキング下部に表示</span>
   </div>
-
-  <span id="club-ranking-settings-status" class="rk-status"></span>
 </div>
 
 <hr>

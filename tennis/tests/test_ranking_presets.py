@@ -206,6 +206,34 @@ class ResolveRankingConfigTests(TestCase):
 
 
 @_NO_MANIFEST_STORAGES
+class RankingRuleSummaryTests(TestCase):
+    """集計ルールの要約（戦績ページ・一般ヘルプの連動表示）。"""
+
+    def test_summary_reflects_preset(self):
+        from tennis.views import _ranking_rule_summary
+        s = _ranking_rule_summary(_ranking_preset_default_config("points"))
+        self.assertEqual(s["preset"], "points")
+        self.assertEqual(s["label"], "勝ち点制")
+        self.assertIn("勝ち点", s["sort"])
+        self.assertEqual(s["min_matches"], 3)
+
+    def test_ranking_page_context_has_rule(self):
+        club = make_club()
+        ClubRankingSetting.objects.create(club=club, preset="wins", min_matches=3)
+        url = reverse("tennis:ranking", args=[club.public_token])
+        ctx = self.client.get(url).context
+        self.assertEqual(ctx["ranking_rule"]["preset"], "wins")
+        self.assertEqual(ctx["ranking_rule"]["label"], "勝利数重視型")
+
+    def test_user_help_context_has_rule(self):
+        club = make_club()
+        url = reverse("tennis:club_user_help", args=[club.public_token])
+        ctx = self.client.get(url).context
+        # 設定なし → 勝率重視型
+        self.assertEqual(ctx["ranking_rule"]["preset"], "winrate")
+
+
+@_NO_MANIFEST_STORAGES
 class SaveRankingSettingTests(TestCase):
     """save_club_ranking_setting 保存API。"""
 

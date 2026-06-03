@@ -117,24 +117,18 @@
     </ul>
 
     <h3 class="help-subsection-title">戦績の集計ルール</h3>
-    <p>ランキングと個人戦績は以下のルールで計算されます。</p>
+    <p>このクラブのランキング・個人戦績は、現在 <strong>{{ ranking_rule.label }}</strong> で集計されています。{{ ranking_rule.description }}</p>
 
     <p><strong>集計対象になる試合</strong></p>
     <ul>
       <li>指定期間内で、対戦表が<strong>公開済み</strong>の試合のみ</li>
       <li><strong>両者のスコアが入力済み</strong>の試合のみ（スコア未入力は集計されない）</li>
       <li>シングルスとダブルスは別ランキング</li>
-      <li>ランキングは<strong>一定の試合数以上</strong>参加した人だけが表示される（試合数は幹事の設定により異なります）</li>
+      <li>ランキングは<strong>最低{{ ranking_rule.min_matches }}試合以上</strong>参加した人だけが表示される</li>
       <li><strong>中止になったイベントは集計対象外</strong>（試合をしていないため）</li>
     </ul>
 
-    <p><strong>ランキングのプリセット（幹事が選択）</strong></p>
-    <ul>
-      <li><strong>勝率重視型</strong>（初期設定）：勝率の高い順。少ない試合数で上位に来すぎないよう、最低試合数はやや多め。</li>
-      <li><strong>勝ち点制</strong>：勝ち＝3点・引き分け＝1点・負け＝0点などの合計点（勝ち点）順。出るほど・勝つほど積み上がります。配点は幹事が調整できます。</li>
-      <li><strong>勝利数重視型</strong>：勝った試合数の多い順。たくさん参加して勝った人が上位に。</li>
-    </ul>
-    <p>引き分けを勝率に算入するか、勝ち点の配点、最低試合数は、いずれも幹事が上書きできます。</p>
+    <p><strong>順位の決め方</strong>：{{ ranking_rule.sort }} の順で比較します。{% if ranking_rule.count_draws %}引き分けは0.5勝として勝率に算入します。{% endif %}{% if ranking_rule.preset == 'points' %}勝ち点は 勝{{ ranking_rule.points_win }}・分{{ ranking_rule.points_draw }}・負{{ ranking_rule.points_loss }} で計算します。{% endif %}</p>
 
     <p><strong>各列の意味</strong></p>
     <table class="help-table">
@@ -144,8 +138,8 @@
         <tr><td>勝</td><td>勝った試合数</td></tr>
         <tr><td>負</td><td>負けた試合数</td></tr>
         <tr><td>分</td><td>引き分け（同点）</td></tr>
-        <tr><td>勝ち点</td><td>勝ち点制のときのみ表示。勝・分・負の配点の合計</td></tr>
-        <tr><td>勝率</td><td>勝 ÷ 試合 × 100（%）。引き分けカウントONのときは引き分けを0.5勝として算入</td></tr>
+        {% if ranking_rule.preset == 'points' %}<tr><td>勝ち点</td><td>勝・分・負の配点の合計</td></tr>{% endif %}
+        <tr><td>勝率</td><td>{% if ranking_rule.count_draws %}(勝 ＋ 分×0.5) ÷ 試合 × 100（%）{% else %}勝 ÷ 試合 × 100（%）{% endif %}</td></tr>
         <tr><td>GF</td><td>自分側の合計獲得ゲーム数</td></tr>
         <tr><td>GA</td><td>相手側の合計獲得ゲーム数</td></tr>
         <tr><td>ゲーム率</td><td>GF ÷ (GF + GA) × 100（%）</td></tr>
@@ -153,14 +147,8 @@
       </tbody>
     </table>
 
-    <p><strong>ランキングのソート順（プリセット別）</strong></p>
-    <ul>
-      <li>勝率重視型：勝率 → ゲーム率 → 勝数 → 得失点 → 試合数 → 名前</li>
-      <li>勝ち点制：勝ち点 → 得失点 → ゲーム率 → 勝数 → 試合数 → 名前</li>
-      <li>勝利数重視型：勝数 → 勝率 → 得失点 → ゲーム率 → 試合数 → 名前</li>
-    </ul>
-
     <p><strong>ダブルス</strong>：1試合につきペアの両プレーヤーに同じ結果がカウントされます。</p>
+    <p style="color:#888; font-size:0.85rem;">※ 集計ルール（プリセット・引き分けの扱い・勝ち点・最低試合数）は幹事が変更できます。</p>
   </section>
 
   <section id="sec-faq" class="help-section">
