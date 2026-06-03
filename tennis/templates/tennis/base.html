@@ -7,8 +7,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}DeuceNet{% endblock %}</title>
 
-  <link rel="icon" type="image/svg+xml" href="{% static 'tennis/logo/logo_favicon.svg' %}">
-  <link rel="apple-touch-icon" href="{% static 'tennis/logo/logo_appicon.png' %}">
+  <link rel="icon" type="image/png" sizes="32x32" href="{% static 'tennis/logo/favicon_32.png' %}">
+  <link rel="icon" type="image/png" sizes="16x16" href="{% static 'tennis/logo/favicon_16.png' %}">
+  <link rel="apple-touch-icon" sizes="180x180" href="{% static 'tennis/logo/apple-touch-icon.png' %}">
   <meta name="theme-color" content="#3b82f6">
 
   <link rel="stylesheet" href="{% static 'tennis/style.css' %}">
@@ -34,7 +35,7 @@
       <div class="topbar topbar--fixed">
         <div class="topbar-inner">
           <div class="topbar-title">
-            <img class="topbar-wordmark" src="{% static 'tennis/logo/logo_wordmark.svg' %}" alt="DeuceNet">
+            <img class="topbar-wordmark" src="{% static 'tennis/logo/wordmark.png' %}" alt="Deuce Net">
           </div>
 
           {# ハンバーガーボタン：狭幅でのみ表示（CSSで制御） #}
@@ -137,8 +138,8 @@
   </div>
 
   <footer class="site-footer">
-    <img class="site-footer-logo" src="{% static 'tennis/logo/logo_footer.svg' %}"
-         alt="DeuceNet — 出欠・対戦表・戦績を、URL1枚で。">
+    <img class="site-footer-logo" src="{% static 'tennis/logo/wordmark.png' %}" alt="Deuce Net">
+    <p class="site-footer-tagline">出欠・対戦表・戦績を、URL1枚で。</p>
   </footer>
 
   {% include "tennis/_ui_modals.html" %}
