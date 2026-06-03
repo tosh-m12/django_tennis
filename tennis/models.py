@@ -257,6 +257,43 @@ class ClubDisplaySetting(models.Model):
         }
 
 
+class ClubRankingSetting(models.Model):
+    """
+    クラブ単位の戦績ランキング集計ルール。
+    プリセット(勝率重視/勝ち点制/勝利数重視)が各値の初期値を決め、
+    幹事が引き分けカウント・勝ち点・最低試合数を個別に上書きできる。
+    上書き後の具体値をそのまま保持する（プリセット選択時にUIが初期値を流し込む）。
+    """
+    PRESET_WINRATE = "winrate"
+    PRESET_POINTS = "points"
+    PRESET_WINS = "wins"
+    PRESET_CHOICES = [
+        (PRESET_WINRATE, "勝率重視型"),
+        (PRESET_POINTS, "勝ち点制"),
+        (PRESET_WINS, "勝利数重視型"),
+    ]
+
+    club = models.OneToOneField("Club", on_delete=models.CASCADE, related_name="ranking_setting")
+    preset = models.CharField(max_length=10, choices=PRESET_CHOICES, default=PRESET_WINRATE)
+    count_draws = models.BooleanField(default=False)
+    points_win = models.DecimalField(max_digits=4, decimal_places=1, default=3)
+    points_draw = models.DecimalField(max_digits=4, decimal_places=1, default=1)
+    points_loss = models.DecimalField(max_digits=4, decimal_places=1, default=0)
+    min_matches = models.PositiveIntegerField(default=6)
+
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def as_dict(self):
+        return {
+            "preset": self.preset,
+            "count_draws": bool(self.count_draws),
+            "points_win": float(self.points_win),
+            "points_draw": float(self.points_draw),
+            "points_loss": float(self.points_loss),
+            "min_matches": int(self.min_matches),
+        }
+
+
 # ============================================================
 # Event-specific flag definitions (per-event)
 # ============================================================

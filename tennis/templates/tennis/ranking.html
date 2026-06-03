@@ -40,6 +40,7 @@
                 <tr>
                   <th>順位</th>
                   <th>名前</th>
+                  {% if ranking_is_points %}<th style="width:80px;">勝ち点</th>{% endif %}
                   <th style="width:70px;">試合</th>
                   <th style="width:60px;">勝</th>
                   <th style="width:60px;">負</th>
@@ -56,6 +57,7 @@
                   <tr>
                     <td>{{ row.rank }}</td>
                     <td style="text-align:left;">{{ row.name }}</td>
+                    {% if ranking_is_points %}<td><strong>{{ row.points }}</strong></td>{% endif %}
                     <td>{{ row.matches }}</td>
                     <td>{{ row.wins }}</td>
                     <td>{{ row.losses }}</td>
@@ -82,6 +84,7 @@
                 <tr>
                   <th>順位</th>
                   <th>名前</th>
+                  {% if ranking_is_points %}<th style="width:80px;">勝ち点</th>{% endif %}
                   <th style="width:70px;">試合</th>
                   <th style="width:60px;">勝</th>
                   <th style="width:60px;">負</th>
@@ -98,6 +101,7 @@
                   <tr>
                     <td>{{ row.rank }}</td>
                     <td style="text-align:left;">{{ row.name }}</td>
+                    {% if ranking_is_points %}<td><strong>{{ row.points }}</strong></td>{% endif %}
                     <td>{{ row.matches }}</td>
                     <td>{{ row.wins }}</td>
                     <td>{{ row.losses }}</td>
@@ -116,7 +120,7 @@
       {% endif %}
 
     {% else %}
-      <p class="ranking-empty">この期間に戦績はありません（スコア未入力の試合は集計対象外、最低3試合以上が対象）。</p>
+      <p class="ranking-empty">この期間に戦績はありません（スコア未入力の試合は集計対象外、最低{{ ranking_config.min_matches }}試合以上が対象）。</p>
     {% endif %}
 
   {% endwith %}
