@@ -235,10 +235,23 @@ th {
 }
 
 .topbar-title{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;            /* flex 子の省略表示のため */
   font-weight: 900;
   font-size: 18px;
   line-height: 1;
-
+}
+.topbar-logo{
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 7px;
+  display: block;
+}
+.topbar-title-text{
+  min-width: 0;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -530,18 +543,16 @@ th {
   margin-top: 2px;
 }
 
-/* サイトフッター（DeuceNet ブランド） */
+/* サイトフッター（DeuceNet ロゴ） */
 .site-footer {
   text-align: center;
-  padding: 24px 16px 32px;
+  padding: 22px 16px 30px;
   margin-top: 32px;
   border-top: 1px solid #eee;
-  color: #888;
-  font-size: 0.8rem;
 }
-.site-footer-brand {
-  font-weight: 700;
-  color: #1f7a8c;
-  letter-spacing: 0.5px;
+.site-footer-logo {
+  height: 44px;
+  width: auto;
+  max-width: 90%;
+  opacity: 0.92;
 }
-.site-footer-note { margin-left: 8px; }

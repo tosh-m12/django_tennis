@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 600 110" width="600" height="110" role="img" aria-label="Deuce Net on red top bar">
+  <rect width="600" height="110" fill="#F87171"/>
+  <g font-family="Optima,'Optima nova','Hiragino Sans',serif" font-weight="700" fill="#15243F">
+    <text x="183" y="71" text-anchor="end" font-size="46" letter-spacing="-0.3">Deuce</text>
+    <text x="237" y="71" text-anchor="start" font-size="46" letter-spacing="-0.3">Net</text>
+  </g>
+  <g transform="translate(195 40) scale(0.30)">
+    <defs><radialGradient id="feltR" cx="37%" cy="32%" r="78%"><stop offset="0%" stop-color="#E8F284"/><stop offset="48%" stop-color="#CADE4C"/><stop offset="84%" stop-color="#ADCA3B"/><stop offset="100%" stop-color="#96B733"/></radialGradient></defs>
+    <circle cx="50" cy="50" r="46" fill="url(#feltR)"/>
+    <ellipse cx="36" cy="31" rx="17" ry="11" fill="#fff" opacity="0.22"/>
+    <path d="M16 26 C40 40 40 60 16 74" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+    <path d="M84 26 C60 40 60 60 84 74" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+  </g>
+  <g stroke="#FFFFFF" stroke-width="4" stroke-linecap="round">
+    <line x1="546" y1="44" x2="574" y2="44"/>
+    <line x1="546" y1="55" x2="574" y2="55"/>
+    <line x1="546" y1="66" x2="574" y2="66"/>
+  </g>
+</svg>

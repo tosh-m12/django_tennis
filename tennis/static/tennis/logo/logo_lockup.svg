@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 720 200" width="720" height="200" role="img" aria-label="Deuce Net horizontal lockup">
+  <!-- compact icon -->
+  <rect x="20" y="20" width="160" height="160" rx="36" fill="#15243F"/>
+  <rect x="44" y="112" width="112" height="7" rx="3.5" fill="#FFFFFF"/>
+  <rect x="42" y="112" width="5" height="52" rx="2.5" fill="#FFFFFF" opacity="0.9"/>
+  <rect x="153" y="112" width="5" height="52" rx="2.5" fill="#FFFFFF" opacity="0.9"/>
+  <path d="M56 119V164 M68 119V164 M80 119V164 M92 119V164 M104 119V164 M116 119V164 M128 119V164 M140 119V164 M48 132H152 M48 148H152 M48 163H152"
+        fill="none" stroke="#FFFFFF" stroke-width="1.5" stroke-opacity="0.4"/>
+  <ellipse cx="100" cy="116" rx="26" ry="4.5" fill="#000000" opacity="0.18"/>
+  <g transform="translate(69 59) scale(0.62)">
+    <defs><radialGradient id="feltL" cx="37%" cy="32%" r="78%"><stop offset="0%" stop-color="#E8F284"/><stop offset="48%" stop-color="#CADE4C"/><stop offset="84%" stop-color="#ADCA3B"/><stop offset="100%" stop-color="#96B733"/></radialGradient></defs>
+    <circle cx="50" cy="50" r="46" fill="url(#feltL)"/>
+    <ellipse cx="36" cy="31" rx="17" ry="11" fill="#fff" opacity="0.22"/>
+    <path d="M16 26 C40 40 40 60 16 74" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+    <path d="M84 26 C60 40 60 60 84 74" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+  </g>
+  <!-- wordmark -->
+  <g font-family="Optima,'Optima nova','Hiragino Sans',serif" font-weight="700" fill="#15243F">
+    <text x="445" y="118" text-anchor="end" font-size="64" letter-spacing="-0.5">Deuce</text>
+    <text x="495" y="118" text-anchor="start" font-size="64" letter-spacing="-0.5">Net</text>
+  </g>
+  <g transform="translate(453 75) scale(0.34)">
+    <defs><radialGradient id="feltL2" cx="37%" cy="32%" r="78%"><stop offset="0%" stop-color="#E8F284"/><stop offset="48%" stop-color="#CADE4C"/><stop offset="84%" stop-color="#ADCA3B"/><stop offset="100%" stop-color="#96B733"/></radialGradient></defs>
+    <circle cx="50" cy="50" r="46" fill="url(#feltL2)"/>
+    <ellipse cx="36" cy="31" rx="17" ry="11" fill="#fff" opacity="0.22"/>
+    <path d="M16 26 C40 40 40 60 16 74" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+    <path d="M84 26 C60 40 60 60 84 74" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/>
+  </g>
+  <text x="214" y="152" font-family="'Hiragino Sans',system-ui,sans-serif" font-weight="500" font-size="20" fill="#5B6B7A" letter-spacing="0.5">出欠・対戦表・戦績を、URL1枚で。</text>
+</svg>
