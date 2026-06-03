@@ -32,6 +32,7 @@ from .models import (
     MatchScore,
     GameType,
     ClubDisplaySetting,
+    ClubRankingSetting,
     EventDisplaySetting,
     ClubMemberClass,
 )
@@ -541,11 +542,20 @@ def _collect_schedule_ep_ids(schedule_json, sink: set) -> None:
                     sink.add(int(p))
 
 
-def _compute_ranking_from(events, ms_by_event, ep_map, min_matches):
+def _compute_ranking_from(events, ms_by_event, ep_map, config):
     """
     1ゲームタイプ分の集計（旧 build_month_ranking 本体）。
     ms_by_event / ep_map は呼び出し側で用意して渡す（クエリ共有のため）。
+    config: 戦績ランキングの集計ルール dict
+        （preset / count_draws / points_win / points_draw / points_loss / min_matches）。
     """
+    preset = config.get("preset", "winrate")
+    count_draws = bool(config.get("count_draws", False))
+    pw = float(config.get("points_win", 3))
+    pd = float(config.get("points_draw", 1))
+    pl = float(config.get("points_loss", 0))
+    min_matches = int(config.get("min_matches", 3))
+
     stats = {}
 
     def ensure(key, name):
@@ -621,32 +631,49 @@ def _compute_ranking_from(events, ms_by_event, ep_map, min_matches):
     for st in stats.values():
         m = st["matches"]
         w = st["wins"]
+        d = st["draws"]
         gf = st["gf"]
         ga = st["ga"]
-        st["win_pct"] = round((w / m) * 100, 1) if m else 0.0
+        # count_draws ON: 引き分けを 0.5 勝として勝率に算入。OFF: 現行（勝のみ／分母は全試合）。
+        win_num = (w + 0.5 * d) if count_draws else w
+        st["win_pct"] = round((win_num / m) * 100, 1) if m else 0.0
         st["gp_pct"] = round((gf / (gf + ga)) * 100, 1) if (gf + ga) else 0.0
         st["diff"] = gf - ga
+        # 勝ち点: 勝・分・負それぞれの配点で合算（勝ち点制プリセットで主指標、他では参考値）。
+        points = w * pw + d * pd + st["losses"] * pl
+        st["points"] = int(points) if points == int(points) else round(points, 1)
         rows.append(st)
 
     ranked = [r for r in rows if r["matches"] >= min_matches]
     others = [r for r in rows if r["matches"] < min_matches]
 
-    ranked.sort(key=lambda r: (-(r["win_pct"]), -(r["gp_pct"]), -(r["wins"]), -(r["diff"]), -(r["matches"]), r["name"]))
+    # プリセットごとに並び順を切り替える（共通の末尾 tiebreak は名前昇順）。
+    sort_keys = {
+        "winrate": lambda r: (-(r["win_pct"]), -(r["gp_pct"]), -(r["wins"]), -(r["diff"]), -(r["matches"]), r["name"]),
+        "points": lambda r: (-(r["points"]), -(r["diff"]), -(r["gp_pct"]), -(r["wins"]), -(r["matches"]), r["name"]),
+        "wins": lambda r: (-(r["wins"]), -(r["win_pct"]), -(r["diff"]), -(r["gp_pct"]), -(r["matches"]), r["name"]),
+    }
+    ranked.sort(key=sort_keys.get(preset, sort_keys["winrate"]))
     for i, r in enumerate(ranked, 1):
         r["rank"] = i
 
     return {"ranked": ranked, "others": others}
 
 
-def build_month_rankings(events_qs, game_types, min_matches: int = 3):
+def build_month_rankings(events_qs, game_types, config=None):
     """
     複数ゲームタイプのランキングを1パスで集計する。
     MatchSchedule / EventParticipant のクエリ・schedule_json パースを
     タイプ間で共有するため、club_home の二重計算を解消する。
 
+    config: 集計ルール dict（省略時は勝率重視型デフォルト＝現行挙動・最低3試合）。
+
     戻り値: {game_type: {"ranked": [...], "others": [...]}}
     各タイプの結果は build_month_ranking(events_qs, game_type) と一致する。
     """
+    if config is None:
+        config = _ranking_preset_default_config("winrate")
+        config["min_matches"] = 3  # 後方互換: 旧デフォルトの最低3試合を維持
     game_types = list(game_types)
     events = list(events_qs)
     result = {gt: {"ranked": [], "others": []} for gt in game_types}
@@ -674,13 +701,19 @@ def build_month_rankings(events_qs, game_types, min_matches: int = 3):
     }
 
     for gt in game_types:
-        result[gt] = _compute_ranking_from(events, ms_by_type[gt], ep_map, min_matches)
+        result[gt] = _compute_ranking_from(events, ms_by_type[gt], ep_map, config)
     return result
 
 
-def build_month_ranking(events_qs, game_type: str, min_matches: int = 3):
-    """単一ゲームタイプのランキング（後方互換）。中身は build_month_rankings に委譲。"""
-    return build_month_rankings(events_qs, [game_type], min_matches)[game_type]
+def build_month_ranking(events_qs, game_type: str, min_matches: int = 3, config=None):
+    """
+    単一ゲームタイプのランキング（後方互換）。中身は build_month_rankings に委譲。
+    config を渡せばそのルールで集計。省略時は勝率重視型デフォルト＋指定 min_matches。
+    """
+    if config is None:
+        config = _ranking_preset_default_config("winrate")
+        config["min_matches"] = min_matches
+    return build_month_rankings(events_qs, [game_type], config)[game_type]
 
 
 # ============================================================
@@ -752,6 +785,7 @@ def club_settings(request, club_public_token, club_admin_token):
     )
 
     default_display_settings = _resolve_club_display_settings(club)
+    ranking_setting = _resolve_club_ranking_config(club)
 
     prev_year = year - 1 if month == 1 else year
     prev_month = 12 if month == 1 else month - 1
@@ -781,6 +815,11 @@ def club_settings(request, club_public_token, club_admin_token):
             "default_display_settings": default_display_settings,
             "default_display_settings_json": json.dumps(default_display_settings, ensure_ascii=False),
             "save_club_display_setting_url": reverse("tennis:save_club_display_setting"),
+            "ranking_setting": ranking_setting,
+            "ranking_setting_json": json.dumps(ranking_setting, ensure_ascii=False),
+            "ranking_preset_defaults_json": json.dumps(RANKING_PRESET_DEFAULTS, ensure_ascii=False),
+            "ranking_preset_choices": ClubRankingSetting.PRESET_CHOICES,
+            "save_club_ranking_setting_url": reverse("tennis:save_club_ranking_setting"),
             "is_admin": True,
             "show_topbar": True,
             "cleanup_warnings": _run_member_auto_cleanup(club),
@@ -1181,10 +1220,13 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
                     "result": result,
                 })
 
+    # 勝率の定義をランキングと一致させる（count_draws ON なら引き分けを0.5勝で算入）。
+    count_draws = bool(_resolve_club_ranking_config(club).get("count_draws", False))
     for gt in ("singles", "doubles"):
         s = stats[gt]
         m = s["matches"]
-        s["win_pct"] = round((s["wins"] / m) * 100, 1) if m else 0.0
+        win_num = (s["wins"] + 0.5 * s["draws"]) if count_draws else s["wins"]
+        s["win_pct"] = round((win_num / m) * 100, 1) if m else 0.0
         gf, ga = s["gf"], s["ga"]
         s["gp_pct"] = round((gf / (gf + ga)) * 100, 1) if (gf + ga) else 0.0
         s["diff"] = gf - ga
@@ -1334,7 +1376,8 @@ def ranking_page(request, club_public_token, club_admin_token=None):
         .order_by("date", "start_time", "id")
     )
 
-    rankings = build_month_rankings(events_qs, [GameType.DOUBLES, GameType.SINGLES])
+    ranking_config = _resolve_club_ranking_config(club)
+    rankings = build_month_rankings(events_qs, [GameType.DOUBLES, GameType.SINGLES], ranking_config)
     ranking_doubles = rankings[GameType.DOUBLES]
     ranking_singles = rankings[GameType.SINGLES]
 
@@ -1358,6 +1401,9 @@ def ranking_page(request, club_public_token, club_admin_token=None):
         "period_label": period_label,
         "ranking_doubles": ranking_doubles,
         "ranking_singles": ranking_singles,
+        "ranking_config": ranking_config,
+        "ranking_preset": ranking_config["preset"],
+        "ranking_is_points": ranking_config["preset"] == "points",
         "back_url": back_url,
         "show_topbar": True,
         "current_page": "ranking",
@@ -1390,6 +1436,34 @@ def _resolve_club_display_settings(club):
         return club.display_setting.as_dict()
     except ClubDisplaySetting.DoesNotExist:
         return dict(HARDCODED_DISPLAY_SETTINGS_DEFAULT)
+
+
+# 戦績ランキングのプリセット別デフォルト値。
+# プリセット選択時にこの値が初期値として各設定へ流し込まれ、幹事が上書きできる。
+RANKING_PRESET_DEFAULTS = {
+    "winrate": {"count_draws": False, "points_win": 3.0, "points_draw": 1.0, "points_loss": 0.0, "min_matches": 6},
+    "points":  {"count_draws": True,  "points_win": 3.0, "points_draw": 1.0, "points_loss": 0.0, "min_matches": 3},
+    "wins":    {"count_draws": False, "points_win": 3.0, "points_draw": 1.0, "points_loss": 0.0, "min_matches": 3},
+}
+
+
+def _ranking_preset_default_config(preset="winrate"):
+    """指定プリセットのデフォルト config（preset キー込み）を新規 dict で返す。"""
+    base = RANKING_PRESET_DEFAULTS.get(preset, RANKING_PRESET_DEFAULTS["winrate"])
+    cfg = dict(base)
+    cfg["preset"] = preset if preset in RANKING_PRESET_DEFAULTS else "winrate"
+    return cfg
+
+
+def _resolve_club_ranking_config(club):
+    """
+    クラブの戦績ランキング集計ルールを返す。
+    ClubRankingSetting があれば as_dict()、無ければ勝率重視型のデフォルト（現行挙動）。
+    """
+    try:
+        return club.ranking_setting.as_dict()
+    except ClubRankingSetting.DoesNotExist:
+        return _ranking_preset_default_config("winrate")
 
 
 def _resolve_event_display_settings(event):
@@ -2570,6 +2644,75 @@ def save_club_display_setting(request):
     obj.show_class = bool(s.get("class"))
     obj.show_schedule = bool(s.get("schedule"))
     obj.save(update_fields=["show_flags", "show_event_flags", "show_class", "show_schedule", "updated_at"])
+
+    return JsonResponse({"ok": True, "settings": obj.as_dict()})
+
+
+@require_POST
+def save_club_ranking_setting(request):
+    """
+    クラブの戦績ランキング集計ルールを保存。
+    認可：admin_token 必須。POST keys: club_id, admin_token, settings_json
+        （preset / count_draws / points_win / points_draw / points_loss / min_matches）。
+    """
+    club_id = (request.POST.get("club_id") or "").strip()
+    if not club_id:
+        return JsonResponse({"ok": False, "error": "missing_club_id"}, status=400)
+
+    club = get_object_or_404(Club, id=int(club_id))
+
+    deny = _require_club_admin_token(request, club)
+    if deny:
+        return deny
+
+    raw = (request.POST.get("settings_json") or "").strip()
+    if not raw:
+        return JsonResponse({"ok": False, "error": "missing_settings_json"}, status=400)
+
+    try:
+        s = json.loads(raw)
+    except Exception:
+        return JsonResponse({"ok": False, "error": "bad_json"}, status=400)
+
+    required_keys = ("preset", "count_draws", "points_win", "points_draw", "points_loss", "min_matches")
+    if not isinstance(s, dict) or any(k not in s for k in required_keys):
+        return JsonResponse({"ok": False, "error": "bad_settings_keys"}, status=400)
+
+    preset = s.get("preset")
+    if preset not in RANKING_PRESET_DEFAULTS:
+        return JsonResponse({"ok": False, "error": "bad_preset"}, status=400)
+
+    def _to_points(v):
+        # 0以上・0.5刻みの数値のみ許容。
+        f = float(v)
+        if f < 0 or (f * 2) != int(f * 2):
+            raise ValueError("bad_points")
+        return round(f, 1)
+
+    try:
+        points_win = _to_points(s.get("points_win"))
+        points_draw = _to_points(s.get("points_draw"))
+        points_loss = _to_points(s.get("points_loss"))
+    except (TypeError, ValueError):
+        return JsonResponse({"ok": False, "error": "bad_points"}, status=400)
+
+    try:
+        min_matches = int(s.get("min_matches"))
+    except (TypeError, ValueError):
+        return JsonResponse({"ok": False, "error": "bad_min_matches"}, status=400)
+    if min_matches < 0:
+        return JsonResponse({"ok": False, "error": "bad_min_matches"}, status=400)
+
+    obj, _ = ClubRankingSetting.objects.get_or_create(club=club)
+    obj.preset = preset
+    obj.count_draws = bool(s.get("count_draws"))
+    obj.points_win = points_win
+    obj.points_draw = points_draw
+    obj.points_loss = points_loss
+    obj.min_matches = min_matches
+    obj.save(update_fields=[
+        "preset", "count_draws", "points_win", "points_draw", "points_loss", "min_matches", "updated_at",
+    ])
 
     return JsonResponse({"ok": True, "settings": obj.as_dict()})
 

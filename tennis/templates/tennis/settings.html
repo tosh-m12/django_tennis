@@ -188,6 +188,68 @@
 </div>
 
 <hr>
+<h3>戦績ランキングのルール</h3>
+
+<small style="color:#666; display:block; margin-bottom:10px;">
+  ※ プリセットを選ぶと、引き分け・勝ち点・最低試合数の初期値が入ります。<br>
+  ※ 各項目は幹事が自由に上書きできます。「保存」を押すと反映されます。
+</small>
+
+<div id="club-ranking-settings-form"
+     data-club-id="{{ club.id }}"
+     data-admin-token="{{ club.admin_token }}"
+     data-save-url="{{ save_club_ranking_setting_url }}"
+     data-current-settings='{{ ranking_setting_json|escapejs }}'
+     data-preset-defaults='{{ ranking_preset_defaults_json|escapejs }}'
+     style="margin:0 0 12px;">
+
+  <div class="rk-presets" style="display:flex; flex-direction:column; gap:6px; margin-bottom:12px;">
+    {% for value, label in ranking_preset_choices %}
+    <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+      <input type="radio" name="rk-preset" value="{{ value }}"
+             {% if ranking_setting.preset == value %}checked{% endif %}>
+      <span>{{ label }}</span>
+    </label>
+    {% endfor %}
+  </div>
+
+  <div class="rk-row" style="display:flex; align-items:center; gap:8px; margin-bottom:10px;">
+    <button type="button"
+            class="check-btn rk-toggle {% if ranking_setting.count_draws %}is-on{% endif %}"
+            data-rk="count_draws"
+            aria-pressed="{% if ranking_setting.count_draws %}true{% else %}false{% endif %}">
+      <span class="check-icon {% if ranking_setting.count_draws %}check-on{% else %}check-off{% endif %}">✓</span>
+    </button>
+    <span class="ds-label">引き分けをカウント（勝率に0.5勝として算入）</span>
+  </div>
+
+  <div class="rk-points" style="margin-bottom:10px;">
+    <div style="font-size:0.9rem; color:#444; margin-bottom:4px;">勝ち点（勝ち点制で使用）</div>
+    <div style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
+      <label style="display:flex; align-items:center; gap:4px;">勝
+        <input type="number" data-rk="points_win" step="0.5" min="0"
+               value="{{ ranking_setting.points_win }}" style="width:64px;"></label>
+      <label style="display:flex; align-items:center; gap:4px;">分
+        <input type="number" data-rk="points_draw" step="0.5" min="0"
+               value="{{ ranking_setting.points_draw }}" style="width:64px;"></label>
+      <label style="display:flex; align-items:center; gap:4px;">負
+        <input type="number" data-rk="points_loss" step="0.5" min="0"
+               value="{{ ranking_setting.points_loss }}" style="width:64px;"></label>
+    </div>
+  </div>
+
+  <div class="rk-row" style="display:flex; align-items:center; gap:8px; margin-bottom:12px;">
+    <label style="display:flex; align-items:center; gap:6px;">最低試合数
+      <input type="number" data-rk="min_matches" min="0" step="1"
+             value="{{ ranking_setting.min_matches }}" style="width:64px;"></label>
+    <span style="font-size:0.8rem; color:#888;">この試合数未満はランキング下部に表示</span>
+  </div>
+
+  <button type="button" id="club-ranking-settings-save" class="btn">保存</button>
+  <span id="club-ranking-settings-status" style="display:block; margin-top:6px; font-size:0.85rem; min-height:1.2em;"></span>
+</div>
+
+<hr>
 <h3>チーム分け設定</h3>
 
 <div id="class-hooks"

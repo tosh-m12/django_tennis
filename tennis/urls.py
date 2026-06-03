@@ -150,6 +150,9 @@ urlpatterns = [
     path("ajax/save_event_display_setting/", views.save_event_display_setting, name="save_event_display_setting"),
     path("ajax/save_club_display_setting/", views.save_club_display_setting, name="save_club_display_setting"),
 
+    # ranking rule settings (club)
+    path("ajax/save_club_ranking_setting/", views.save_club_ranking_setting, name="save_club_ranking_setting"),
+
     # ============================================================
     # Score
     # ============================================================

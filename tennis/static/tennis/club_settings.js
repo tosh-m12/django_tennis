@@ -117,6 +117,137 @@ document.addEventListener("DOMContentLoaded", () => {
   })();
 
   // ============================================================
+  // [Z2] 戦績ランキングのルール（クラブ単位）
+  //   - プリセット選択で初期値を流し込み、各項目を上書き可
+  //   - 「保存」ボタンで全フィールドをまとめて保存
+  // ============================================================
+  (function initClubRankingSettings() {
+    const root = document.getElementById("club-ranking-settings-form");
+    if (!root) return;
+
+    const status = document.getElementById("club-ranking-settings-status");
+    const saveBtn = document.getElementById("club-ranking-settings-save");
+    const clubId = (root.dataset.clubId || "").trim();
+    const adminToken = (root.dataset.adminToken || "").trim();
+    const saveUrl = (root.dataset.saveUrl || "").trim();
+    if (!clubId || !adminToken || !saveUrl) return;
+
+    let presetDefaults = {};
+    try {
+      presetDefaults = JSON.parse(root.dataset.presetDefaults || "{}");
+    } catch (_) {
+      presetDefaults = {};
+    }
+
+    function setStatus(text, ok) {
+      if (!status) return;
+      status.textContent = text;
+      status.style.color = ok ? "#0a7a3a" : "#a00";
+    }
+
+    const numInput = (key) => root.querySelector(`input[type="number"][data-rk="${key}"]`);
+    const drawToggle = () => root.querySelector('.rk-toggle[data-rk="count_draws"]');
+
+    function getSelectedPreset() {
+      const checked = root.querySelector('input[name="rk-preset"]:checked');
+      return checked ? checked.value : "winrate";
+    }
+
+    function readToggle(btn) {
+      return !!btn?.classList.contains("is-on");
+    }
+
+    function setToggle(btn, on) {
+      if (!btn) return;
+      btn.classList.toggle("is-on", !!on);
+      btn.setAttribute("aria-pressed", on ? "true" : "false");
+      const icon = btn.querySelector(".check-icon");
+      if (icon) {
+        icon.classList.toggle("check-on", !!on);
+        icon.classList.toggle("check-off", !on);
+      }
+    }
+
+    // プリセットのデフォルト値を各コントロールへ流し込む
+    function applyPresetDefaults(preset) {
+      const d = presetDefaults[preset];
+      if (!d) return;
+      setToggle(drawToggle(), !!d.count_draws);
+      const set = (key, v) => { const el = numInput(key); if (el) el.value = v; };
+      set("points_win", d.points_win);
+      set("points_draw", d.points_draw);
+      set("points_loss", d.points_loss);
+      set("min_matches", d.min_matches);
+    }
+
+    function collectSettings() {
+      const num = (key, fallback) => {
+        const el = numInput(key);
+        const v = parseFloat(el?.value);
+        return Number.isFinite(v) ? v : fallback;
+      };
+      return {
+        preset: getSelectedPreset(),
+        count_draws: readToggle(drawToggle()),
+        points_win: num("points_win", 3),
+        points_draw: num("points_draw", 1),
+        points_loss: num("points_loss", 0),
+        min_matches: Math.max(0, Math.trunc(num("min_matches", 3))),
+      };
+    }
+
+    async function save(payload) {
+      const fd = new FormData();
+      fd.append("club_id", clubId);
+      fd.append("admin_token", adminToken);
+      fd.append("settings_json", JSON.stringify(payload));
+
+      const resp = await fetch(saveUrl, {
+        method: "POST",
+        headers: { "X-CSRFToken": csrftoken || "" },
+        body: fd,
+      });
+      const data = await resp.json().catch(() => null);
+      if (!resp.ok || !data?.ok) {
+        throw new Error(data?.error || "save_failed");
+      }
+      return data.settings;
+    }
+
+    // プリセット切替で初期値を流し込み
+    root.addEventListener("change", (e) => {
+      if (e.target?.name === "rk-preset") {
+        applyPresetDefaults(e.target.value);
+      }
+    });
+
+    // 引き分けトグル
+    root.addEventListener("click", (e) => {
+      const btn = e.target.closest('.rk-toggle[data-rk="count_draws"]');
+      if (!btn) return;
+      e.preventDefault();
+      setToggle(btn, !readToggle(btn));
+    });
+
+    let saving = false;
+    saveBtn?.addEventListener("click", async () => {
+      if (saving) return;
+      saving = true;
+      setStatus("保存中…", true);
+      try {
+        const saved = await save(collectSettings());
+        root.dataset.currentSettings = JSON.stringify(saved);
+        setStatus("保存しました", true);
+      } catch (err) {
+        console.error("[club ranking settings] save failed", err);
+        setStatus("保存に失敗しました", false);
+      } finally {
+        saving = false;
+      }
+    });
+  })();
+
+  // ============================================================
   // [A] クラブ名変更（保存あり）
   // ============================================================
   (function initClubRenameModal() {

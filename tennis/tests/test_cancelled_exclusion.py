@@ -8,6 +8,8 @@ import datetime
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from tennis.models import ClubRankingSetting
+
 from .factories import (
     make_club,
     make_ep,
@@ -43,6 +45,8 @@ def _make_singles_event_with_score(club, date_, a, b, a_score=6, b_score=2, canc
 class CancelledEventExclusionTests(TestCase):
     def setUp(self):
         self.club = make_club()
+        # このテストは3試合前提（中止除外の検証が目的）。旧来の最低3試合に設定。
+        ClubRankingSetting.objects.create(club=self.club, preset="winrate", min_matches=3)
         self.a = make_member(self.club, "A", member_no=1)
         self.b = make_member(self.club, "B", member_no=2)
 

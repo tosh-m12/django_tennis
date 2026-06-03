@@ -9,6 +9,8 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
+from tennis.models import ClubRankingSetting
+
 from .factories import (
     make_club,
     make_event,
@@ -69,6 +71,8 @@ class RankingPagePeriodTests(TestCase):
 
     def setUp(self):
         self.club = make_club()
+        # このテストは3試合前提（期間フィルタの検証が目的）。旧来の最低3試合に設定。
+        ClubRankingSetting.objects.create(club=self.club, preset="winrate", min_matches=3)
         # 4月に3試合（A全勝）
         self.event_apr = make_event(self.club, date=datetime.date(2026, 4, 5))
         a = make_member(self.club, "A", member_no=1)
