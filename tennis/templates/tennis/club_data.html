@@ -31,7 +31,7 @@
   {# ダウンロード（この期間のデータを Excel / CSV で書き出し） #}
   <section class="data-download">
     <h2 class="data-section-title">ダウンロード</h2>
-    <p class="data-download-hint">表示中の期間のデータを書き出します。</p>
+    <p class="data-download-hint">表示中の期間のデータを、1件＝1行の「縦持ち」1枚で書き出します（並べ替え・検索置換で一括修正しやすい形）。</p>
     <div class="data-download-actions">
       <a class="btn btn-pill" href="{{ download_xlsx_url }}?format=xlsx&start={{ start_date|date:'Y-m-d' }}&end={{ end_date|date:'Y-m-d' }}">Excel(.xlsx)</a>
       <a class="btn btn-pill" href="{{ download_xlsx_url }}?format=csv&start={{ start_date|date:'Y-m-d' }}&end={{ end_date|date:'Y-m-d' }}">CSV(.zip)</a>

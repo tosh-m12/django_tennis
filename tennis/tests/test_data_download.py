@@ -1,5 +1,5 @@
 """
-データ集計表のダウンロード（Excel/CSV）のテスト。
+データ集計表のダウンロード（縦持ち long 形式・Excel/CSV）のテスト。
 """
 from __future__ import annotations
 
@@ -47,31 +47,26 @@ class DataDownloadTests(TestCase):
         url = reverse("tennis:club_data_download", args=[self.club.public_token, "wrong"])
         self.assertEqual(self.client.get(url, self.params).status_code, 400)
 
-    def test_xlsx_download(self):
+    def test_xlsx_is_single_long_sheet(self):
         url, p = self._url("xlsx")
         resp = self.client.get(url, p)
         self.assertEqual(resp.status_code, 200)
-        self.assertIn("spreadsheetml", resp["Content-Type"])
-        self.assertIn(".xlsx", resp["Content-Disposition"])
         wb = load_workbook(io.BytesIO(resp.content))
-        self.assertIn("メタ", wb.sheetnames)
-        self.assertIn("出欠", wb.sheetnames)
-        # 出欠シート：機械ヘッダに row_key と event:<id>、データに 参加
-        ws = wb["出欠"]
-        kind_row = [c.value for c in ws[1]]
-        self.assertEqual(kind_row[:2], ["#meta", "attendance"])
-        machine = [c.value for c in ws[2]]
-        self.assertEqual(machine[0], "__rowkey__")
-        self.assertIn(f"event:{self.ev.id}", machine)
-        # 山田の行（m:<id>）に「参加」
-        body = [[c.value for c in row] for row in ws.iter_rows(min_row=4)]
-        yamada = next(r for r in body if r[0] == f"m:{self.m.id}")
-        self.assertEqual(yamada[1], "山田")
-        self.assertEqual(yamada[2], "参加")
-        # 共通フラグシートがある
-        self.assertTrue(any(n.startswith("共通_") for n in wb.sheetnames))
+        # シートは メタ＋データ の2枚だけ（フラグごとの別シートは無い）
+        self.assertEqual(set(wb.sheetnames), {"メタ", "データ"})
+        ws = wb["データ"]
+        header = [c.value for c in ws[1]]
+        self.assertEqual(header, ["row_key", "名前", "event", "イベント", "item", "項目", "値"])
+        body = [[c.value for c in row] for row in ws.iter_rows(min_row=2)]
+        # 出欠の行
+        att = next(r for r in body if r[0] == f"m:{self.m.id}" and r[4] == "attendance")
+        self.assertEqual(att[2], f"event:{self.ev.id}")
+        self.assertEqual(att[6], "参加")
+        # フラグの行（同じ1枚に積まれている）
+        flg = next(r for r in body if r[0] == f"m:{self.m.id}" and r[4] == f"clubflag:{self.flag.id}")
+        self.assertEqual(flg[6], "✓")
 
-    def test_csv_zip_download(self):
+    def test_csv_zip_two_files(self):
         url, p = self._url("csv")
         resp = self.client.get(url, p)
         self.assertEqual(resp.status_code, 200)
@@ -79,10 +74,9 @@ class DataDownloadTests(TestCase):
         zf = zipfile.ZipFile(io.BytesIO(resp.content))
         names = zf.namelist()
         self.assertIn("00_meta.csv", names)
-        self.assertTrue(any("出欠" in n for n in names))
-        meta = zf.read("00_meta.csv").decode("utf-8")
+        self.assertIn("01_データ.csv", names)
+        meta = zf.read("00_meta.csv").decode("utf-8-sig")
         self.assertIn("snapshot_token", meta)
-        self.assertIn(str(self.club.id), meta)
 
     def test_snapshot_token_changes_when_data_changes(self):
         from tennis.views import build_club_data_matrices
