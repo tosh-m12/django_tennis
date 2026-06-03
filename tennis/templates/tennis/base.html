@@ -34,17 +34,7 @@
       <div class="topbar topbar--fixed">
         <div class="topbar-inner">
           <div class="topbar-title">
-            <img class="topbar-logo" src="{% static 'tennis/logo/logo_appicon.svg' %}" alt="DeuceNet" width="28" height="28">
-            <span class="topbar-title-text">
-              {% if club %}
-                {{ club.name }}
-                {% if is_admin %}
-                  <span class="topbar-admin-badge">- 幹事モード</span>
-                {% endif %}
-              {% else %}
-                DeuceNet
-              {% endif %}
-            </span>
+            <img class="topbar-wordmark" src="{% static 'tennis/logo/logo_wordmark.svg' %}" alt="DeuceNet">
           </div>
 
           {# ハンバーガーボタン：狭幅でのみ表示（CSSで制御） #}
@@ -145,11 +135,6 @@
 
     {% block content %}{% endblock %}
   </div>
-
-  <footer class="site-footer">
-    <img class="site-footer-logo" src="{% static 'tennis/logo/logo_lockup.svg' %}"
-         alt="DeuceNet — 出欠・対戦表・戦績を、URL1枚で。">
-  </footer>
 
   {% include "tennis/_ui_modals.html" %}
 

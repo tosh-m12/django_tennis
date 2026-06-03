@@ -237,24 +237,12 @@ th {
 .topbar-title{
   display: flex;
   align-items: center;
-  gap: 8px;
-  min-width: 0;            /* flex 子の省略表示のため */
-  font-weight: 900;
-  font-size: 18px;
-  line-height: 1;
-}
-.topbar-logo{
-  flex: none;
-  width: 28px;
-  height: 28px;
-  border-radius: 7px;
-  display: block;
-}
-.topbar-title-text{
   min-width: 0;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+.topbar-wordmark{
+  height: 30px;
+  width: auto;
+  display: block;
 }
 
 .topbar-actions{
@@ -543,16 +531,3 @@ th {
   margin-top: 2px;
 }
 
-/* サイトフッター（DeuceNet ロゴ） */
-.site-footer {
-  text-align: center;
-  padding: 22px 16px 30px;
-  margin-top: 32px;
-  border-top: 1px solid #eee;
-}
-.site-footer-logo {
-  height: 44px;
-  width: auto;
-  max-width: 90%;
-  opacity: 0.92;
-}
