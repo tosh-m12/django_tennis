@@ -188,3 +188,27 @@
 }
 
 /* 出欠アイコンは event ページの色を流用（participants.css 側の定義に依存） */
+
+/* ダウンロードセクション */
+.data-download {
+  margin: 12px 0 4px;
+}
+.data-download-hint {
+  margin: 0 0 8px;
+  font-size: 0.85rem;
+  color: #666;
+}
+.data-download-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.data-download-actions .btn {
+  border: 1px solid #1f7a8c;
+  color: #1f7a8c;
+  background: #fff;
+  text-decoration: none;
+}
+.data-download-actions .btn:hover {
+  background: #f0f8fa;
+}

@@ -38,6 +38,11 @@ urlpatterns = [
         name="club_data",
     ),
     path(
+        "c/<str:club_public_token>/admin/<str:club_admin_token>/data/download/",
+        views.club_data_download,
+        name="club_data_download",
+    ),
+    path(
         "c/<str:club_public_token>/admin/<str:club_admin_token>/help/",
         views.club_admin_help,
         name="club_admin_help",
