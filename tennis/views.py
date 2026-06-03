@@ -1131,6 +1131,9 @@ def club_data(request, club_public_token, club_admin_token):
         "download_xlsx_url": reverse(
             "tennis:club_data_download", args=[club.public_token, club.admin_token]
         ),
+        "upload_url": reverse(
+            "tennis:club_data_upload", args=[club.public_token, club.admin_token]
+        ),
         "is_admin": True,
         "show_topbar": True,
         "cleanup_warnings": _run_member_auto_cleanup(club),
@@ -1176,6 +1179,104 @@ def club_data_download(request, club_public_token, club_admin_token):
     )
     resp["Content-Disposition"] = f'attachment; filename="{base}.xlsx"'
     return resp
+
+
+# データアップロードの最大サイズ（バイト）
+DATA_UPLOAD_MAX_BYTES = 8 * 1024 * 1024
+
+
+@require_POST
+def club_data_upload(request, club_public_token, club_admin_token):
+    """
+    アップロードされたファイルをパース・検証し、差分プレビューを表示する。
+    まだ DB は変更しない。検証OKなら差分を session に保持し、確定ボタンを出す。
+    """
+    from . import data_import
+
+    club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
+    if club.admin_token != club_admin_token:
+        return HttpResponseBadRequest("admin token mismatch")
+
+    upload = request.FILES.get("file")
+    if not upload:
+        return _render_upload_preview(request, club, error="ファイルが選択されていません。")
+    if upload.size > DATA_UPLOAD_MAX_BYTES:
+        return _render_upload_preview(request, club, error="ファイルが大きすぎます（上限8MB）。")
+
+    content = upload.read()
+    try:
+        parsed = data_import.parse_upload(upload.name, content)
+    except data_import.ParseError as e:
+        return _render_upload_preview(request, club, error=str(e))
+
+    result = data_import.analyze(club, parsed)
+
+    if result["errors"]:
+        # ブロッキングエラー：適用不可
+        request.session.pop("data_upload_pending", None)
+        return _render_upload_preview(request, club, result=result, can_apply=False)
+
+    # 検証OK：差分を session に保持
+    request.session["data_upload_pending"] = {
+        "club_id": club.id,
+        "file_snapshot": result["file_snapshot"],
+        "period_start": result["period_start"],
+        "period_end": result["period_end"],
+        "changes": result["changes"],
+    }
+    return _render_upload_preview(
+        request, club, result=result, can_apply=bool(result["changes"])
+    )
+
+
+@require_POST
+def club_data_apply(request, club_public_token, club_admin_token):
+    """
+    プレビューで確認した差分を atomic に適用する。
+    適用直前に snapshot を再検証し、DL後にDBが変わっていたら中止する。
+    """
+    from . import data_import
+
+    club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
+    if club.admin_token != club_admin_token:
+        return HttpResponseBadRequest("admin token mismatch")
+
+    pending = request.session.get("data_upload_pending")
+    if not pending or pending.get("club_id") != club.id:
+        return _render_upload_preview(request, club, error="適用対象がありません。もう一度アップロードしてください。")
+
+    # snapshot 再検証（楽観ロック）
+    ps, pe = pending.get("period_start"), pending.get("period_end")
+    if ps and pe:
+        sd = _parse_date_yyyy_mm_dd(ps)
+        ed = _parse_date_yyyy_mm_dd(pe)
+        if sd and ed:
+            current = build_club_data_matrices(club, sd, ed)["snapshot_token"]
+            if current != pending.get("file_snapshot"):
+                request.session.pop("data_upload_pending", None)
+                return _render_upload_preview(
+                    request, club,
+                    error="ダウンロード後にデータが変更されました。最新を再ダウンロードしてやり直してください。",
+                )
+
+    applied = data_import.apply_changes(club, pending["changes"], actor_kind="admin")
+    request.session.pop("data_upload_pending", None)
+    return _render_upload_preview(request, club, applied=applied)
+
+
+def _render_upload_preview(request, club, *, result=None, error=None,
+                           can_apply=False, applied=None):
+    return render(request, "tennis/data_upload_preview.html", {
+        "club": club,
+        "is_admin": True,
+        "show_topbar": True,
+        "result": result,
+        "error": error,
+        "can_apply": can_apply,
+        "applied": applied,
+        "data_url": reverse("tennis:club_data", args=[club.public_token, club.admin_token]),
+        "apply_url": reverse("tennis:club_data_apply", args=[club.public_token, club.admin_token]),
+    })
 
 
 def _parse_int_or_none(v):

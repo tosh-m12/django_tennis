@@ -38,6 +38,17 @@
     </div>
   </section>
 
+  {# アップロード（編集したファイルを反映：差分プレビュー→確定の2段） #}
+  <section class="data-upload">
+    <h2 class="data-section-title">アップロード</h2>
+    <p class="data-download-hint">編集した Excel/CSV を取り込み、変更内容を確認してから反映します（出欠・フラグの値）。</p>
+    <form method="post" action="{{ upload_url }}" enctype="multipart/form-data" class="data-upload-form">
+      {% csrf_token %}
+      <input type="file" name="file" accept=".xlsx,.zip" required>
+      <button type="submit" class="btn btn-pill btn-primary">確認する</button>
+    </form>
+  </section>
+
   {% if not events %}
     <p class="data-empty">この期間にはイベントがありません。</p>
   {% else %}

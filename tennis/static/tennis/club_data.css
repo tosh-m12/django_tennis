@@ -212,3 +212,12 @@
 .data-download-actions .btn:hover {
   background: #f0f8fa;
 }
+
+/* アップロード／差分プレビュー */
+.data-upload { margin: 16px 0 4px; }
+.data-upload-form { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.upload-result { padding: 10px 14px; border-radius: 8px; margin: 12px 0; }
+.upload-ok { background: #eefbf2; border: 1px solid #b7e4c7; color: #0a7a3a; }
+.upload-err { background: #fdeeee; border: 1px solid #f4c2c2; color: #a00; }
+.upload-warn { background: #fff8e6; border: 1px solid #f0e0a0; color: #8a6d00; }
+.upload-diff th, .upload-diff td { padding: 6px 10px; }
