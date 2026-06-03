@@ -214,16 +214,17 @@
     {% endfor %}
   </div>
 
-  <div class="rk-row">
+  <div class="rk-row{% if ranking_setting.preset == 'points' %} rk-disabled{% endif %}" data-used-by="winrate,wins">
     <button type="button"
             class="check-btn rk-toggle {% if ranking_setting.count_draws %}is-on{% endif %}"
             data-rk="count_draws"
-            aria-pressed="{% if ranking_setting.count_draws %}true{% else %}false{% endif %}">
+            aria-pressed="{% if ranking_setting.count_draws %}true{% else %}false{% endif %}"
+            {% if ranking_setting.preset == 'points' %}disabled{% endif %}>
       <span class="check-icon {% if ranking_setting.count_draws %}check-on{% else %}check-off{% endif %}">✓</span>
     </button>
     <span class="rk-label-wrap">
       <span class="rk-label">勝率で引き分けを0.5勝として数える</span>
-      <span class="rk-hint">勝率の計算方法だけに影響します。OFFのときは引き分けを勝ちに数えません（勝ち点制の「分」の配点とは別です）。</span>
+      <span class="rk-hint">勝率の計算方法だけに影響します。OFFのときは引き分けを勝ちに数えません（勝ち点制の「分」の配点とは別です）。勝ち点制では順位に勝率を使わないため設定できません。</span>
     </span>
   </div>
 
