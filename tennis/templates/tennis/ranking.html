@@ -67,7 +67,7 @@
                 {% for row in ranking_doubles.ranked %}
                   <tr>
                     <td>{{ row.rank }}</td>
-                    <td style="text-align:left;">{{ row.name }}</td>
+                    <td style="text-align:left;">{% if row.member_id %}{% if is_admin %}<a class="name-link" href="{% url 'tennis:member_detail_admin' club.public_token club.admin_token row.member_id %}">{{ row.name }}</a>{% else %}<a class="name-link" href="{% url 'tennis:member_detail' club.public_token row.member_id %}">{{ row.name }}</a>{% endif %}{% else %}{{ row.name }}{% endif %}</td>
                     {% if ranking_is_points %}<td><strong>{{ row.points }}</strong></td>{% endif %}
                     <td>{{ row.matches }}</td>
                     <td>{{ row.wins }}</td>
@@ -111,7 +111,7 @@
                 {% for row in ranking_singles.ranked %}
                   <tr>
                     <td>{{ row.rank }}</td>
-                    <td style="text-align:left;">{{ row.name }}</td>
+                    <td style="text-align:left;">{% if row.member_id %}{% if is_admin %}<a class="name-link" href="{% url 'tennis:member_detail_admin' club.public_token club.admin_token row.member_id %}">{{ row.name }}</a>{% else %}<a class="name-link" href="{% url 'tennis:member_detail' club.public_token row.member_id %}">{{ row.name }}</a>{% endif %}{% else %}{{ row.name }}{% endif %}</td>
                     {% if ranking_is_points %}<td><strong>{{ row.points }}</strong></td>{% endif %}
                     <td>{{ row.matches }}</td>
                     <td>{{ row.wins }}</td>
