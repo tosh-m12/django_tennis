@@ -7,6 +7,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}DeuceNet{% endblock %}</title>
 
+  <link rel="icon" type="image/svg+xml" href="{% static 'tennis/logo/logo_favicon.svg' %}">
+  <link rel="apple-touch-icon" href="{% static 'tennis/logo/logo_appicon.png' %}">
+  <meta name="theme-color" content="#3b82f6">
+
   <link rel="stylesheet" href="{% static 'tennis/style.css' %}">
   <link rel="stylesheet" href="{% static 'tennis/calendar.css' %}">
   <link rel="stylesheet" href="{% static 'tennis/index.css' %}">
@@ -30,14 +34,17 @@
       <div class="topbar topbar--fixed">
         <div class="topbar-inner">
           <div class="topbar-title">
-            {% if club %}
-              {{ club.name }}
-              {% if is_admin %}
-                <span class="topbar-admin-badge">- 幹事モード</span>
+            <img class="topbar-logo" src="{% static 'tennis/logo/logo_appicon.svg' %}" alt="DeuceNet" width="28" height="28">
+            <span class="topbar-title-text">
+              {% if club %}
+                {{ club.name }}
+                {% if is_admin %}
+                  <span class="topbar-admin-badge">- 幹事モード</span>
+                {% endif %}
+              {% else %}
+                DeuceNet
               {% endif %}
-            {% else %}
-              DeuceNet
-            {% endif %}
+            </span>
           </div>
 
           {# ハンバーガーボタン：狭幅でのみ表示（CSSで制御） #}
@@ -140,8 +147,8 @@
   </div>
 
   <footer class="site-footer">
-    <span class="site-footer-brand">DeuceNet</span>
-    <span class="site-footer-note">テニスサークル管理アプリ</span>
+    <img class="site-footer-logo" src="{% static 'tennis/logo/logo_lockup.svg' %}"
+         alt="DeuceNet — 出欠・対戦表・戦績を、URL1枚で。">
   </footer>
 
   {% include "tennis/_ui_modals.html" %}

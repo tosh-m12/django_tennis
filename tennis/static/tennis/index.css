@@ -59,14 +59,21 @@
   font-weight: 600;
 }
 /* トップ（クラブ登録）ページのブランド表示 */
-.brand-title {
-  font-size: 2.4rem;
-  letter-spacing: 1px;
-  margin: 0 0 8px;
-  color: #1f7a8c;
+.brand-logo {
+  display: block;
+  width: min(420px, 90%);
+  height: auto;
+  margin: 0 auto 20px;
 }
 .brand-tagline {
   color: #666;
   margin: 0 0 28px;
   font-size: 0.95rem;
+}
+.sr-only {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0);
+  white-space: nowrap; border: 0;
 }

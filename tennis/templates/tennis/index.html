@@ -12,7 +12,9 @@
 {% block content %}
 <div style="max-width:720px; margin:0 auto; text-align:center; padding:80px 16px;">
 
-  <h1 class="brand-title">DeuceNet</h1>
+  <h1 class="sr-only">DeuceNet</h1>
+  <img class="brand-logo" src="{% static 'tennis/logo/logo_master.svg' %}"
+       alt="DeuceNet — コートのネット、仲間のネットワーク。">
   <p class="brand-tagline">テニスサークルの出欠管理・対戦表・戦績集計を、URLひとつで。</p>
 
   {% if error %}
