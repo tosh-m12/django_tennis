@@ -1,0 +1,79 @@
+{% extends "tennis/base.html" %}
+{% load static %}
+
+{% block title %}整理の確認 - {{ club.name }}{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'tennis/club_data.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="data-page">
+  <header class="data-header">
+    <h1 class="data-title">{% if mode == 'merge' %}統合の確認{% else %}完全削除の確認{% endif %}</h1>
+  </header>
+
+  <p><a href="{{ cleanup_url }}">← メンバー整理に戻る</a></p>
+
+  {% if result.errors %}
+    <div class="upload-result upload-err">
+      <ul>{% for e in result.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+    </div>
+
+  {% elif mode == 'merge' %}
+    <p><strong>{{ result.target.display_name }}</strong> に {{ result.sources|length }} 件を統合します。</p>
+    <ul>
+      <li>そのまま移動する記録: <strong>{{ result.moves }}</strong> 件</li>
+      <li>同じイベントで重複していて統合する記録: <strong>{{ result.conflicts }}</strong> 件</li>
+    </ul>
+
+    {% if result.conflict_details %}
+      <div class="upload-result upload-warn">
+        <p>同一イベントの出欠は強い方（参加&gt;未定&gt;不参加&gt;空）を採用します。フラグは両者を合わせます。</p>
+        <div class="data-matrix-wrap">
+          <table class="data-matrix-table">
+            <thead><tr><th>イベント</th><th>統合元</th><th>統合先</th><th>結果</th></tr></thead>
+            <tbody>
+              {% for c in result.conflict_details %}
+                <tr><td>{{ c.event }}</td><td>{{ c.src_att }}</td><td>{{ c.tgt_att }}</td><td><strong>{{ c.result_att }}</strong></td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    {% endif %}
+
+    {% if result.moves or result.conflicts %}
+      <form method="post" action="{{ apply_url }}" style="margin-top:16px;">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-pill btn-primary">この内容で統合する</button>
+        <a class="btn btn-pill" href="{{ cleanup_url }}">やめる</a>
+      </form>
+    {% else %}
+      <div class="upload-result upload-ok">統合する記録はありませんでした。</div>
+    {% endif %}
+
+  {% else %}
+    {# delete #}
+    <p><strong>{{ result.member.display_name }}</strong>{% if result.member.is_fixed %}（固定メンバー）{% endif %} を完全削除します。</p>
+    <ul>
+      <li>削除される出欠記録: <strong>{{ result.ep_count }}</strong> 件</li>
+      <li>削除されるフラグ記録: <strong>{{ result.flag_count }}</strong> 件</li>
+    </ul>
+    {% if result.warnings %}
+      <div class="upload-result upload-err">
+        <p><strong>注意（取り消せません）</strong></p>
+        <ul>{% for w in result.warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+      </div>
+    {% else %}
+      <div class="upload-result upload-warn">この操作は取り消せません。</div>
+    {% endif %}
+
+    <form method="post" action="{{ apply_url }}" style="margin-top:16px;">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-pill btn-primary">完全に削除する</button>
+      <a class="btn btn-pill" href="{{ cleanup_url }}">やめる</a>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

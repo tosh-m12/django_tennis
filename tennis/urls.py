@@ -52,6 +52,32 @@ urlpatterns = [
         views.club_data_apply,
         name="club_data_apply",
     ),
+    # メンバー整理（統合・完全削除）
+    path(
+        "c/<str:club_public_token>/admin/<str:club_admin_token>/members/cleanup/",
+        views.club_member_cleanup,
+        name="club_member_cleanup",
+    ),
+    path(
+        "c/<str:club_public_token>/admin/<str:club_admin_token>/members/merge/preview/",
+        views.club_member_merge_preview,
+        name="club_member_merge_preview",
+    ),
+    path(
+        "c/<str:club_public_token>/admin/<str:club_admin_token>/members/merge/apply/",
+        views.club_member_merge_apply,
+        name="club_member_merge_apply",
+    ),
+    path(
+        "c/<str:club_public_token>/admin/<str:club_admin_token>/members/delete/preview/",
+        views.club_member_delete_preview,
+        name="club_member_delete_preview",
+    ),
+    path(
+        "c/<str:club_public_token>/admin/<str:club_admin_token>/members/delete/apply/",
+        views.club_member_delete_apply,
+        name="club_member_delete_apply",
+    ),
     path(
         "c/<str:club_public_token>/admin/<str:club_admin_token>/help/",
         views.club_admin_help,

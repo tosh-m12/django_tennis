@@ -1,0 +1,79 @@
+{% extends "tennis/base.html" %}
+{% load static %}
+
+{% block title %}メンバー整理 - {{ club.name }}{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'tennis/club_data.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="data-page">
+  <header class="data-header">
+    <h1 class="data-title">メンバー整理</h1>
+  </header>
+
+  {% if flash %}
+    <div class="upload-result {% if flash.kind == 'ok' %}upload-ok{% else %}upload-err{% endif %}">{{ flash.text }}</div>
+  {% endif %}
+
+  <p class="data-download-hint">
+    重複したメンバーを1人にまとめる（名寄せ）／使われていないメンバーを完全削除します。<br>
+    出欠・フラグ・対戦表の記録は自動でまとめ直されます。実行前に内容を確認できます。
+  </p>
+
+  {# 統合フォーム：統合元（チェック）と統合先（ラジオ）を選ぶ #}
+  <form method="post" action="{{ merge_preview_url }}">
+    {% csrf_token %}
+    <div class="data-matrix-wrap">
+      <table class="data-matrix-table">
+        <thead>
+          <tr>
+            <th>統合元</th>
+            <th>統合先</th>
+            <th>名前</th>
+            <th>種別</th>
+            <th>出欠</th>
+            <th>フラグ</th>
+            <th>最終参加</th>
+            <th>試合履歴</th>
+            <th>削除</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for r in rows %}
+            <tr>
+              <td><input type="checkbox" name="source_keys" value="{{ r.key }}"></td>
+              <td>{% if r.kind == 'member' %}<input type="radio" name="target_key" value="{{ r.key }}">{% endif %}</td>
+              <td style="text-align:left;">{{ r.display_name }}{% if r.is_fixed %} <span class="ev-title">(固定)</span>{% endif %}</td>
+              <td>{% if r.kind == 'member' %}メンバー{% else %}ゲスト{% endif %}</td>
+              <td>{{ r.ep_count }}</td>
+              <td>{{ r.flag_count }}</td>
+              <td>{% if r.last_date %}{{ r.last_date|date:'Y/n/j' }}{% else %}—{% endif %}</td>
+              <td>{% if r.has_match_history %}あり{% else %}—{% endif %}</td>
+              <td>
+                {% if r.kind == 'member' %}
+                  <button type="submit" form="del-{{ r.member_id }}" class="btn btn-pill">削除</button>
+                {% endif %}
+              </td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <div style="margin-top:12px;">
+      <button type="submit" class="btn btn-pill btn-primary">選んだ統合元を統合先へまとめる（確認）</button>
+    </div>
+  </form>
+
+  {# 削除用の隠しフォーム（行のボタンから submit） #}
+  {% for r in rows %}
+    {% if r.kind == 'member' %}
+      <form id="del-{{ r.member_id }}" method="post" action="{{ delete_preview_url }}" style="display:none;">
+        {% csrf_token %}
+        <input type="hidden" name="member_id" value="{{ r.member_id }}">
+      </form>
+    {% endif %}
+  {% endfor %}
+</div>
+{% endblock %}
