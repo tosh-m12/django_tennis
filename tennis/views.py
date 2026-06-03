@@ -560,7 +560,9 @@ def _compute_ranking_from(events, ms_by_event, ep_map, config):
 
     def ensure(key, name):
         if key not in stats:
-            stats[key] = {"name": name, "matches": 0, "wins": 0, "losses": 0, "draws": 0, "gf": 0, "ga": 0}
+            # key は ("m", member_id) か ("g", name)。メンバーのみ個人ページへリンクできるよう member_id を持たせる。
+            stats[key] = {"name": name, "member_id": key[1] if key[0] == "m" else None,
+                          "matches": 0, "wins": 0, "losses": 0, "draws": 0, "gf": 0, "ga": 0}
         return stats[key]
 
     def resolve_player_key_and_name(p):

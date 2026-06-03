@@ -95,3 +95,14 @@
     color: #777;
     line-height: 1.5;
 }
+
+/* 戦績表の名前リンク（個人ページへ遷移） */
+.rank-table a.name-link,
+.rank-table a.name-link:visited {
+    color: #1f7a8c;
+    text-decoration: none;
+    font-weight: 600;
+}
+.rank-table a.name-link:hover {
+    text-decoration: underline;
+}

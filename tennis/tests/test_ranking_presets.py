@@ -206,6 +206,52 @@ class ResolveRankingConfigTests(TestCase):
 
 
 @_NO_MANIFEST_STORAGES
+class RankingNameLinkTests(TestCase):
+    """戦績表の名前 → 個人ページリンク（メンバーのみ、ゲストはテキスト）。"""
+
+    def setUp(self):
+        self.club = make_club()
+        # メンバーは min 1 で ranked に出るよう設定
+        ClubRankingSetting.objects.create(club=self.club, preset="winrate", min_matches=1)
+        ev = make_event(self.club, date=datetime.date(2026, 5, 10))
+        self.member = make_member(self.club, "メンバーA", member_no=1)
+        ep_m = make_ep(ev, member=self.member, attendance="yes")
+        ep_g = make_ep(ev, display_name="ゲストB", attendance="yes")
+        schedule = [
+            {"round": i, "matches": [{"court": 1, "team1": [ep_m.id], "team2": [ep_g.id]}], "rests": []}
+            for i in range(1, 3)
+        ]
+        ms = make_published_schedule(ev, schedule, game_type="singles", court_count=1, round_count=2)
+        make_score(ms, 1, 1, 6, 0)
+        make_score(ms, 2, 1, 6, 1)
+
+    def test_rows_carry_member_id(self):
+        qs = Event.objects.filter(club=self.club)
+        ranked = build_month_rankings(qs, ["singles"], _cfg("winrate", min_matches=1))["singles"]["ranked"]
+        by_name = {r["name"]: r for r in ranked}
+        self.assertEqual(by_name["メンバーA"]["member_id"], self.member.id)
+        self.assertIsNone(by_name["ゲストB"]["member_id"])
+
+    def test_ranking_page_links_member_not_guest(self):
+        url = reverse("tennis:ranking", args=[self.club.public_token])
+        html = self.client.get(url, {"start": "2026-05-01", "end": "2026-05-31"}).content.decode()
+        member_url = reverse("tennis:member_detail", args=[self.club.public_token, self.member.id])
+        self.assertIn(f'href="{member_url}"', html)
+        # ゲストはリンクにならない（名前は出るがアンカー無し）
+        self.assertIn("ゲストB", html)
+        self.assertNotIn(f">ゲストB</a>", html)
+
+    def test_ranking_page_admin_uses_admin_link(self):
+        url = reverse("tennis:ranking_admin", args=[self.club.public_token, self.club.admin_token])
+        html = self.client.get(url, {"start": "2026-05-01", "end": "2026-05-31"}).content.decode()
+        admin_url = reverse(
+            "tennis:member_detail_admin",
+            args=[self.club.public_token, self.club.admin_token, self.member.id],
+        )
+        self.assertIn(f'href="{admin_url}"', html)
+
+
+@_NO_MANIFEST_STORAGES
 class RankingRuleSummaryTests(TestCase):
     """集計ルールの要約（戦績ページ・一般ヘルプの連動表示）。"""
 
