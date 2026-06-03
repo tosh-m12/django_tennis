@@ -5,7 +5,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>{% block title %}テニスサークル{% endblock %}</title>
+  <title>{% block title %}DeuceNet{% endblock %}</title>
 
   <link rel="stylesheet" href="{% static 'tennis/style.css' %}">
   <link rel="stylesheet" href="{% static 'tennis/calendar.css' %}">
@@ -36,7 +36,7 @@
                 <span class="topbar-admin-badge">- 幹事モード</span>
               {% endif %}
             {% else %}
-              テニスサークル管理アプリ
+              DeuceNet
             {% endif %}
           </div>
 
@@ -138,6 +138,11 @@
 
     {% block content %}{% endblock %}
   </div>
+
+  <footer class="site-footer">
+    <span class="site-footer-brand">DeuceNet</span>
+    <span class="site-footer-note">テニスサークル管理アプリ</span>
+  </footer>
 
   {% include "tennis/_ui_modals.html" %}
 
