@@ -1279,6 +1279,125 @@ def _render_upload_preview(request, club, *, result=None, error=None,
     })
 
 
+# ============================================================
+# メンバー整理（統合・完全削除）— アプリ内クレンジング（フェーズ2）
+# ============================================================
+
+def _cleanup_club_or_400(club_public_token, club_admin_token):
+    club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
+    if club.admin_token != club_admin_token:
+        return None, HttpResponseBadRequest("admin token mismatch")
+    return club, None
+
+
+@require_http_methods(["GET"])
+def club_member_cleanup(request, club_public_token, club_admin_token):
+    """メンバー整理ページ：記録件数つき一覧＋統合フォーム＋完全削除。"""
+    from . import data_cleanup
+
+    club, err = _cleanup_club_or_400(club_public_token, club_admin_token)
+    if err:
+        return err
+    return render(request, "tennis/member_cleanup.html", {
+        "club": club,
+        "is_admin": True,
+        "show_topbar": True,
+        "rows": data_cleanup.member_summaries(club),
+        "merge_preview_url": reverse("tennis:club_member_merge_preview", args=[club.public_token, club.admin_token]),
+        "delete_preview_url": reverse("tennis:club_member_delete_preview", args=[club.public_token, club.admin_token]),
+        "cleanup_url": reverse("tennis:club_member_cleanup", args=[club.public_token, club.admin_token]),
+        "flash": request.session.pop("cleanup_flash", None),
+    })
+
+
+@require_POST
+def club_member_merge_preview(request, club_public_token, club_admin_token):
+    from . import data_cleanup
+
+    club, err = _cleanup_club_or_400(club_public_token, club_admin_token)
+    if err:
+        return err
+
+    target_key = (request.POST.get("target_key") or "").strip()
+    source_keys = [k for k in request.POST.getlist("source_keys") if k]
+    result = data_cleanup.preview_merge(club, source_keys, target_key)
+
+    if not result.get("errors") and (result.get("moves") or result.get("conflicts")):
+        request.session["member_merge_pending"] = {
+            "club_id": club.id, "target_key": target_key, "source_keys": source_keys,
+        }
+    else:
+        request.session.pop("member_merge_pending", None)
+
+    return render(request, "tennis/member_cleanup_preview.html", {
+        "club": club, "is_admin": True, "show_topbar": True,
+        "mode": "merge", "result": result,
+        "apply_url": reverse("tennis:club_member_merge_apply", args=[club.public_token, club.admin_token]),
+        "cleanup_url": reverse("tennis:club_member_cleanup", args=[club.public_token, club.admin_token]),
+    })
+
+
+@require_POST
+def club_member_merge_apply(request, club_public_token, club_admin_token):
+    from . import data_cleanup
+
+    club, err = _cleanup_club_or_400(club_public_token, club_admin_token)
+    if err:
+        return err
+
+    pending = request.session.get("member_merge_pending")
+    if not pending or pending.get("club_id") != club.id:
+        request.session["cleanup_flash"] = {"kind": "err", "text": "対象がありません。やり直してください。"}
+        return redirect("tennis:club_member_cleanup", club.public_token, club.admin_token)
+
+    n = data_cleanup.apply_merge(club, pending["source_keys"], pending["target_key"], actor_kind="admin")
+    request.session.pop("member_merge_pending", None)
+    request.session["cleanup_flash"] = {"kind": "ok", "text": f"統合しました（{n}件の記録を移動）。"}
+    return redirect("tennis:club_member_cleanup", club.public_token, club.admin_token)
+
+
+@require_POST
+def club_member_delete_preview(request, club_public_token, club_admin_token):
+    from . import data_cleanup
+
+    club, err = _cleanup_club_or_400(club_public_token, club_admin_token)
+    if err:
+        return err
+
+    member_id = (request.POST.get("member_id") or "").strip()
+    result = data_cleanup.preview_delete(club, member_id)
+    if not result.get("errors"):
+        request.session["member_delete_pending"] = {"club_id": club.id, "member_id": member_id}
+    else:
+        request.session.pop("member_delete_pending", None)
+
+    return render(request, "tennis/member_cleanup_preview.html", {
+        "club": club, "is_admin": True, "show_topbar": True,
+        "mode": "delete", "result": result,
+        "apply_url": reverse("tennis:club_member_delete_apply", args=[club.public_token, club.admin_token]),
+        "cleanup_url": reverse("tennis:club_member_cleanup", args=[club.public_token, club.admin_token]),
+    })
+
+
+@require_POST
+def club_member_delete_apply(request, club_public_token, club_admin_token):
+    from . import data_cleanup
+
+    club, err = _cleanup_club_or_400(club_public_token, club_admin_token)
+    if err:
+        return err
+
+    pending = request.session.get("member_delete_pending")
+    if not pending or pending.get("club_id") != club.id:
+        request.session["cleanup_flash"] = {"kind": "err", "text": "対象がありません。やり直してください。"}
+        return redirect("tennis:club_member_cleanup", club.public_token, club.admin_token)
+
+    n = data_cleanup.apply_delete(club, pending["member_id"], actor_kind="admin")
+    request.session.pop("member_delete_pending", None)
+    request.session["cleanup_flash"] = {"kind": "ok", "text": f"完全削除しました（出欠{n}件を削除）。"}
+    return redirect("tennis:club_member_cleanup", club.public_token, club.admin_token)
+
+
 def _parse_int_or_none(v):
     try:
         return int(v)

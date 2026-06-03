@@ -55,6 +55,10 @@
   ※ 固定メンバーは、一度設定すると次回以降に新しく作成するイベントではデフォルトで名前が表示されます。<br>
   新しくメンバーを追加した際、固定メンバーの場合は✓を入れてください。
 </small>
+
+<p style="margin:0 0 12px;">
+  <a class="btn btn-pill" href="{% url 'tennis:club_member_cleanup' club.public_token club.admin_token %}">メンバー整理（重複の統合・完全削除）</a>
+</p>
 <small style="color:#666; display:block; margin-bottom:10px;">
   ※ チーム分けは、ここで設定したものがイベント新規作成時にデフォルトとして表示されます。<br>
   各イベントページで設定したチーム分けはそのイベント固有の設定となり、クラブ全体の設定には影響しません。
