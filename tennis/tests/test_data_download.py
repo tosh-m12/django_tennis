@@ -58,11 +58,13 @@ class DataDownloadTests(TestCase):
         self.assertIn("出欠", wb.sheetnames)
         # 出欠シート：機械ヘッダに row_key と event:<id>、データに 参加
         ws = wb["出欠"]
-        machine = [c.value for c in ws[1]]
+        kind_row = [c.value for c in ws[1]]
+        self.assertEqual(kind_row[:2], ["#meta", "attendance"])
+        machine = [c.value for c in ws[2]]
         self.assertEqual(machine[0], "__rowkey__")
         self.assertIn(f"event:{self.ev.id}", machine)
         # 山田の行（m:<id>）に「参加」
-        body = [[c.value for c in row] for row in ws.iter_rows(min_row=3)]
+        body = [[c.value for c in row] for row in ws.iter_rows(min_row=4)]
         yamada = next(r for r in body if r[0] == f"m:{self.m.id}")
         self.assertEqual(yamada[1], "山田")
         self.assertEqual(yamada[2], "参加")

@@ -1,0 +1,81 @@
+{% extends "tennis/base.html" %}
+{% load static %}
+
+{% block title %}データ取り込み確認 - {{ club.name }}{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'tennis/club_data.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="data-page">
+  <header class="data-header">
+    <h1 class="data-title">データ取り込み</h1>
+  </header>
+
+  <p><a href="{{ data_url }}">← データ集計表に戻る</a></p>
+
+  {% if applied is not None %}
+    {# 適用完了 #}
+    <div class="upload-result upload-ok">
+      <strong>{{ applied }}件</strong> の変更を反映しました。
+    </div>
+
+  {% elif error %}
+    <div class="upload-result upload-err">{{ error }}</div>
+
+  {% elif result %}
+    {% if result.errors %}
+      <div class="upload-result upload-err">
+        <p>エラーがあるため反映できません。修正して再アップロードしてください。</p>
+        <ul>
+          {% for e in result.errors %}<li>{{ e }}</li>{% endfor %}
+        </ul>
+      </div>
+    {% else %}
+      {% if result.warnings %}
+        <div class="upload-result upload-warn">
+          <ul>{% for w in result.warnings %}<li>{{ w }}</li>{% endfor %}</ul>
+        </div>
+      {% endif %}
+
+      {% if result.ignored %}
+        <div class="upload-result upload-warn">
+          <ul>{% for ig in result.ignored %}<li>{{ ig }}</li>{% endfor %}</ul>
+        </div>
+      {% endif %}
+
+      {% if result.changes %}
+        <p>以下の <strong>{{ result.summary.changes }}件</strong> を反映します。</p>
+        <div class="data-matrix-wrap">
+          <table class="data-matrix-table upload-diff">
+            <thead>
+              <tr><th>種類</th><th>メンバー</th><th>対象</th><th>変更前</th><th>→</th><th>変更後</th></tr>
+            </thead>
+            <tbody>
+              {% for ch in result.changes %}
+                <tr>
+                  <td>{% if ch.kind == 'attendance' %}出欠{% else %}フラグ:{{ ch.flag_name }}{% endif %}</td>
+                  <td style="text-align:left;">{{ ch.display_name }}</td>
+                  <td>{% if ch.kind == 'attendance' %}イベント#{{ ch.event_id }}{% else %}イベント#{{ ch.event_id }}{% endif %}</td>
+                  <td>{{ ch.old_text }}</td>
+                  <td>→</td>
+                  <td><strong>{{ ch.new_text }}</strong></td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+        <form method="post" action="{{ apply_url }}" class="data-upload-form" style="margin-top:16px;">
+          {% csrf_token %}
+          <button type="submit" class="btn btn-pill btn-primary">この内容で反映する</button>
+          <a class="btn btn-pill" href="{{ data_url }}">やめる</a>
+        </form>
+      {% else %}
+        <div class="upload-result upload-ok">変更点はありませんでした。</div>
+      {% endif %}
+    {% endif %}
+  {% endif %}
+</div>
+{% endblock %}

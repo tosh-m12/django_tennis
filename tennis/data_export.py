@@ -156,17 +156,18 @@ def build_workbook(club, start_d, end_d, data, generated_at):
     for row in _meta_rows(club, start_d, end_d, generated_at, data["snapshot_token"], sheets):
         meta_ws.append(row)
 
-    # データシート
+    # データシート。1行目=種別行(#meta,kind,ref) 2行目=機械ヘッダ 3行目=人間ヘッダ 4行目〜=データ
     for s in sheets:
         ws = wb.create_sheet(title=_safe_sheet_name(s["name"], used))
+        ws.append(["#meta", s["kind"], s["ref_id"]])
         ws.append(s["machine_header"])
         ws.append(s["human_header"])
         for dr in s["data_rows"]:
             ws.append(dr)
-        # 機械ヘッダ行は隠す（人間には2行目を見せる）
+        # 種別行・機械ヘッダ行は隠す（人間には3行目を見せる）
         ws.row_dimensions[1].hidden = True
-        ws.freeze_panes = "C3"
-        # 列幅をざっくり
+        ws.row_dimensions[2].hidden = True
+        ws.freeze_panes = "C4"
         ws.column_dimensions[get_column_letter(2)].width = 16
 
     return wb
@@ -205,6 +206,7 @@ def csv_zip_bytes(club, start_d, end_d, data, generated_at):
 
             sio = io.StringIO()
             w = csv.writer(sio)
+            w.writerow(["#meta", s["kind"], s["ref_id"]])
             w.writerow(s["machine_header"])
             w.writerow(s["human_header"])
             for dr in s["data_rows"]:

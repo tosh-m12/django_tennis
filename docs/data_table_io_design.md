@@ -68,4 +68,10 @@
 
 ## 進捗
 
-- フェーズ1 から実装着手。実サークルでの利用フィードバックを見ながら拡張する。
+- フェーズ1a 完了: Excel/CSV ダウンロード（`tennis/data_export.py`, `club_data_download`）。
+- フェーズ1b 完了: アップロード→差分プレビュー→確定→atomic 反映（出欠＋フラグ値）。
+  `tennis/data_import.py`（parse/analyze/apply）, `club_data_upload`/`club_data_apply`,
+  `data_upload_preview.html`。snapshot 楽観ロック・値ホワイトリスト・全件検証→atomic・
+  AuditLog(action=data_upload_apply) を実装。名簿シートの編集は無視して注記。
+- 次: フェーズ2（名簿の固定/順 編集＋メンバー完全削除）、フェーズ3（名寄せ統合＋フラグ定義整理）。
+- 実サークルでの利用フィードバックを見ながら拡張する。
