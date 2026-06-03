@@ -118,15 +118,14 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // ============================================================
   // [Z2] 戦績ランキングのルール（クラブ単位）
-  //   - プリセット選択で初期値を流し込み、各項目を上書き可
-  //   - 「保存」ボタンで全フィールドをまとめて保存
+  //   - プリセット選択で引き分け・勝ち点・最低試合数を連動して切替
+  //   - 各項目の変更（トグル/数値/プリセット）で即保存（保存ボタンなし）
   // ============================================================
   (function initClubRankingSettings() {
     const root = document.getElementById("club-ranking-settings-form");
     if (!root) return;
 
     const status = document.getElementById("club-ranking-settings-status");
-    const saveBtn = document.getElementById("club-ranking-settings-save");
     const clubId = (root.dataset.clubId || "").trim();
     const adminToken = (root.dataset.adminToken || "").trim();
     const saveUrl = (root.dataset.saveUrl || "").trim();
@@ -214,24 +213,15 @@ document.addEventListener("DOMContentLoaded", () => {
       return data.settings;
     }
 
-    // プリセット切替で初期値を流し込み
-    root.addEventListener("change", (e) => {
-      if (e.target?.name === "rk-preset") {
-        applyPresetDefaults(e.target.value);
-      }
-    });
-
-    // 引き分けトグル
-    root.addEventListener("click", (e) => {
-      const btn = e.target.closest('.rk-toggle[data-rk="count_draws"]');
-      if (!btn) return;
-      e.preventDefault();
-      setToggle(btn, !readToggle(btn));
-    });
-
+    // 変更のたびに即保存（保存ボタンなし）。多重送信は最新値で直列化。
     let saving = false;
-    saveBtn?.addEventListener("click", async () => {
-      if (saving) return;
+    let pendingPayload = null;
+    async function persist() {
+      if (saving) {
+        // 進行中なら最新値を保留にして、完了後にもう一度送る
+        pendingPayload = collectSettings();
+        return;
+      }
       saving = true;
       setStatus("保存中…", true);
       try {
@@ -243,7 +233,32 @@ document.addEventListener("DOMContentLoaded", () => {
         setStatus("保存に失敗しました", false);
       } finally {
         saving = false;
+        if (pendingPayload) {
+          pendingPayload = null;
+          persist();
+        }
       }
+    }
+
+    // プリセット切替：初期値を流し込んでから即保存
+    root.addEventListener("change", (e) => {
+      const t = e.target;
+      if (t?.name === "rk-preset") {
+        applyPresetDefaults(t.value);
+        persist();
+      } else if (t?.matches?.('input[type="number"][data-rk]')) {
+        // 数値入力は確定（change=blur/Enter）で保存
+        persist();
+      }
+    });
+
+    // 引き分けトグル：切り替えて即保存
+    root.addEventListener("click", (e) => {
+      const btn = e.target.closest('.rk-toggle[data-rk="count_draws"]');
+      if (!btn) return;
+      e.preventDefault();
+      setToggle(btn, !readToggle(btn));
+      persist();
     });
   })();
 
