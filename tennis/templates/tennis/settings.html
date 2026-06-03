@@ -221,7 +221,10 @@
             aria-pressed="{% if ranking_setting.count_draws %}true{% else %}false{% endif %}">
       <span class="check-icon {% if ranking_setting.count_draws %}check-on{% else %}check-off{% endif %}">✓</span>
     </button>
-    <span class="rk-label">引き分けをカウント（勝率に0.5勝として算入）</span>
+    <span class="rk-label-wrap">
+      <span class="rk-label">勝率で引き分けを0.5勝として数える</span>
+      <span class="rk-hint">勝率の計算方法だけに影響します。OFFのときは引き分けを勝ちに数えません（勝ち点制の「分」の配点とは別です）。</span>
+    </span>
   </div>
 
   <div class="rk-field{% if ranking_setting.preset != 'points' %} rk-disabled{% endif %}" data-used-by="points">
