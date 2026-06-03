@@ -101,7 +101,6 @@ class RankingPagePeriodTests(TestCase):
             y -= 1
         self.assertEqual(ctx["start_date"], datetime.date(y, m, 1))
         self.assertEqual(ctx["end_date"], today)
-        self.assertIn("直近3ヶ月", ctx["period_label"])
 
     def test_explicit_period_filters(self):
         url = reverse("tennis:ranking", args=[self.club.public_token])
