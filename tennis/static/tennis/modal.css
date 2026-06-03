@@ -1008,9 +1008,15 @@
 }
 #club-ranking-settings-form .rk-row{
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 10px;
   margin-bottom: 14px;
+}
+#club-ranking-settings-form .rk-label-wrap{
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 5px;
 }
 #club-ranking-settings-form .check-btn.rk-toggle{
   width: 34px;
