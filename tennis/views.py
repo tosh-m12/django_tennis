@@ -489,7 +489,9 @@ def _run_member_auto_cleanup(club):
         if m.latest_pf_updated:
             ts_list.append(m.latest_pf_updated)
         last_activity = max(ts_list)
-        last_activity_date = last_activity.date() if last_activity else None
+        # today は localdate なので、活動日時もローカルTZの日付に揃える
+        # （UTCの .date() と引き算すると時刻次第で1日ずれるため）
+        last_activity_date = timezone.localtime(last_activity).date() if last_activity else None
         if last_activity_date is None:
             continue
 
