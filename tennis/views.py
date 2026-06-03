@@ -1388,13 +1388,6 @@ def ranking_page(request, club_public_token, club_admin_token=None):
     ranking_doubles = rankings[GameType.DOUBLES]
     ranking_singles = rankings[GameType.SINGLES]
 
-    # 期間ラベル：デフォルト（過去3ヶ月）なら専用表記、それ以外は範囲表示
-    is_default_period = (start_d == default_start and end_d == default_end)
-    if is_default_period:
-        period_label = f"直近3ヶ月（{start_d.strftime('%Y/%-m/%-d')} 〜 {end_d.strftime('%Y/%-m/%-d')}）"
-    else:
-        period_label = f"{start_d.strftime('%Y/%-m/%-d')} 〜 {end_d.strftime('%Y/%-m/%-d')}"
-
     back_url = reverse(
         "tennis:club_home_admin" if is_admin else "tennis:club_home",
         args=[club.public_token, club.admin_token] if is_admin else [club.public_token],
@@ -1405,7 +1398,6 @@ def ranking_page(request, club_public_token, club_admin_token=None):
         "is_admin": is_admin,
         "start_date": start_d,
         "end_date": end_d,
-        "period_label": period_label,
         "ranking_doubles": ranking_doubles,
         "ranking_singles": ranking_singles,
         "ranking_config": ranking_config,
