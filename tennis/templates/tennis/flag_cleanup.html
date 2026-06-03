@@ -1,0 +1,79 @@
+{% extends "tennis/base.html" %}
+{% load static %}
+
+{% block title %}フラグ整理 - {{ club.name }}{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'tennis/club_data.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="data-page">
+  <header class="data-header">
+    <h1 class="data-title">フラグ整理</h1>
+  </header>
+
+  {% if flash %}
+    <div class="upload-result {% if flash.kind == 'ok' %}upload-ok{% else %}upload-err{% endif %}">{{ flash.text }}</div>
+  {% endif %}
+
+  <p class="data-download-hint">
+    乱立したフラグを、名前変更・削除・統合で整理します。<br>
+    統合すると、フラグの記録（付いていた人）は統合先へまとめられ、統合元は削除されます。
+  </p>
+
+  {# フラグ一覧（リネーム＋削除） #}
+  <div class="data-matrix-wrap">
+    <table class="data-matrix-table">
+      <thead>
+        <tr><th>種別</th><th>名前</th><th>方式</th><th>使用件数</th><th>状態</th><th>操作</th></tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+          <tr>
+            <td>{% if r.scope == 'club' %}共通{% else %}固有<br><span class="ev-title">{{ r.event_label }}</span>{% endif %}</td>
+            <td style="text-align:left;">
+              <form method="post" action="{{ rename_url }}" style="display:flex; gap:6px; align-items:center;">
+                {% csrf_token %}
+                <input type="hidden" name="flag_key" value="{{ r.key }}">
+                <input type="text" name="new_name" value="{{ r.name }}" style="width:140px;">
+                <button type="submit" class="btn btn-pill">保存</button>
+              </form>
+            </td>
+            <td>{% if r.input_mode == 'digit' %}数字{% else %}チェック{% endif %}</td>
+            <td>{{ r.usage }}</td>
+            <td>{% if r.is_active %}有効{% else %}無効{% endif %}</td>
+            <td>
+              <form method="post" action="{{ delete_preview_url }}" style="display:inline;">
+                {% csrf_token %}
+                <input type="hidden" name="flag_key" value="{{ r.key }}">
+                <button type="submit" class="btn btn-pill">削除</button>
+              </form>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  {# 統合フォーム #}
+  <h2 class="data-section-title" style="margin-top:20px;">フラグを統合する</h2>
+  <p class="data-download-hint">同じ種別（共通同士／同じイベントの固有同士）かつ同じ入力方式のフラグだけ統合できます。</p>
+  <form method="post" action="{{ merge_preview_url }}" class="data-upload-form">
+    {% csrf_token %}
+    <label>統合元
+      <select name="source_key" required>
+        <option value="">—</option>
+        {% for r in rows %}<option value="{{ r.key }}">{% if r.scope == 'club' %}共通{% else %}固有({{ r.event_label }}){% endif %}：{{ r.name }}（{{ r.usage }}）</option>{% endfor %}
+      </select>
+    </label>
+    <label>統合先
+      <select name="target_key" required>
+        <option value="">—</option>
+        {% for r in rows %}<option value="{{ r.key }}">{% if r.scope == 'club' %}共通{% else %}固有({{ r.event_label }}){% endif %}：{{ r.name }}（{{ r.usage }}）</option>{% endfor %}
+      </select>
+    </label>
+    <button type="submit" class="btn btn-pill btn-primary">確認する</button>
+  </form>
+</div>
+{% endblock %}

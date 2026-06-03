@@ -1398,6 +1398,133 @@ def club_member_delete_apply(request, club_public_token, club_admin_token):
     return redirect("tennis:club_member_cleanup", club.public_token, club.admin_token)
 
 
+# ============================================================
+# フラグ整理（リネーム・削除・統合）— アプリ内クレンジング（フェーズ3）
+# ============================================================
+
+@require_http_methods(["GET"])
+def club_flag_cleanup(request, club_public_token, club_admin_token):
+    from . import data_cleanup
+
+    club, err = _cleanup_club_or_400(club_public_token, club_admin_token)
+    if err:
+        return err
+    rows = data_cleanup.flag_summaries(club)
+    return render(request, "tennis/flag_cleanup.html", {
+        "club": club, "is_admin": True, "show_topbar": True,
+        "rows": rows,
+        "club_flags": [r for r in rows if r["scope"] == "club"],
+        "event_flags": [r for r in rows if r["scope"] == "event"],
+        "rename_url": reverse("tennis:club_flag_rename", args=[club.public_token, club.admin_token]),
+        "delete_preview_url": reverse("tennis:club_flag_delete_preview", args=[club.public_token, club.admin_token]),
+        "merge_preview_url": reverse("tennis:club_flag_merge_preview", args=[club.public_token, club.admin_token]),
+        "cleanup_url": reverse("tennis:club_flag_cleanup", args=[club.public_token, club.admin_token]),
+        "flash": request.session.pop("flag_flash", None),
+    })
+
+
+@require_POST
+def club_flag_rename(request, club_public_token, club_admin_token):
+    from . import data_cleanup
+
+    club, err = _cleanup_club_or_400(club_public_token, club_admin_token)
+    if err:
+        return err
+    res = data_cleanup.rename_flag(club, (request.POST.get("flag_key") or "").strip(),
+                                   request.POST.get("new_name"), actor_kind="admin")
+    if res.get("errors"):
+        request.session["flag_flash"] = {"kind": "err", "text": "／".join(res["errors"])}
+    else:
+        request.session["flag_flash"] = {"kind": "ok", "text": "名前を変更しました。"}
+    return redirect("tennis:club_flag_cleanup", club.public_token, club.admin_token)
+
+
+def _render_flag_preview(request, club, *, mode, result, apply_url):
+    return render(request, "tennis/flag_cleanup_preview.html", {
+        "club": club, "is_admin": True, "show_topbar": True,
+        "mode": mode, "result": result, "apply_url": apply_url,
+        "cleanup_url": reverse("tennis:club_flag_cleanup", args=[club.public_token, club.admin_token]),
+    })
+
+
+@require_POST
+def club_flag_delete_preview(request, club_public_token, club_admin_token):
+    from . import data_cleanup
+
+    club, err = _cleanup_club_or_400(club_public_token, club_admin_token)
+    if err:
+        return err
+    flag_key = (request.POST.get("flag_key") or "").strip()
+    result = data_cleanup.preview_flag_delete(club, flag_key)
+    if not result.get("errors"):
+        request.session["flag_delete_pending"] = {"club_id": club.id, "flag_key": flag_key}
+    else:
+        request.session.pop("flag_delete_pending", None)
+    return _render_flag_preview(
+        request, club, mode="delete", result=result,
+        apply_url=reverse("tennis:club_flag_delete_apply", args=[club.public_token, club.admin_token]),
+    )
+
+
+@require_POST
+def club_flag_delete_apply(request, club_public_token, club_admin_token):
+    from . import data_cleanup
+
+    club, err = _cleanup_club_or_400(club_public_token, club_admin_token)
+    if err:
+        return err
+    pending = request.session.get("flag_delete_pending")
+    if not pending or pending.get("club_id") != club.id:
+        request.session["flag_flash"] = {"kind": "err", "text": "対象がありません。やり直してください。"}
+        return redirect("tennis:club_flag_cleanup", club.public_token, club.admin_token)
+    n = data_cleanup.apply_flag_delete(club, pending["flag_key"], actor_kind="admin")
+    request.session.pop("flag_delete_pending", None)
+    request.session["flag_flash"] = {"kind": "ok", "text": f"フラグを削除しました（{n}件の記録を削除）。"}
+    return redirect("tennis:club_flag_cleanup", club.public_token, club.admin_token)
+
+
+@require_POST
+def club_flag_merge_preview(request, club_public_token, club_admin_token):
+    from . import data_cleanup
+
+    club, err = _cleanup_club_or_400(club_public_token, club_admin_token)
+    if err:
+        return err
+    source_key = (request.POST.get("source_key") or "").strip()
+    target_key = (request.POST.get("target_key") or "").strip()
+    result = data_cleanup.preview_flag_merge(club, source_key, target_key)
+    if not result.get("errors"):
+        request.session["flag_merge_pending"] = {
+            "club_id": club.id, "source_key": source_key, "target_key": target_key,
+        }
+    else:
+        request.session.pop("flag_merge_pending", None)
+    return _render_flag_preview(
+        request, club, mode="merge", result=result,
+        apply_url=reverse("tennis:club_flag_merge_apply", args=[club.public_token, club.admin_token]),
+    )
+
+
+@require_POST
+def club_flag_merge_apply(request, club_public_token, club_admin_token):
+    from . import data_cleanup
+
+    club, err = _cleanup_club_or_400(club_public_token, club_admin_token)
+    if err:
+        return err
+    pending = request.session.get("flag_merge_pending")
+    if not pending or pending.get("club_id") != club.id:
+        request.session["flag_flash"] = {"kind": "err", "text": "対象がありません。やり直してください。"}
+        return redirect("tennis:club_flag_cleanup", club.public_token, club.admin_token)
+    res = data_cleanup.apply_flag_merge(club, pending["source_key"], pending["target_key"], actor_kind="admin")
+    request.session.pop("flag_merge_pending", None)
+    if res.get("errors"):
+        request.session["flag_flash"] = {"kind": "err", "text": "／".join(res["errors"])}
+    else:
+        request.session["flag_flash"] = {"kind": "ok", "text": f"統合しました（移動{res['moved']}・統合{res['conflicts']}）。"}
+    return redirect("tennis:club_flag_cleanup", club.public_token, club.admin_token)
+
+
 def _parse_int_or_none(v):
     try:
         return int(v)

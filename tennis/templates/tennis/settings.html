@@ -56,8 +56,9 @@
   新しくメンバーを追加した際、固定メンバーの場合は✓を入れてください。
 </small>
 
-<p style="margin:0 0 12px;">
+<p style="margin:0 0 12px; display:flex; gap:8px; flex-wrap:wrap;">
   <a class="btn btn-pill" href="{% url 'tennis:club_member_cleanup' club.public_token club.admin_token %}">メンバー整理（重複の統合・完全削除）</a>
+  <a class="btn btn-pill" href="{% url 'tennis:club_flag_cleanup' club.public_token club.admin_token %}">フラグ整理（名前変更・削除・統合）</a>
 </p>
 <small style="color:#666; display:block; margin-bottom:10px;">
   ※ チーム分けは、ここで設定したものがイベント新規作成時にデフォルトとして表示されます。<br>
