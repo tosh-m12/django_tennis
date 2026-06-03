@@ -95,8 +95,12 @@
   `club_member_cleanup` ほかビュー, `member_cleanup.html` / `member_cleanup_preview.html`。
   件数表示・統合プレビュー（競合の出欠は参加>未定>不参加>空、フラグは和集合）・対戦表 ep_id 付替/除去・
   atomic・AuditLog(member_merge / member_delete_full、payload に適用前スナップショット)。設定ページから導線。
-- フェーズ3: **アプリ内フラグ整理**（リネーム/削除/統合）画面。
-- フェーズ1.5（任意・小）: 値編集の**縦持ち(long)形式**のDL/UL。
+- フェーズ3（**実装済み**）: アプリ内フラグ整理（リネーム/削除/統合）画面。
+  `data_cleanup.py`（flag_summaries / rename_flag / preview_flag_delete / apply_flag_delete /
+  preview_flag_merge / apply_flag_merge）, `club_flag_cleanup` ほかビュー,
+  `flag_cleanup.html` / `flag_cleanup_preview.html`。使用件数表示・統合プレビュー（移動/競合）・
+  入力方式不一致や別スコープは拒否・atomic・AuditLog(flag_rename/flag_delete/flag_merge)。設定ページから導線。
+- フェーズ1.5（任意・小・未着手）: 値編集の**縦持ち(long)形式**のDL/UL。
 
 ## 既知のリスク
 

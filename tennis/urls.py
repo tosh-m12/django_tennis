@@ -78,6 +78,37 @@ urlpatterns = [
         views.club_member_delete_apply,
         name="club_member_delete_apply",
     ),
+    # フラグ整理（リネーム・削除・統合）
+    path(
+        "c/<str:club_public_token>/admin/<str:club_admin_token>/flags/cleanup/",
+        views.club_flag_cleanup,
+        name="club_flag_cleanup",
+    ),
+    path(
+        "c/<str:club_public_token>/admin/<str:club_admin_token>/flags/rename/",
+        views.club_flag_rename,
+        name="club_flag_rename",
+    ),
+    path(
+        "c/<str:club_public_token>/admin/<str:club_admin_token>/flags/delete/preview/",
+        views.club_flag_delete_preview,
+        name="club_flag_delete_preview",
+    ),
+    path(
+        "c/<str:club_public_token>/admin/<str:club_admin_token>/flags/delete/apply/",
+        views.club_flag_delete_apply,
+        name="club_flag_delete_apply",
+    ),
+    path(
+        "c/<str:club_public_token>/admin/<str:club_admin_token>/flags/merge/preview/",
+        views.club_flag_merge_preview,
+        name="club_flag_merge_preview",
+    ),
+    path(
+        "c/<str:club_public_token>/admin/<str:club_admin_token>/flags/merge/apply/",
+        views.club_flag_merge_apply,
+        name="club_flag_merge_apply",
+    ),
     path(
         "c/<str:club_public_token>/admin/<str:club_admin_token>/help/",
         views.club_admin_help,

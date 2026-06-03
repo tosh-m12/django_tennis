@@ -1,0 +1,49 @@
+{% extends "tennis/base.html" %}
+{% load static %}
+
+{% block title %}フラグ整理の確認 - {{ club.name }}{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'tennis/club_data.css' %}">
+{% endblock %}
+
+{% block content %}
+<div class="data-page">
+  <header class="data-header">
+    <h1 class="data-title">{% if mode == 'merge' %}フラグ統合の確認{% else %}フラグ削除の確認{% endif %}</h1>
+  </header>
+
+  <p><a href="{{ cleanup_url }}">← フラグ整理に戻る</a></p>
+
+  {% if result.errors %}
+    <div class="upload-result upload-err">
+      <ul>{% for e in result.errors %}<li>{{ e }}</li>{% endfor %}</ul>
+    </div>
+
+  {% elif mode == 'merge' %}
+    <p><strong>{{ result.source.name }}</strong> を <strong>{{ result.target.name }}</strong> に統合します。</p>
+    <ul>
+      <li>そのまま移動する記録: <strong>{{ result.moves }}</strong> 件</li>
+      <li>統合先にも記録があり、まとめる件: <strong>{{ result.conflicts }}</strong> 件（チェックはOR、数字は統合先優先）</li>
+    </ul>
+    <div class="upload-result upload-warn">統合元のフラグ「{{ result.source.name }}」は削除されます。</div>
+    <form method="post" action="{{ apply_url }}" style="margin-top:16px;">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-pill btn-primary">この内容で統合する</button>
+      <a class="btn btn-pill" href="{{ cleanup_url }}">やめる</a>
+    </form>
+
+  {% else %}
+    <p>フラグ <strong>{{ result.flag.name }}</strong>（{% if result.flag.scope == 'club' %}共通{% else %}固有{% endif %}）を削除します。</p>
+    <ul>
+      <li>削除される記録: <strong>{{ result.usage }}</strong> 件</li>
+    </ul>
+    <div class="upload-result upload-err">この操作は取り消せません。フラグ定義と、付いていた記録がすべて削除されます。</div>
+    <form method="post" action="{{ apply_url }}" style="margin-top:16px;">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-pill btn-primary">削除する</button>
+      <a class="btn btn-pill" href="{{ cleanup_url }}">やめる</a>
+    </form>
+  {% endif %}
+</div>
+{% endblock %}

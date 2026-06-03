@@ -17,6 +17,8 @@ from .models import (
     Event,
     EventParticipant,
     ParticipantFlag,
+    ClubFlagDefinition,
+    EventFlagDefinition,
     MatchSchedule,
     MatchScheduleDraft,
     AuditLog,
@@ -398,3 +400,206 @@ def _rewrite_json(schedule_json, remap, remove):
                 r["rests"] = new_rests
                 dirty = True
     return schedule_json, dirty
+
+
+# ============================================================
+# フラグ整理（リネーム・削除・統合）— フェーズ3
+# ============================================================
+
+def _flag_key(scope, fid):
+    return f"{scope}:{fid}"
+
+
+def _parse_flag_key(key):
+    """'club:<id>' / 'event:<id>' -> (scope, id) or (None, None)。"""
+    if key.startswith("club:"):
+        try:
+            return "club", int(key[5:])
+        except ValueError:
+            return None, None
+    if key.startswith("event:"):
+        try:
+            return "event", int(key[6:])
+        except ValueError:
+            return None, None
+    return None, None
+
+
+def _get_flag_def(club, scope, fid):
+    if scope == "club":
+        return ClubFlagDefinition.objects.filter(club=club, id=fid).first()
+    if scope == "event":
+        return EventFlagDefinition.objects.filter(event__club=club, id=fid).first()
+    return None
+
+
+def flag_summaries(club):
+    """
+    クラブの共通フラグ＋固有フラグを使用件数つきで返す。フラグ整理画面用。
+    各要素: key, scope('club'|'event'), flag_id, name, input_mode, is_active,
+            usage, event_label(固有のみ), event_id(固有のみ)
+    """
+    rows = []
+    club_flags = list(ClubFlagDefinition.objects.filter(club=club).order_by("display_order", "id"))
+    usage_club = _flag_usage_map("club", [f.id for f in club_flags])
+    for f in club_flags:
+        rows.append({
+            "key": _flag_key("club", f.id), "scope": "club", "flag_id": f.id,
+            "name": f.name, "input_mode": f.input_mode, "is_active": f.is_active,
+            "usage": usage_club.get(f.id, 0), "event_label": "", "event_id": None,
+        })
+
+    ev_flags = list(
+        EventFlagDefinition.objects.filter(event__club=club)
+        .select_related("event").order_by("event__date", "event_id", "display_order", "id")
+    )
+    usage_ev = _flag_usage_map("event", [f.id for f in ev_flags])
+    for f in ev_flags:
+        rows.append({
+            "key": _flag_key("event", f.id), "scope": "event", "flag_id": f.id,
+            "name": f.name, "input_mode": f.input_mode, "is_active": f.is_active,
+            "usage": usage_ev.get(f.id, 0),
+            "event_label": str(f.event), "event_id": f.event_id,
+        })
+    return rows
+
+
+def _flag_usage_map(scope, ids):
+    if not ids:
+        return {}
+    field = "club_flag_definition_id" if scope == "club" else "event_flag_definition_id"
+    out = {}
+    for fid in ParticipantFlag.objects.filter(**{f"{field}__in": ids}).values_list(field, flat=True):
+        out[fid] = out.get(fid, 0) + 1
+    return out
+
+
+def rename_flag(club, flag_key, new_name, actor_kind="admin"):
+    """フラグ定義の名前を変更（非破壊）。"""
+    scope, fid = _parse_flag_key(flag_key)
+    new_name = (new_name or "").strip()
+    if not new_name:
+        return {"errors": ["名前を入力してください。"]}
+    fdef = _get_flag_def(club, scope, fid)
+    if not fdef:
+        return {"errors": ["フラグが見つかりません。"]}
+    old = fdef.name
+    if old == new_name:
+        return {"ok": True, "unchanged": True}
+    with transaction.atomic():
+        fdef.name = new_name
+        fdef.save(update_fields=["name"])
+        AuditLog.objects.create(
+            club=club, actor_token_kind=actor_kind, action="flag_rename",
+            payload_json={"key": flag_key, "old": old, "new": new_name},
+        )
+    return {"ok": True, "old": old, "new": new_name}
+
+
+def preview_flag_delete(club, flag_key):
+    scope, fid = _parse_flag_key(flag_key)
+    fdef = _get_flag_def(club, scope, fid)
+    if not fdef:
+        return {"errors": ["フラグが見つかりません。"]}
+    usage = _flag_usage_map(scope, [fid]).get(fid, 0)
+    return {
+        "errors": [],
+        "flag": {"key": flag_key, "name": fdef.name, "scope": scope},
+        "usage": usage,
+    }
+
+
+def apply_flag_delete(club, flag_key, actor_kind="admin"):
+    scope, fid = _parse_flag_key(flag_key)
+    with transaction.atomic():
+        fdef = _get_flag_def(club, scope, fid)
+        if not fdef:
+            return 0
+        field = "club_flag_definition_id" if scope == "club" else "event_flag_definition_id"
+        pfs = list(ParticipantFlag.objects.filter(**{field: fid})
+                   .values("event_participant_id", "is_on", "value"))
+        AuditLog.objects.create(
+            club=club, actor_token_kind=actor_kind, action="flag_delete",
+            payload_json={"key": flag_key, "name": fdef.name, "records": pfs},
+        )
+        fdef.delete()  # ParticipantFlag は CASCADE
+    return len(pfs)
+
+
+def preview_flag_merge(club, source_key, target_key):
+    s_scope, s_id = _parse_flag_key(source_key)
+    t_scope, t_id = _parse_flag_key(target_key)
+    if source_key == target_key:
+        return {"errors": ["統合元と統合先が同じです。"]}
+    sdef = _get_flag_def(club, s_scope, s_id)
+    tdef = _get_flag_def(club, t_scope, t_id)
+    if not sdef or not tdef:
+        return {"errors": ["フラグが見つかりません。"]}
+    if s_scope != t_scope:
+        return {"errors": ["共通フラグ同士・固有フラグ同士でのみ統合できます。"]}
+    if s_scope == "event" and sdef.event_id != tdef.event_id:
+        return {"errors": ["固有フラグは同じイベント内でのみ統合できます。"]}
+    if sdef.input_mode != tdef.input_mode:
+        return {"errors": ["入力方式（チェック/数字）が異なるフラグは統合できません。"]}
+
+    field = "club_flag_definition_id" if s_scope == "club" else "event_flag_definition_id"
+    src_eps = set(ParticipantFlag.objects.filter(**{field: s_id})
+                  .values_list("event_participant_id", flat=True))
+    tgt_eps = set(ParticipantFlag.objects.filter(**{field: t_id})
+                  .values_list("event_participant_id", flat=True))
+    moves = len(src_eps - tgt_eps)
+    conflicts = len(src_eps & tgt_eps)
+    return {
+        "errors": [],
+        "source": {"key": source_key, "name": sdef.name},
+        "target": {"key": target_key, "name": tdef.name},
+        "moves": moves, "conflicts": conflicts,
+    }
+
+
+def apply_flag_merge(club, source_key, target_key, actor_kind="admin"):
+    pre = preview_flag_merge(club, source_key, target_key)
+    if pre.get("errors"):
+        return pre
+    s_scope, s_id = _parse_flag_key(source_key)
+    _, t_id = _parse_flag_key(target_key)
+    field = "club_flag_definition_id" if s_scope == "club" else "event_flag_definition_id"
+
+    moved = conflicts = 0
+    with transaction.atomic():
+        sdef = _get_flag_def(club, s_scope, s_id)
+        tdef = _get_flag_def(club, s_scope, t_id)
+        snapshot = list(ParticipantFlag.objects.filter(**{field: s_id})
+                        .values("event_participant_id", "is_on", "value"))
+        tgt_by_ep = {
+            pf.event_participant_id: pf
+            for pf in ParticipantFlag.objects.filter(**{field: t_id})
+        }
+        for pf in ParticipantFlag.objects.filter(**{field: s_id}):
+            tgt = tgt_by_ep.get(pf.event_participant_id)
+            if tgt is None:
+                # 統合先に無い → 付け替え
+                if s_scope == "club":
+                    pf.club_flag_definition = tdef
+                else:
+                    pf.event_flag_definition = tdef
+                pf.save(update_fields=["club_flag_definition", "event_flag_definition", "updated_at"])
+                tgt_by_ep[pf.event_participant_id] = pf
+                moved += 1
+            else:
+                # 競合 → 和集合（check は OR、digit は統合先優先で空なら元）
+                new_on = bool(tgt.is_on) or bool(pf.is_on)
+                new_val = tgt.value if tgt.value is not None else pf.value
+                if tgt.is_on != new_on or tgt.value != new_val:
+                    tgt.is_on = new_on
+                    tgt.value = new_val
+                    tgt.save(update_fields=["is_on", "value", "updated_at"])
+                conflicts += 1
+                # 元 pf は sdef 削除時にカスケード削除
+        AuditLog.objects.create(
+            club=club, actor_token_kind=actor_kind, action="flag_merge",
+            payload_json={"source": source_key, "target": target_key,
+                          "moved": moved, "conflicts": conflicts, "before": snapshot},
+        )
+        sdef.delete()
+    return {"ok": True, "moved": moved, "conflicts": conflicts}
