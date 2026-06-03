@@ -1072,6 +1072,17 @@
   font-size: 0.8rem;
   color: #888;
 }
+/* そのプリセットで使わない項目（グレーアウト＝編集不可） */
+#club-ranking-settings-form .rk-disabled{
+  opacity: 0.5;
+}
+#club-ranking-settings-form .rk-disabled .rk-field-label{
+  color: #999;
+}
+#club-ranking-settings-form input:disabled{
+  background: #f0f0f0;
+  cursor: not-allowed;
+}
 
 .event-modal .event-flag-name-input {
   width: 100%;

@@ -172,6 +172,15 @@ document.addEventListener("DOMContentLoaded", () => {
       set("min_matches", d.min_matches);
     }
 
+    // そのプリセットで使わない項目（data-used-by 宣言）をグレーアウト＝編集不可に
+    function applyFieldAvailability(preset) {
+      root.querySelectorAll("[data-used-by]").forEach((field) => {
+        const used = (field.dataset.usedBy || "").split(",").includes(preset);
+        field.classList.toggle("rk-disabled", !used);
+        field.querySelectorAll("input, button").forEach((el) => { el.disabled = !used; });
+      });
+    }
+
     function collectSettings() {
       const num = (key, fallback) => {
         const el = numInput(key);
@@ -229,17 +238,21 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    // プリセット切替：初期値を流し込んでから即保存
+    // プリセット切替：初期値を流し込み→使用可否を更新→即保存
     root.addEventListener("change", (e) => {
       const t = e.target;
       if (t?.name === "rk-preset") {
         applyPresetDefaults(t.value);
+        applyFieldAvailability(t.value);
         persist();
       } else if (t?.matches?.('input[type="number"][data-rk]')) {
         // 数値入力は確定（change=blur/Enter）で保存
         persist();
       }
     });
+
+    // 初期表示：現在のプリセットで使わない項目をグレーアウト
+    applyFieldAvailability(getSelectedPreset());
 
     // 引き分けトグル：切り替えて即保存
     root.addEventListener("click", (e) => {

@@ -224,12 +224,12 @@
     <span class="rk-label">引き分けをカウント（勝率に0.5勝として算入）</span>
   </div>
 
-  <div class="rk-field">
+  <div class="rk-field{% if ranking_setting.preset != 'points' %} rk-disabled{% endif %}" data-used-by="points">
     <span class="rk-field-label">勝ち点（勝ち点制で使用）</span>
     <div class="rk-points-inputs">
-      <label>勝 <input type="number" data-rk="points_win" step="0.5" min="0" value="{{ ranking_setting.points_win }}"></label>
-      <label>分 <input type="number" data-rk="points_draw" step="0.5" min="0" value="{{ ranking_setting.points_draw }}"></label>
-      <label>負 <input type="number" data-rk="points_loss" step="0.5" min="0" value="{{ ranking_setting.points_loss }}"></label>
+      <label>勝 <input type="number" data-rk="points_win" step="0.5" min="0" value="{{ ranking_setting.points_win }}"{% if ranking_setting.preset != 'points' %} disabled{% endif %}></label>
+      <label>分 <input type="number" data-rk="points_draw" step="0.5" min="0" value="{{ ranking_setting.points_draw }}"{% if ranking_setting.preset != 'points' %} disabled{% endif %}></label>
+      <label>負 <input type="number" data-rk="points_loss" step="0.5" min="0" value="{{ ranking_setting.points_loss }}"{% if ranking_setting.preset != 'points' %} disabled{% endif %}></label>
     </div>
   </div>
 
