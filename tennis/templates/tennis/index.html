@@ -2,7 +2,7 @@
 {% extends "tennis/base.html" %}
 {% load static %}
 
-{% block title %}サークル管理アプリ-トップ{% endblock %}
+{% block title %}DeuceNet - トップ{% endblock %}
 
 {% block extra_head %}
 {% endblock %}
@@ -12,7 +12,8 @@
 {% block content %}
 <div style="max-width:720px; margin:0 auto; text-align:center; padding:80px 16px;">
 
-  <h2>テニスサークル管理アプリ</h2>
+  <h1 class="brand-title">DeuceNet</h1>
+  <p class="brand-tagline">テニスサークルの出欠管理・対戦表・戦績集計を、URLひとつで。</p>
 
   {% if error %}
     <div class="alert alert-danger" style="margin:12px auto; max-width:420px; text-align:left;">
