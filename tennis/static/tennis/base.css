@@ -531,3 +531,17 @@ th {
   margin-top: 2px;
 }
 
+
+/* サイトフッター（DeuceNet ロゴ・アイコン無し） */
+.site-footer {
+  text-align: center;
+  padding: 24px 16px 32px;
+  margin-top: 32px;
+  border-top: 1px solid #eee;
+}
+.site-footer-logo {
+  height: 60px;
+  width: auto;
+  max-width: 90%;
+  opacity: 0.95;
+}

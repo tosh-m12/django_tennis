@@ -136,6 +136,11 @@
     {% block content %}{% endblock %}
   </div>
 
+  <footer class="site-footer">
+    <img class="site-footer-logo" src="{% static 'tennis/logo/logo_footer.svg' %}"
+         alt="DeuceNet — 出欠・対戦表・戦績を、URL1枚で。">
+  </footer>
+
   {% include "tennis/_ui_modals.html" %}
 
   {# topbar の「もどる」URLを直前のカレンダー月に合わせる #}
