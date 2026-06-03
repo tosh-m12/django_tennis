@@ -6,3 +6,4 @@ gunicorn==23.0.0
 whitenoise==6.7.0
 dj-database-url==2.2.0
 psycopg[binary]>=3.2.10
+openpyxl==3.1.5

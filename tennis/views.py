@@ -1,5 +1,6 @@
 # tennis/views.py
 import calendar
+import hashlib
 import json
 import datetime as dt
 import logging
@@ -10,7 +11,7 @@ from django.db import transaction, models
 from django.db.models import Max
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse
-from django.http import JsonResponse, HttpResponseBadRequest
+from django.http import JsonResponse, HttpResponseBadRequest, HttpResponse
 from django.utils import timezone
 from django.views.decorators.http import require_POST, require_http_methods
 from django.views.decorators.csrf import ensure_csrf_cookie
@@ -874,27 +875,26 @@ def club_user_help(request, club_public_token):
     )
 
 
-@require_http_methods(["GET"])
-def club_data(request, club_public_token, club_admin_token):
+def _club_data_cell_text(input_mode, pf_tuple):
+    """フラグ表のセル表示文字列。digit は数値、check は ✓/空。"""
+    if not pf_tuple:
+        return ""
+    is_on, value = pf_tuple
+    if input_mode == "digit":
+        return "" if value is None else str(value)
+    return "✓" if is_on else ""
+
+
+def build_club_data_matrices(club, start_d, end_d):
     """
-    幹事専用：出欠・共通フラグ・固有フラグのデータ集計表ページ。
-    期間内のイベントを対象に、メンバー×イベントの3種のマトリクスを構築する。
+    データ集計表（出欠・共通フラグ・固有フラグ）のマトリクスを構築して返す。
+    club_data ページ表示とファイル出力(data_export)で共有する。
+
+    戻り値 dict:
+      events, rows, attendance_table, club_flag_tables, event_flag_blocks,
+      ep_lookup（row_key -> event_id -> ep）, snapshot_token
+    各 row は {key, display_name, withdrawn, is_fixed, member_id, member_no}。
     """
-    club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
-    if club.admin_token != club_admin_token:
-        return HttpResponseBadRequest("admin token mismatch")
-
-    # 期間：デフォルトは今月の1日〜末日
-    today = timezone.localdate()
-    default_start = today.replace(day=1)
-    next_month = (default_start + dt.timedelta(days=32)).replace(day=1)
-    default_end = next_month - dt.timedelta(days=1)
-
-    start_d = _parse_date_yyyy_mm_dd((request.GET.get("start") or "").strip()) or default_start
-    end_d = _parse_date_yyyy_mm_dd((request.GET.get("end") or "").strip()) or default_end
-    if end_d < start_d:
-        end_d = start_d
-
     # 期間内イベントとEPを一括取得
     events = list(
         Event.objects.filter(club=club, date__gte=start_d, date__lte=end_d)
@@ -922,6 +922,8 @@ def club_data(request, club_public_token, club_admin_token):
             "display_name": m.display_name,
             "withdrawn": False,
             "is_fixed": m.is_fixed,
+            "member_id": m.id,
+            "member_no": m.member_no,
         })
         member_key_set.add(("m", m.id))
 
@@ -939,6 +941,8 @@ def club_data(request, club_public_token, club_admin_token):
             "display_name": name,
             "withdrawn": bool(ep.member_deleted),
             "is_fixed": False,
+            "member_id": None,
+            "member_no": None,
         })
     guest_rows.sort(key=lambda r: r["display_name"])
     rows.extend(guest_rows)
@@ -994,14 +998,6 @@ def club_data(request, club_public_token, club_admin_token):
                 pf["event_participant_id"]
             ] = (bool(pf["is_on"]), pf["value"])
 
-    def _cell_text(input_mode, pf_tuple):
-        if not pf_tuple:
-            return ""
-        is_on, value = pf_tuple
-        if input_mode == "digit":
-            return "" if value is None else str(value)
-        return "✓" if is_on else ""
-
     club_flag_tables = []
     for f in club_flags:
         f_rows = []
@@ -1011,7 +1007,7 @@ def club_data(request, club_public_token, club_admin_token):
             for event in events:
                 ep = per_ev.get(event.id)
                 pf_tuple = pf_club.get(f.id, {}).get(ep.id) if ep else None
-                cells.append({"text": _cell_text(f.input_mode, pf_tuple)})
+                cells.append({"text": _club_data_cell_text(f.input_mode, pf_tuple)})
             f_rows.append({"row": row, "cells": cells})
         club_flag_tables.append({
             "flag": f,
@@ -1050,7 +1046,7 @@ def club_data(request, club_public_token, club_admin_token):
             ep = ep_lookup.get(row["key"], {}).get(event.id)
             for f in efs:
                 pf_tuple = pf_event.get(f.id, {}).get(ep.id) if ep else None
-                cells.append({"text": _cell_text(f.input_mode, pf_tuple)})
+                cells.append({"text": _club_data_cell_text(f.input_mode, pf_tuple)})
             block_rows.append({"row": row, "cells": cells})
         event_flag_blocks.append({
             "event": event,
@@ -1058,21 +1054,128 @@ def club_data(request, club_public_token, club_admin_token):
             "rows": block_rows,
         })
 
+    snapshot_token = _compute_data_snapshot(eps, all_members, club_flags, event_flag_defs)
+
+    return {
+        "events": events,
+        "rows": rows,
+        "attendance_table": attendance_table,
+        "club_flag_tables": club_flag_tables,
+        "event_flag_blocks": event_flag_blocks,
+        "ep_lookup": ep_lookup,
+        "snapshot_token": snapshot_token,
+    }
+
+
+def _compute_data_snapshot(eps, members, club_flags, event_flag_defs):
+    """
+    対象データの内容ハッシュ。アップロード時の楽観ロック（DL後にDBが変わったか）に使う。
+    EP(出欠)・Member(固定/順/名)・フラグ定義(名)を含める。ParticipantFlag は EP.updated_at
+    だけでは捉えられないため別途含める。
+    """
+    parts = []
+    for ep in eps:
+        ts = ep.updated_at.isoformat() if ep.updated_at else ""
+        parts.append(f"E{ep.id}:{ep.attendance}:{ts}")
+    for m in members:
+        ts = m.updated_at.isoformat() if m.updated_at else ""
+        parts.append(f"M{m.id}:{int(m.is_fixed)}:{m.member_no}:{m.display_name}:{ts}")
+    for f in club_flags:
+        parts.append(f"CD{f.id}:{f.name}:{int(f.is_active)}")
+    for f in event_flag_defs:
+        parts.append(f"ED{f.id}:{f.name}:{int(f.is_active)}")
+    ep_ids = [ep.id for ep in eps]
+    if ep_ids:
+        for pf in ParticipantFlag.objects.filter(
+            event_participant_id__in=ep_ids
+        ).values_list("id", "is_on", "value", "updated_at"):
+            parts.append(f"PF{pf[0]}:{int(pf[1])}:{pf[2]}:{pf[3].isoformat() if pf[3] else ''}")
+    parts.sort()
+    return hashlib.sha256("\n".join(parts).encode("utf-8")).hexdigest()
+
+
+@require_http_methods(["GET"])
+def club_data(request, club_public_token, club_admin_token):
+    """
+    幹事専用：出欠・共通フラグ・固有フラグのデータ集計表ページ。
+    期間内のイベントを対象に、メンバー×イベントの3種のマトリクスを構築する。
+    """
+    club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
+    if club.admin_token != club_admin_token:
+        return HttpResponseBadRequest("admin token mismatch")
+
+    # 期間：デフォルトは今月の1日〜末日
+    today = timezone.localdate()
+    default_start = today.replace(day=1)
+    next_month = (default_start + dt.timedelta(days=32)).replace(day=1)
+    default_end = next_month - dt.timedelta(days=1)
+
+    start_d = _parse_date_yyyy_mm_dd((request.GET.get("start") or "").strip()) or default_start
+    end_d = _parse_date_yyyy_mm_dd((request.GET.get("end") or "").strip()) or default_end
+    if end_d < start_d:
+        end_d = start_d
+
+    data = build_club_data_matrices(club, start_d, end_d)
+
     return render(request, "tennis/club_data.html", {
         "club": club,
         "club_public_token": club_public_token,
         "club_admin_token": club_admin_token,
         "start_date": start_d,
         "end_date": end_d,
-        "events": events,
-        "rows": rows,
-        "attendance_table": attendance_table,
-        "club_flag_tables": club_flag_tables,
-        "event_flag_blocks": event_flag_blocks,
+        "events": data["events"],
+        "rows": data["rows"],
+        "attendance_table": data["attendance_table"],
+        "club_flag_tables": data["club_flag_tables"],
+        "event_flag_blocks": data["event_flag_blocks"],
+        "download_xlsx_url": reverse(
+            "tennis:club_data_download", args=[club.public_token, club.admin_token]
+        ),
         "is_admin": True,
         "show_topbar": True,
         "cleanup_warnings": _run_member_auto_cleanup(club),
     })
+
+
+@require_http_methods(["GET"])
+def club_data_download(request, club_public_token, club_admin_token):
+    """
+    データ集計表＋名簿を Excel(.xlsx) または CSV束(ZIP) でダウンロード。
+    GET: format=xlsx|csv（既定 xlsx）、start/end=YYYY-MM-DD（club_data と同じ既定）。
+    """
+    from . import data_export
+
+    club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
+    if club.admin_token != club_admin_token:
+        return HttpResponseBadRequest("admin token mismatch")
+
+    today = timezone.localdate()
+    default_start = today.replace(day=1)
+    next_month = (default_start + dt.timedelta(days=32)).replace(day=1)
+    default_end = next_month - dt.timedelta(days=1)
+    start_d = _parse_date_yyyy_mm_dd((request.GET.get("start") or "").strip()) or default_start
+    end_d = _parse_date_yyyy_mm_dd((request.GET.get("end") or "").strip()) or default_end
+    if end_d < start_d:
+        end_d = start_d
+
+    data = build_club_data_matrices(club, start_d, end_d)
+    generated_at = timezone.localtime().isoformat(timespec="seconds")
+    fmt = (request.GET.get("format") or "xlsx").strip().lower()
+    base = f"data_{club.public_token[:8]}_{start_d.isoformat()}_{end_d.isoformat()}"
+
+    if fmt == "csv":
+        payload = data_export.csv_zip_bytes(club, start_d, end_d, data, generated_at)
+        resp = HttpResponse(payload, content_type="application/zip")
+        resp["Content-Disposition"] = f'attachment; filename="{base}.zip"'
+        return resp
+
+    payload = data_export.workbook_bytes(club, start_d, end_d, data, generated_at)
+    resp = HttpResponse(
+        payload,
+        content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )
+    resp["Content-Disposition"] = f'attachment; filename="{base}.xlsx"'
+    return resp
 
 
 def _parse_int_or_none(v):
