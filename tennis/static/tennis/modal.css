@@ -976,21 +976,35 @@
 #club-ranking-settings-form .rk-presets{
   display: flex;
   flex-direction: column;
-  gap: 4px;
-  margin-bottom: 14px;
+  gap: 10px;
+  margin-bottom: 16px;
 }
 #club-ranking-settings-form .rk-preset{
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   gap: 8px;
   cursor: pointer;
-  font-weight: 700;
-  font-size: 0.98rem;
 }
 #club-ranking-settings-form .rk-preset input{
   width: 18px;
   height: 18px;
+  margin-top: 2px;
   cursor: pointer;
+  flex: 0 0 auto;
+}
+#club-ranking-settings-form .rk-preset-text{
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+#club-ranking-settings-form .rk-preset-name{
+  font-weight: 700;
+  font-size: 0.98rem;
+}
+#club-ranking-settings-form .rk-preset-desc{
+  font-size: 0.82rem;
+  color: #666;
+  line-height: 1.4;
 }
 #club-ranking-settings-form .rk-row{
   display: flex;
@@ -1057,12 +1071,6 @@
 #club-ranking-settings-form .rk-hint{
   font-size: 0.8rem;
   color: #888;
-}
-#club-ranking-settings-form .rk-status{
-  display: block;
-  margin-top: 4px;
-  font-size: 0.85rem;
-  min-height: 1.2em;
 }
 
 .event-modal .event-flag-name-input {

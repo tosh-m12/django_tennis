@@ -71,3 +71,34 @@
     align-self: flex-end;
     flex: 0 0 auto;              /* 自然な幅 */
 }
+
+/* 現在の集計ルールの説明（プリセット連動） */
+.ranking-rule-note {
+    margin: 4px 0 18px;
+    padding: 10px 14px;
+    background: #f6f8fb;
+    border: 1px solid #e3e8ef;
+    border-radius: 8px;
+}
+.ranking-rule-head {
+    margin: 0 0 4px;
+    font-size: 0.95rem;
+}
+.ranking-rule-desc {
+    margin: 0 0 4px;
+    font-size: 0.88rem;
+    color: #555;
+}
+.ranking-rule-detail {
+    margin: 0;
+    font-size: 0.8rem;
+    color: #777;
+    line-height: 1.5;
+}
+
+.ranking-period-label {
+    margin: 0 0 8px;
+    font-size: 0.9rem;
+    color: #444;
+    font-weight: 600;
+}

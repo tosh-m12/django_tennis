@@ -125,7 +125,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const root = document.getElementById("club-ranking-settings-form");
     if (!root) return;
 
-    const status = document.getElementById("club-ranking-settings-status");
     const clubId = (root.dataset.clubId || "").trim();
     const adminToken = (root.dataset.adminToken || "").trim();
     const saveUrl = (root.dataset.saveUrl || "").trim();
@@ -136,12 +135,6 @@ document.addEventListener("DOMContentLoaded", () => {
       presetDefaults = JSON.parse(root.dataset.presetDefaults || "{}");
     } catch (_) {
       presetDefaults = {};
-    }
-
-    function setStatus(text, ok) {
-      if (!status) return;
-      status.textContent = text;
-      status.style.color = ok ? "#0a7a3a" : "#a00";
     }
 
     const numInput = (key) => root.querySelector(`input[type="number"][data-rk="${key}"]`);
@@ -213,28 +206,24 @@ document.addEventListener("DOMContentLoaded", () => {
       return data.settings;
     }
 
-    // 変更のたびに即保存（保存ボタンなし）。多重送信は最新値で直列化。
+    // 変更のたびに即保存（保存ボタン・メッセージなし）。多重送信は最新値で直列化。
     let saving = false;
-    let pendingPayload = null;
+    let pending = false;
     async function persist() {
       if (saving) {
-        // 進行中なら最新値を保留にして、完了後にもう一度送る
-        pendingPayload = collectSettings();
+        // 進行中なら「あとでもう一度送る」フラグだけ立てる
+        pending = true;
         return;
       }
       saving = true;
-      setStatus("保存中…", true);
       try {
-        const saved = await save(collectSettings());
-        root.dataset.currentSettings = JSON.stringify(saved);
-        setStatus("保存しました", true);
+        await save(collectSettings());
       } catch (err) {
         console.error("[club ranking settings] save failed", err);
-        setStatus("保存に失敗しました", false);
       } finally {
         saving = false;
-        if (pendingPayload) {
-          pendingPayload = null;
+        if (pending) {
+          pending = false;
           persist();
         }
       }
