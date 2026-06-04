@@ -31,10 +31,10 @@
      data-is-admin="{% if is_admin %}1{% else %}0{% endif %}">
 </div>
 
-<h2>クラブ設定画面</h2>
+<h2 class="page-title">クラブ設定画面</h2>
 
 <hr>
-<h3>クラブ名編集</h3>
+<h3 class="section-title">クラブ名編集</h3>
 
 {% if club %}
   <div class="theme-box" style="margin:12px 0; padding:10px;">
@@ -64,7 +64,7 @@
 {% endif %}
 
 <hr>
-<h3>メンバー管理</h3>
+<h3 class="section-title">メンバー管理</h3>
 
 <small style="color:#666; display:block; margin-bottom:10px;">
   ※ 固定メンバーは、一度設定すると次回以降に新しく作成するイベントではデフォルトで名前が表示されます。<br>
@@ -149,7 +149,7 @@
 {% endif %}
 
 <hr>
-<h3>デフォルト表示設定</h3>
+<h3 class="section-title">デフォルト表示設定</h3>
 
 <small style="color:#666; display:block; margin-bottom:10px;">
   ※ 新規イベントや個別に表示設定をしていないイベントで使われる初期値です。<br>
@@ -204,7 +204,7 @@
 </div>
 
 <hr>
-<h3>戦績ランキングのルール</h3>
+<h3 class="section-title">戦績ランキングのルール</h3>
 
 <small style="color:#666; display:block; margin-bottom:10px;">
   ※ プリセットを選ぶと、引き分け・勝ち点・最低試合数が連動して切り替わります。<br>
@@ -261,7 +261,7 @@
 </div>
 
 <hr>
-<h3>チーム分け設定</h3>
+<h3 class="section-title">チーム分け設定</h3>
 
 <div id="class-hooks"
      data-club-id="{{ club.id }}"
@@ -311,7 +311,7 @@
 
 {# ===== フラグ設定（シンプル版：フラグ一覧） ===== #}
 
-<h3>フラグ設定</h3>
+<h3 class="section-title">フラグ設定</h3>
 
 <div class="flag-add-area">
   <button type="button"
@@ -400,7 +400,7 @@
 </div>
 
 <hr>
-<h3>データ整理</h3>
+<h3 class="section-title">データ整理</h3>
 <small style="color:#666; display:block; margin-bottom:10px;">
   ※ 取り消せない操作を含みます。実行前に内容を確認できます。
 </small>

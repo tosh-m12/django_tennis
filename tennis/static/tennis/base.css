@@ -239,6 +239,11 @@ th {
   align-items: center;
   min-width: 0;
 }
+.topbar-logo-link{
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
 .topbar-wordmark{
   height: 38px;
   width: auto;
@@ -411,11 +416,36 @@ th {
   align-items: center;
   justify-content: space-between; /* ← 左にタイトル、右にボタン */
   gap: 12px;
-  margin: 14px 0 10px;
+  margin: 22px 0 12px;
 }
 
+/* ===== 共通の見出し（ヘルプ・戦績ページと統一） ===== */
+/* ページ見出し（h1/h2 相当） */
+.page-title{
+  font-size: 1.5rem;
+  font-weight: 800;
+  margin: 0 0 14px;
+  line-height: 1.3;
+}
+/* セクション見出し：左にティールの縦バー */
 .section-title{
-  margin: 0; /* h3 のデフォルトmarginを潰す（ズレ防止） */
+  font-size: 1.15rem;
+  font-weight: 700;
+  border-left: 4px solid #1f7a8c;
+  padding-left: 10px;
+  margin: 22px 0 12px;
+  line-height: 1.35;
+}
+/* section-head 内ではバーは出すが、余白は section-head 側に任せる */
+.section-head > .section-title{
+  margin: 0;
+}
+/* サブ見出し（h3/h4 相当） */
+.subsection-title{
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: #334155;
+  margin: 16px 0 6px;
 }
 
 .section-head > .btn{
