@@ -38,11 +38,17 @@
             {% if club %}
               <a class="topbar-logo-link"
                  href="{% if is_admin %}{% url 'tennis:club_home_admin' club.public_token club.admin_token %}{% else %}{% url 'tennis:club_home' club.public_token %}{% endif %}">
-                <img class="topbar-wordmark" src="{% static 'tennis/logo/wordmark.png' %}" alt="Deuce Net">
+                <picture>
+                  <source srcset="{% static 'tennis/logo/wordmark.webp' %}" type="image/webp">
+                  <img class="topbar-wordmark" src="{% static 'tennis/logo/wordmark.png' %}" alt="Deuce Net">
+                </picture>
               </a>
             {% else %}
               <a class="topbar-logo-link" href="/">
-                <img class="topbar-wordmark" src="{% static 'tennis/logo/wordmark.png' %}" alt="Deuce Net">
+                <picture>
+                  <source srcset="{% static 'tennis/logo/wordmark.webp' %}" type="image/webp">
+                  <img class="topbar-wordmark" src="{% static 'tennis/logo/wordmark.png' %}" alt="Deuce Net">
+                </picture>
               </a>
             {% endif %}
           </div>
@@ -147,7 +153,10 @@
   </div>
 
   <footer class="site-footer">
-    <img class="site-footer-logo" src="{% static 'tennis/logo/wordmark.png' %}" alt="Deuce Net">
+    <picture>
+      <source srcset="{% static 'tennis/logo/wordmark.webp' %}" type="image/webp">
+      <img class="site-footer-logo" src="{% static 'tennis/logo/wordmark.png' %}" alt="Deuce Net">
+    </picture>
     <p class="site-footer-copyright">© {% now "Y" %} Deuce Net</p>
   </footer>
 

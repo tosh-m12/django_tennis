@@ -14,3 +14,5 @@ Thumbs.db
 venv/
 .env/
 .venv/
+# collectstatic 出力（デプロイ時に生成）
+staticfiles/
