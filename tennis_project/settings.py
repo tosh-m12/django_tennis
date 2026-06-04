@@ -241,3 +241,9 @@ if not DEBUG:
     SESSION_COOKIE_SAMESITE = "Lax"
     CSRF_COOKIE_SAMESITE = "Lax"
     SECURE_SSL_REDIRECT = True
+    # ヘルスチェック /healthz は SSL リダイレクトの対象外（http のまま 200 を返す）
+    SECURE_REDIRECT_EXEMPT = [r"^healthz$"]
+    # HSTS：2回目以降は最初から https で来るのでリダイレクト往復が消える
+    SECURE_HSTS_SECONDS = 31536000  # 1年
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+    SECURE_HSTS_PRELOAD = True

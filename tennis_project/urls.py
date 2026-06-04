@@ -16,8 +16,16 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.http import HttpResponse
+
+
+def healthz(request):
+    """ヘルスチェック用：DB等に触れず即200を返す軽量エンドポイント。"""
+    return HttpResponse("ok", content_type="text/plain")
+
 
 urlpatterns = [
+    path("healthz", healthz),
     path("admin/", admin.site.urls),
     path("", include("tennis.urls")),
 ]
