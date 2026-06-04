@@ -202,29 +202,31 @@ th {
    ========================================================= */
 
 .topbar{
-  /* フル幅をやめて、コンテンツ幅にする */
-  width: min(980px, calc(100% - 32px)); /* 画面端に少し余白 */
-  margin: 0 auto;
+  /* 背景は画面いっぱい（左右いっぱいに伸ばす） */
+  width: 100%;
+  margin: 0;
 
   background: var(--accent);
   color: #fff;
   box-shadow: 0 1px 0 rgba(0,0,0,0.08);
 
-  border-radius: 0; /* 好みで 12px とかでもOK */
+  border-radius: 0;
 }
 
-/* 固定：ただし中央寄せで固定する */
+/* 固定：全幅で固定 */
 .topbar--fixed{
   position: fixed;
   top: 0;
-  left: 50%;
-  transform: translateX(-50%);
+  left: 0;
+  right: 0;
   z-index: 900;
 }
 
-/* 中身は topbar の中で詰めるだけ */
+/* 中身はページ本文(.container)と同じ幅で中央寄せ・パディングは維持 */
 .topbar-inner{
   position: relative;        /* ハンバーガー時のドロップダウン配置基準 */
+  max-width: 980px;
+  margin: 0 auto;
   height: 56px;
   display: flex;
   align-items: center;
