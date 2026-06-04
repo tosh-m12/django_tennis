@@ -576,9 +576,9 @@ th {
   display: block;
   margin: 0 auto;
 }
-.site-footer-tagline {
-  margin: 8px 0 0;
-  color: #5B6B7A;
-  font-size: 0.85rem;
+.site-footer-copyright {
+  margin: 10px 0 0;
+  color: #9aa6b2;
+  font-size: 0.78rem;
   letter-spacing: 0.3px;
 }
