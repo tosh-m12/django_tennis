@@ -57,6 +57,7 @@ LOGGING_LEVEL = env_str("LOGGING_LEVEL", "DEBUG" if DEBUG else "INFO")
 
 ALLOWED_HOSTS = [
     "djangotennis-production.up.railway.app",
+    "healthcheck.railway.app",  # Railway のヘルスチェックは Host: healthcheck.railway.app で来る
     "localhost",
     "127.0.0.1",
 ]
