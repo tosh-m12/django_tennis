@@ -28,26 +28,8 @@
     </form>
   </section>
 
-  {# ダウンロード（この期間のデータを Excel / CSV で書き出し） #}
-  <section class="data-download">
-    <h2 class="data-section-title">ダウンロード</h2>
-    <p class="data-download-hint">表示中の期間のデータを、1件＝1行の「縦持ち」1枚で書き出します（並べ替え・検索置換で一括修正しやすい形）。</p>
-    <div class="data-download-actions">
-      <a class="btn btn-pill" href="{{ download_xlsx_url }}?format=xlsx&start={{ start_date|date:'Y-m-d' }}&end={{ end_date|date:'Y-m-d' }}">Excel(.xlsx)</a>
-      <a class="btn btn-pill" href="{{ download_xlsx_url }}?format=csv&start={{ start_date|date:'Y-m-d' }}&end={{ end_date|date:'Y-m-d' }}">CSV(.zip)</a>
-    </div>
-  </section>
-
-  {# アップロード（編集したファイルを反映：差分プレビュー→確定の2段） #}
-  <section class="data-upload">
-    <h2 class="data-section-title">アップロード</h2>
-    <p class="data-download-hint">編集した Excel/CSV を取り込み、変更内容を確認してから反映します（出欠・フラグの値）。</p>
-    <form method="post" action="{{ upload_url }}" enctype="multipart/form-data" class="data-upload-form">
-      {% csrf_token %}
-      <input type="file" name="file" accept=".xlsx,.zip" required>
-      <button type="submit" class="btn btn-pill btn-primary">確認する</button>
-    </form>
-  </section>
+  {# 集計表本体 #}
+  <h2 class="data-section-title">集計表</h2>
 
   {% if not events %}
     <p class="data-empty">この期間にはイベントがありません。</p>
@@ -178,6 +160,27 @@
     </section>
 
   {% endif %}
+
+  {# ダウンロード／アップロードは集計表の下に配置 #}
+  <section class="data-download">
+    <h2 class="data-section-title">ダウンロード</h2>
+    <p class="data-download-hint">表示中の期間のデータを、1件＝1行の「縦持ち」1枚で書き出します（並べ替え・検索置換で一括修正しやすい形）。</p>
+    <div class="data-download-actions">
+      <a class="btn btn-pill" href="{{ download_xlsx_url }}?format=xlsx&start={{ start_date|date:'Y-m-d' }}&end={{ end_date|date:'Y-m-d' }}">Excel(.xlsx)</a>
+      <a class="btn btn-pill" href="{{ download_xlsx_url }}?format=csv&start={{ start_date|date:'Y-m-d' }}&end={{ end_date|date:'Y-m-d' }}">CSV(.zip)</a>
+    </div>
+  </section>
+
+  {# アップロード（編集したファイルを反映：差分プレビュー→確定の2段） #}
+  <section class="data-upload">
+    <h2 class="data-section-title">アップロード</h2>
+    <p class="data-download-hint">編集した Excel/CSV を取り込み、変更内容を確認してから反映します（出欠・フラグの値）。</p>
+    <form method="post" action="{{ upload_url }}" enctype="multipart/form-data" class="data-upload-form">
+      {% csrf_token %}
+      <input type="file" name="file" accept=".xlsx,.zip" required>
+      <button type="submit" class="btn btn-pill btn-primary">確認する</button>
+    </form>
+  </section>
 </div>
 {% endblock %}
 
