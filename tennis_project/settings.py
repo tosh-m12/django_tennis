@@ -93,6 +93,14 @@ if EXTRA_CSRF:
         if o not in CSRF_TRUSTED_ORIGINS:
             CSRF_TRUSTED_ORIGINS.append(o)
 
+# ALLOWED_HOSTS_EXTRA で足した独自ドメインは CSRF 信頼オリジン(https)にも自動追加
+# （カスタムドメイン切替時に POST が 403 になるのを防ぐ）
+if ALLOWED_HOSTS_EXTRA:
+    for host in [h.strip() for h in ALLOWED_HOSTS_EXTRA.split(",") if h.strip()]:
+        origin = f"https://{host}"
+        if origin not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(origin)
+
 # Reverse proxy 配下（Railway）で https 判定を正しくする
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
