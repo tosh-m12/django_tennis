@@ -245,7 +245,7 @@ th {
   text-decoration: none;
 }
 .topbar-wordmark{
-  height: 38px;
+  height: 24px;
   width: auto;
   display: block;
 }
@@ -577,7 +577,7 @@ th {
   border-top: 1px solid #eee;
 }
 .site-footer-logo {
-  height: 40px;
+  height: 30px;
   width: auto;
   max-width: 88%;
   display: block;
