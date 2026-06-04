@@ -113,6 +113,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "django.middleware.gzip.GZipMiddleware",  # 動的HTMLレスポンスを gzip 圧縮（静的は WhiteNoise が担当）
     "whitenoise.middleware.WhiteNoiseMiddleware",  # static 配信
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
