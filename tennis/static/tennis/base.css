@@ -231,7 +231,7 @@ th {
   justify-content: space-between;
   gap: 12px;
 
-  padding: 0 12px;
+  padding: 0 16px;
 }
 
 .topbar-title{
@@ -294,13 +294,6 @@ th {
    狭幅時：トップバーアクションをドロップダウン化
    ========================================================= */
 @media (max-width: 720px) {
-  /* 狭幅では左右の余白を詰めてロゴを端に寄せる */
-  .topbar{
-    width: min(980px, calc(100% - 12px));
-  }
-  .topbar-inner{
-    padding: 0 8px;
-  }
   .topbar-hamburger{
     display: inline-flex;
   }
