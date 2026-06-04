@@ -455,7 +455,7 @@
   <hr>
 
   {% if is_admin %}
-    <h3>対戦表（ランダム生成）</h3>
+    <h3 class="section-title">対戦表（ランダム生成）</h3>
 
     <div class="match-settings-bar">
       <div class="match-pill-group">
@@ -495,7 +495,7 @@
     </div>
   {% endif %}
 
-  <h3>対戦表</h3>
+  <h3 class="section-title">対戦表</h3>
   <div id="schedule-area" data-can-edit-score="{% if publish_state == 'published' %}1{% else %}0{% endif %}">
     {% include "tennis/_schedule_block.html" %}
   </div>
