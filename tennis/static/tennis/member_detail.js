@@ -98,3 +98,66 @@
     });
   }
 })();
+
+// ランキング推移グラフ：点をタップするとその順位を吹き出し表示。
+// 別の点（または余白）をタップすると直前の吹き出しは消す（常に1つだけ）。
+(function () {
+  "use strict";
+  const SVGNS = "http://www.w3.org/2000/svg";
+
+  function clearTip(svg) {
+    const old = svg.querySelector(".rt-tip");
+    if (old) old.remove();
+  }
+
+  function showTip(svg, pt) {
+    clearTip(svg);
+    const cx = parseFloat(pt.getAttribute("cx"));
+    const cy = parseFloat(pt.getAttribute("cy"));
+    const label = pt.getAttribute("data-date") + " " + pt.getAttribute("data-rank") + "位";
+
+    const g = document.createElementNS(SVGNS, "g");
+    g.setAttribute("class", "rt-tip");
+
+    // 文字幅をだいたい見積もってラベル背景を作る（等幅前提のざっくり計算）
+    const w = label.length * 7 + 10;
+    const h = 16;
+    // 左右にはみ出さないようにクランプ
+    let bx = cx - w / 2;
+    bx = Math.max(2, Math.min(bx, 340 - w - 2));
+    let by = cy - h - 7;
+    if (by < 2) by = cy + 7; // 上に出せなければ下に
+
+    const rect = document.createElementNS(SVGNS, "rect");
+    rect.setAttribute("x", bx.toFixed(1));
+    rect.setAttribute("y", by.toFixed(1));
+    rect.setAttribute("width", w.toFixed(1));
+    rect.setAttribute("height", h);
+    rect.setAttribute("rx", "4");
+    rect.setAttribute("fill", "#15243F");
+
+    const text = document.createElementNS(SVGNS, "text");
+    text.setAttribute("x", (bx + w / 2).toFixed(1));
+    text.setAttribute("y", (by + 11).toFixed(1));
+    text.setAttribute("text-anchor", "middle");
+    text.setAttribute("font-size", "11");
+    text.setAttribute("font-weight", "700");
+    text.setAttribute("fill", "#fff");
+    text.textContent = label;
+
+    g.appendChild(rect);
+    g.appendChild(text);
+    svg.appendChild(g);
+  }
+
+  document.querySelectorAll(".rank-trend-svg").forEach(function (svg) {
+    svg.addEventListener("click", function (e) {
+      const pt = e.target.closest(".rt-pt");
+      if (pt) {
+        showTip(svg, pt);
+      } else {
+        clearTip(svg);
+      }
+    });
+  });
+})();
