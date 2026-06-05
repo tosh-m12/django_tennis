@@ -1542,17 +1542,33 @@ def _parse_int_or_none(v):
         return None
 
 
+def _ranking_window_start(as_of):
+    """
+    クラブランキングの算出基準＝「過去3ヶ月」の開始日（基準日 as_of を含む月の2ヶ月前の月初）。
+    例: as_of=6/5 → 4/1。戦績ページの既定期間と推移グラフの各日の算出窓を一致させるための共通ロジック。
+    """
+    y, m = as_of.year, as_of.month - 2
+    while m <= 0:
+        m += 12
+        y -= 1
+    return dt.date(y, m, 1)
+
+
 def _member_rank_trend(club, member_id, config, start_d, end_d):
     """
-    指定期間内の「試合があった日ごと」に、その日までの累積クラブランキングでの本人の順位を返す。
-    試合がある日にだけ順位が変わる前提（＝階段グラフ用）。種別ごと。
-    戻り値: {"singles": [{date, rank|None}, ...], "doubles": [...]}（試合日の昇順）。
-    rank=None はその時点で最低試合数に達していない（圏外）。ランキング設定は config に準ずる。
+    [start_d, end_d] の「試合があった日ごと」に、その日のクラブランキングでの本人の順位を返す。
+    各日のランキングはクラブの算出基準（その日を末尾とする過去3ヶ月のローリング窓）で計算する
+    ため、最新点は戦績ページの現在ランキングと一致する。試合がある日にだけ順位が変わる前提
+    （＝階段グラフ用）。種別ごと。
+    戻り値: {"singles": [{date, rank|None, total}, ...], "doubles": [...]}（試合日の昇順）。
+    rank=None はその日の3ヶ月窓で最低試合数に達していない（圏外）。ランキング設定は config に準ずる。
     """
+    # 表示期間の先頭(start_d)の点も3ヶ月窓で算出するため、3ヶ月手前まで遡って試合を読む。
+    load_start = _ranking_window_start(start_d)
     schedules = list(
         MatchSchedule.objects
         .filter(event__club=club, published=True, event__cancelled=False,
-                event__date__gte=start_d, event__date__lte=end_d)
+                event__date__gte=load_start, event__date__lte=end_d)
         .select_related("event")
         .order_by("event__date", "event__id")
     )
@@ -1583,34 +1599,41 @@ def _member_rank_trend(club, member_id, config, start_d, end_d):
                 k2 = [_player_key_and_name(p, ep_map) for p in (m.get("team2") or [])]
                 by_gt_date[gt].setdefault(the_date, []).append((k1, k2, int(s1), int(s2)))
 
+    def add(stats, key, name, gf, ga):
+        st = stats.get(key)
+        if st is None:
+            st = stats[key] = {"name": name, "member_id": key[1] if key[0] == "m" else None,
+                               "matches": 0, "wins": 0, "losses": 0, "draws": 0, "gf": 0, "ga": 0}
+        st["matches"] += 1
+        st["gf"] += gf
+        st["ga"] += ga
+        if gf > ga:
+            st["wins"] += 1
+        elif gf < ga:
+            st["losses"] += 1
+        else:
+            st["draws"] += 1
+
     out = {"singles": [], "doubles": []}
     for gt in ("singles", "doubles"):
-        stats = {}
-
-        def add(key, name, gf, ga):
-            st = stats.get(key)
-            if st is None:
-                st = stats[key] = {"name": name, "member_id": key[1] if key[0] == "m" else None,
-                                   "matches": 0, "wins": 0, "losses": 0, "draws": 0, "gf": 0, "ga": 0}
-            st["matches"] += 1
-            st["gf"] += gf
-            st["ga"] += ga
-            if gf > ga:
-                st["wins"] += 1
-            elif gf < ga:
-                st["losses"] += 1
-            else:
-                st["draws"] += 1
-
-        for the_date in sorted(by_gt_date[gt].keys()):
-            for (k1, k2, s1, s2) in by_gt_date[gt][the_date]:
-                for (key, name) in k1:
-                    add(key, name, s1, s2)
-                for (key, name) in k2:
-                    add(key, name, s2, s1)
+        date_keys = sorted(by_gt_date[gt].keys())
+        # 点を打つのは表示期間 [start_d, end_d] 内の試合日のみ（load_start〜start_d は算出用の助走）。
+        display_dates = [d for d in date_keys if start_d <= d <= end_d]
+        for the_date in display_dates:
+            # その日を末尾とする過去3ヶ月のローリング窓で、その日のクラブランキングを算出。
+            w_start = _ranking_window_start(the_date)
+            stats = {}
+            for d2 in date_keys:
+                if d2 < w_start or d2 > the_date:
+                    continue
+                for (k1, k2, s1, s2) in by_gt_date[gt][d2]:
+                    for (key, name) in k1:
+                        add(stats, key, name, s1, s2)
+                    for (key, name) in k2:
+                        add(stats, key, name, s2, s1)
             ranked = _finalize_ranking(stats, config)["ranked"]
             rank = next((r["rank"] for r in ranked if r.get("member_id") == member_id), None)
-            # total = その時点のクラブ内ランキング人数（＝最下位の順位番号）
+            # total = その日のクラブ内ランキング人数（＝最下位の順位番号）
             out[gt].append({"date": the_date, "rank": rank, "total": len(ranked)})
     return out
 
@@ -1996,12 +2019,8 @@ def ranking_page(request, club_public_token, club_admin_token=None):
 
     today = timezone.localdate()
     # デフォルトは「過去3ヶ月」。開始は常に月初（当月を含む2ヶ月前の1日）、終了は今日。
-    # 例: 今日が 6/3 なら 4/1 〜 6/3。
-    y, m = today.year, today.month - 2
-    while m <= 0:
-        m += 12
-        y -= 1
-    default_start = dt.date(y, m, 1)
+    # 例: 今日が 6/3 なら 4/1 〜 6/3。推移グラフの各日の算出窓と同じ _ranking_window_start を使う。
+    default_start = _ranking_window_start(today)
     default_end = today
 
     start_d = _parse_date_yyyy_mm_dd((request.GET.get("start") or "").strip()) or default_start
