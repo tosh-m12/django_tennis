@@ -123,12 +123,12 @@ class RankTrendTests(TestCase):
         self.assertEqual(svg.count('r="2.4"'), 4)      # 圏内マーカーは4点のみ
         self.assertIn("7位", svg)                       # 軸下端=クラブ最下位
 
-    def test_rank_uses_rolling_three_month_window(self):
-        # クラブランキングの算出基準＝過去3ヶ月。3ヶ月より前にしか試合がないメンバーは、
-        # 最新日にはローリング窓から外れて圏外になる（期間先頭からの累積ではない）。
+    def test_rank_uses_rolling_window(self):
+        # クラブランキングの算出基準＝過去90日（既定）のローリング窓。90日より前にしか
+        # 試合がないメンバーは、最新日には窓から外れて圏外になる（期間先頭からの累積ではない）。
         x = make_member(self.club, "X", member_no=10)
         yy = make_member(self.club, "Y", member_no=11)
-        old_day = self.today - datetime.timedelta(days=100)  # 3ヶ月超前・表示期間内
+        old_day = self.today - datetime.timedelta(days=100)  # 90日超前・表示期間内
         ev = make_event(self.club, date=old_day)
         ep_x = make_ep(ev, member=x, attendance="yes")
         ep_y = make_ep(ev, member=yy, attendance="yes")
@@ -139,10 +139,10 @@ class RankTrendTests(TestCase):
         )
         make_score(ms, 1, 1, 6, 0)  # X 勝ち
         pts = _member_rank_trend(self.club, x.id, self._config(), self.start, self.today)["singles"]
-        # Xの試合日（old_day）はその日の3ヶ月窓に入るので圏内
+        # Xの試合日（old_day）はその日の90日窓に入るので圏内
         xpt = next(p for p in pts if p["date"] == old_day)
         self.assertIsNotNone(xpt["rank"])
-        # 最新日（today）の3ヶ月窓には old_day が含まれず、Xは圏外
+        # 最新日（today）の90日窓には old_day が含まれず、Xは圏外
         self.assertIsNone(pts[-1]["rank"])
 
     def test_points_have_tappable_hit_targets(self):

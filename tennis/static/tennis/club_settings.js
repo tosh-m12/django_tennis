@@ -194,6 +194,8 @@ document.addEventListener("DOMContentLoaded", () => {
         points_draw: num("points_draw", 1),
         points_loss: num("points_loss", 0),
         min_matches: Math.max(0, Math.trunc(num("min_matches", 3))),
+        // 集計対象期間（日）。1〜3650 にクランプ。プリセットとは独立（連動しない）。
+        period_days: Math.min(3650, Math.max(1, Math.trunc(num("period_days", 90)))),
       };
     }
 
