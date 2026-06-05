@@ -101,6 +101,17 @@ if ALLOWED_HOSTS_EXTRA:
         if origin not in CSRF_TRUSTED_ORIGINS:
             CSRF_TRUSTED_ORIGINS.append(origin)
 
+# 正規ドメインへの統一（旧ホスト→正規ホストへ 301）
+# 例: CANONICAL_HOST=deucenet.app をセットすると旧 *.up.railway.app から寄せる
+CANONICAL_HOST = env_str("CANONICAL_HOST", "")
+# 旧ホスト一覧（ここに含まれるホストへのアクセスを CANONICAL_HOST へ301）。
+# ※ healthcheck.railway.app は含めない（Railwayのヘルスチェックを壊さないため）
+REDIRECT_HOSTS = ["djangotennis-production.up.railway.app"]
+if RAILWAY_PUBLIC_DOMAIN and RAILWAY_PUBLIC_DOMAIN not in REDIRECT_HOSTS:
+    REDIRECT_HOSTS.append(RAILWAY_PUBLIC_DOMAIN)
+# CANONICAL_HOST 自身は誤って入っていても除外
+REDIRECT_HOSTS = [h for h in REDIRECT_HOSTS if h and h != CANONICAL_HOST]
+
 # Reverse proxy 配下（Railway）で https 判定を正しくする
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
@@ -121,6 +132,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "tennis_project.middleware.CanonicalHostRedirectMiddleware",  # 旧ドメイン→正規ドメインへ301
     "django.middleware.gzip.GZipMiddleware",  # 動的HTMLレスポンスを gzip 圧縮（静的は WhiteNoise が担当）
     "whitenoise.middleware.WhiteNoiseMiddleware",  # static 配信
     "django.contrib.sessions.middleware.SessionMiddleware",
