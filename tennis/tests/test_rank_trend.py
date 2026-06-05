@@ -106,6 +106,23 @@ class RankTrendTests(TestCase):
         self.assertIn("3位", svg)   # 軸下端＝クラブ最下位(3位)
         self.assertIn("1位", svg)   # 軸上端
 
+    def test_out_of_rank_breaks_line(self):
+        # 中間に圏外(None)があると線が途切れて2区間になる
+        def d(off):
+            return self.start + datetime.timedelta(days=off)
+        pts = [
+            {"date": d(10), "rank": None, "total": 5},
+            {"date": d(40), "rank": 3, "total": 5},
+            {"date": d(70), "rank": 2, "total": 6},
+            {"date": d(100), "rank": None, "total": 6},  # ← 圏外で途切れる
+            {"date": d(130), "rank": 4, "total": 7},
+            {"date": self.today, "rank": 1, "total": 7},
+        ]
+        svg = _rank_trend_svg(pts, self.start, self.today)
+        self.assertEqual(svg.count("<polyline"), 2)    # 2区間に分割
+        self.assertEqual(svg.count('r="2.4"'), 4)      # 圏内マーカーは4点のみ
+        self.assertIn("7位", svg)                       # 軸下端=クラブ最下位
+
     def test_member_page_renders_trend_below_stats(self):
         url = reverse("tennis:member_detail", args=[self.club.public_token, self.a.id])
         resp = self.client.get(url)

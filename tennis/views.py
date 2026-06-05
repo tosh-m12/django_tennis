@@ -1650,29 +1650,47 @@ def _rank_trend_svg(points, start_d, end_d):
         f'<text x="{padL}" y="{H - 6}" text-anchor="start" font-size="9" fill="#999">{start_d.strftime("%-m/%-d")}</text>',
         f'<text x="{W - padR}" y="{H - 6}" text-anchor="end" font-size="9" fill="#999">現在</text>',
     ]
-    # 階段（step-after）: 各試合日で順位が変わり、次の試合日まで水平を保つ。最後は現在(右端)まで伸ばす。
-    step = []
-    prev_y = None
-    for p in ranked_pts:
-        x = xv(p["date"])
-        y = yv(p["rank"])
-        if prev_y is not None:
-            step.append((x, prev_y))   # 水平に移動
-        step.append((x, y))            # 縦に移動
-        prev_y = y
-    step.append((padL + plot_w, prev_y))  # 現在まで水平に伸ばす
-    pts = " ".join(f"{x:.1f},{y:.1f}" for x, y in step)
-    parts.append(f'<polyline points="{pts}" fill="none" stroke="#1f7a8c" stroke-width="2"/>')
+    # 圏外(rank=None)で線を区切る。圏内が連続する区間ごとに階段(step-after)を描く。
+    runs = []
+    cur = []
+    for p in points:
+        if p["rank"] is None:
+            if cur:
+                runs.append(cur)
+                cur = []
+        else:
+            cur.append(p)
+    if cur:
+        runs.append(cur)
 
-    # 各試合日に小マーカー
+    now_ranked = bool(points) and points[-1]["rank"] is not None
+    for ri, run in enumerate(runs):
+        step = []
+        prev_y = None
+        for p in run:
+            x = xv(p["date"])
+            y = yv(p["rank"])
+            if prev_y is not None:
+                step.append((x, prev_y))   # 水平に移動
+            step.append((x, y))            # 縦に移動
+            prev_y = y
+        # 現在まで圏内が続いている区間（＝最後の区間）だけ右端まで伸ばす
+        if ri == len(runs) - 1 and now_ranked:
+            step.append((padL + plot_w, prev_y))
+        if len(step) >= 2:
+            pts = " ".join(f"{x:.1f},{y:.1f}" for x, y in step)
+            parts.append(f'<polyline points="{pts}" fill="none" stroke="#1f7a8c" stroke-width="2"/>')
+
+    # 各試合日（圏内のみ）に小マーカー
     for p in ranked_pts:
         parts.append(f'<circle cx="{xv(p["date"]):.1f}" cy="{yv(p["rank"]):.1f}" r="2.4" fill="#1f7a8c"/>')
 
-    # 現在（最新）の順位を強調
-    last = ranked_pts[-1]
-    lx, ly = padL + plot_w, yv(last["rank"])
-    parts.append(f'<circle cx="{lx:.1f}" cy="{ly:.1f}" r="3.6" fill="#15243F"/>')
-    parts.append(f'<text x="{lx - 2:.1f}" y="{ly - 7:.1f}" text-anchor="end" font-size="11" font-weight="700" fill="#15243F">{last["rank"]}位</text>')
+    # 現在が圏内なら最新順位を強調
+    if now_ranked:
+        last = points[-1]
+        lx, ly = padL + plot_w, yv(last["rank"])
+        parts.append(f'<circle cx="{lx:.1f}" cy="{ly:.1f}" r="3.6" fill="#15243F"/>')
+        parts.append(f'<text x="{lx - 2:.1f}" y="{ly - 7:.1f}" text-anchor="end" font-size="11" font-weight="700" fill="#15243F">{last["rank"]}位</text>')
 
     parts.append("</svg>")
     return "".join(parts)
