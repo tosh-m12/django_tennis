@@ -203,8 +203,9 @@
   margin-bottom: 4px;
 }
 .rank-trend-svg {
+  /* 直上の戦績表（width:100%）と幅を揃える。PCではカード幅いっぱいに広がり大きく表示される */
   width: 100%;
-  max-width: 360px;
+  max-width: 100%;
   height: auto;
   display: block;
 }
