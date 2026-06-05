@@ -85,8 +85,26 @@ class RankTrendTests(TestCase):
         self.assertIn("現在", svg)
 
     def test_all_out_of_rank_returns_empty(self):
-        pts = [{"date": self.today, "rank": None}]
+        pts = [{"date": self.today, "rank": None, "total": 0}]
         self.assertEqual(_rank_trend_svg(pts, self.start, self.today), "")
+
+    def test_axis_bottom_is_club_last_place(self):
+        # 3人目Cを当日参加させ、クラブ最下位=3 にする（Aは常に1位）
+        c = make_member(self.club, "C", member_no=3)
+        ev = make_event(self.club, date=self.today)
+        ep_b = make_ep(ev, member=self.b, attendance="yes")
+        ep_c = make_ep(ev, member=c, attendance="yes")
+        ms = make_published_schedule(
+            ev,
+            [{"round": 1, "matches": [{"court": 1, "team1": [ep_b.id], "team2": [ep_c.id]}], "rests": []}],
+            game_type="singles", court_count=1, round_count=1,
+        )
+        make_score(ms, 1, 1, 6, 0)  # B が C に勝ち
+        trends = _member_rank_trend(self.club, self.a.id, self._config(), self.start, self.today)
+        self.assertEqual(trends["singles"][-1]["total"], 3)   # 最新は3人ランク
+        svg = _rank_trend_svg(trends["singles"], self.start, self.today)
+        self.assertIn("3位", svg)   # 軸下端＝クラブ最下位(3位)
+        self.assertIn("1位", svg)   # 軸上端
 
     def test_member_page_renders_trend_below_stats(self):
         url = reverse("tennis:member_detail", args=[self.club.public_token, self.a.id])

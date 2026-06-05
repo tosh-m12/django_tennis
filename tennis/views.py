@@ -1610,7 +1610,8 @@ def _member_rank_trend(club, member_id, config, start_d, end_d):
                     add(key, name, s2, s1)
             ranked = _finalize_ranking(stats, config)["ranked"]
             rank = next((r["rank"] for r in ranked if r.get("member_id") == member_id), None)
-            out[gt].append({"date": the_date, "rank": rank})
+            # total = その時点のクラブ内ランキング人数（＝最下位の順位番号）
+            out[gt].append({"date": the_date, "rank": rank, "total": len(ranked)})
     return out
 
 
@@ -1629,7 +1630,10 @@ def _rank_trend_svg(points, start_d, end_d):
     plot_w = W - padL - padR
     plot_h = H - padT - padB
     span = max((end_d - start_d).days, 1)
-    maxr = max(max(p["rank"] for p in ranked_pts), 2)
+    # 縦軸の下端＝対象期間中のクラブ最下位（ランキング人数の最大）。
+    # 本人の最下位やデータ不足時のための保険も入れて確保。
+    period_last = max((p.get("total", 0) for p in points), default=0)
+    maxr = max(period_last, max(p["rank"] for p in ranked_pts), 2)
 
     def xv(d):
         return padL + (d - start_d).days / span * plot_w
