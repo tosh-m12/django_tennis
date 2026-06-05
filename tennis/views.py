@@ -545,6 +545,67 @@ def _collect_schedule_ep_ids(schedule_json, sink: set) -> None:
                     sink.add(int(p))
 
 
+def _player_key_and_name(p, ep_map):
+    """
+    schedule_json の参加者値 p を集計キーと表示名に解決する。
+    ep_id(int/数字str) → member_id があれば ("m", member_id)、無ければゲスト名 ("g", name)。
+    旧形式の名前文字列 → ("g", name)。
+    """
+    if isinstance(p, int) or (isinstance(p, str) and p.isdigit()):
+        ep = ep_map.get(int(p))
+        if ep:
+            if ep.member_id:
+                name = ep.member.display_name if ep.member else (ep.display_name or f"Member#{ep.member_id}")
+                return (("m", ep.member_id), name)
+            gname = (ep.display_name or f"Guest#{ep.id}").strip()
+            return (("g", gname), gname)
+        return (("g", str(p)), str(p))
+    name = str(p).strip()
+    return (("g", name), name)
+
+
+def _finalize_ranking(stats, config):
+    """
+    集計済み stats（key -> {name, member_id, matches, wins, losses, draws, gf, ga}）から、
+    config のルール（preset/count_draws/勝ち点/min_matches）で順位を確定して返す。
+    本ランキングと個人ページの推移グラフで同じ算出を共有する。
+    戻り値: {"ranked": [...rank付き...], "others": [...]}
+    """
+    count_draws = bool(config.get("count_draws", False))
+    pw = float(config.get("points_win", 3))
+    pd = float(config.get("points_draw", 1))
+    pl = float(config.get("points_loss", 0))
+    min_matches = int(config.get("min_matches", 3))
+    preset = config.get("preset", "winrate")
+
+    rows = []
+    for st in stats.values():
+        m = st["matches"]
+        w = st["wins"]
+        d = st["draws"]
+        gf = st["gf"]
+        ga = st["ga"]
+        win_num = (w + 0.5 * d) if count_draws else w
+        st["win_pct"] = round((win_num / m) * 100, 1) if m else 0.0
+        st["gp_pct"] = round((gf / (gf + ga)) * 100, 1) if (gf + ga) else 0.0
+        st["diff"] = gf - ga
+        points = w * pw + d * pd + st["losses"] * pl
+        st["points"] = int(points) if points == int(points) else round(points, 1)
+        rows.append(st)
+
+    ranked = [r for r in rows if r["matches"] >= min_matches]
+    others = [r for r in rows if r["matches"] < min_matches]
+    sort_keys = {
+        "winrate": lambda r: (-(r["win_pct"]), -(r["gp_pct"]), -(r["wins"]), -(r["diff"]), -(r["matches"]), r["name"]),
+        "points": lambda r: (-(r["points"]), -(r["diff"]), -(r["gp_pct"]), -(r["wins"]), -(r["matches"]), r["name"]),
+        "wins": lambda r: (-(r["wins"]), -(r["win_pct"]), -(r["diff"]), -(r["gp_pct"]), -(r["matches"]), r["name"]),
+    }
+    ranked.sort(key=sort_keys.get(preset, sort_keys["winrate"]))
+    for i, r in enumerate(ranked, 1):
+        r["rank"] = i
+    return {"ranked": ranked, "others": others}
+
+
 def _compute_ranking_from(events, ms_by_event, ep_map, config):
     """
     1ゲームタイプ分の集計（旧 build_month_ranking 本体）。
@@ -552,12 +613,6 @@ def _compute_ranking_from(events, ms_by_event, ep_map, config):
     config: 戦績ランキングの集計ルール dict
         （preset / count_draws / points_win / points_draw / points_loss / min_matches）。
     """
-    preset = config.get("preset", "winrate")
-    count_draws = bool(config.get("count_draws", False))
-    pw = float(config.get("points_win", 3))
-    pd = float(config.get("points_draw", 1))
-    pl = float(config.get("points_loss", 0))
-    min_matches = int(config.get("min_matches", 3))
 
     stats = {}
 
@@ -569,24 +624,7 @@ def _compute_ranking_from(events, ms_by_event, ep_map, config):
         return stats[key]
 
     def resolve_player_key_and_name(p):
-        """
-        p が:
-        - ep_id(int or digit str) → member_id があれば member集計、無ければゲスト名集計
-        - 名前文字列（旧形式） → ゲスト名集計
-        """
-        if isinstance(p, int) or (isinstance(p, str) and p.isdigit()):
-            ep = ep_map.get(int(p))
-            if ep:
-                if ep.member_id:
-                    name = ep.member.display_name if ep.member else (ep.display_name or f"Member#{ep.member_id}")
-                    return (("m", ep.member_id), name)
-                gname = (ep.display_name or f"Guest#{ep.id}").strip()
-                return (("g", gname), gname)
-
-            return (("g", str(p)), str(p))
-
-        name = str(p).strip()
-        return (("g", name), name)
+        return _player_key_and_name(p, ep_map)
 
     for ev in events:
         ms = ms_by_event.get(ev.id)
@@ -632,37 +670,7 @@ def _compute_ranking_from(events, ms_by_event, ep_map, config):
                     else:
                         st["draws"] += 1
 
-    rows = []
-    for st in stats.values():
-        m = st["matches"]
-        w = st["wins"]
-        d = st["draws"]
-        gf = st["gf"]
-        ga = st["ga"]
-        # count_draws ON: 引き分けを 0.5 勝として勝率に算入。OFF: 現行（勝のみ／分母は全試合）。
-        win_num = (w + 0.5 * d) if count_draws else w
-        st["win_pct"] = round((win_num / m) * 100, 1) if m else 0.0
-        st["gp_pct"] = round((gf / (gf + ga)) * 100, 1) if (gf + ga) else 0.0
-        st["diff"] = gf - ga
-        # 勝ち点: 勝・分・負それぞれの配点で合算（勝ち点制プリセットで主指標、他では参考値）。
-        points = w * pw + d * pd + st["losses"] * pl
-        st["points"] = int(points) if points == int(points) else round(points, 1)
-        rows.append(st)
-
-    ranked = [r for r in rows if r["matches"] >= min_matches]
-    others = [r for r in rows if r["matches"] < min_matches]
-
-    # プリセットごとに並び順を切り替える（共通の末尾 tiebreak は名前昇順）。
-    sort_keys = {
-        "winrate": lambda r: (-(r["win_pct"]), -(r["gp_pct"]), -(r["wins"]), -(r["diff"]), -(r["matches"]), r["name"]),
-        "points": lambda r: (-(r["points"]), -(r["diff"]), -(r["gp_pct"]), -(r["wins"]), -(r["matches"]), r["name"]),
-        "wins": lambda r: (-(r["wins"]), -(r["win_pct"]), -(r["diff"]), -(r["gp_pct"]), -(r["matches"]), r["name"]),
-    }
-    ranked.sort(key=sort_keys.get(preset, sort_keys["winrate"]))
-    for i, r in enumerate(ranked, 1):
-        r["rank"] = i
-
-    return {"ranked": ranked, "others": others}
+    return _finalize_ranking(stats, config)
 
 
 def build_month_rankings(events_qs, game_types, config=None):
@@ -1534,59 +1542,97 @@ def _parse_int_or_none(v):
         return None
 
 
-def _member_rank_trends(club, member_id, today, config):
+def _member_rank_trend(club, member_id, config, start_d, end_d):
     """
-    過去3ヶ月（当月含む・古い→新しい）の月次クラブランキングでの順位を種別ごとに返す。
-    戻り値: {"singles": [{label, rank|None, total}, ...3], "doubles": [...]}
-    rank=None はその月にランキング圏内（最低試合数以上）に入らなかったことを示す。
+    指定期間内の「試合があった日ごと」に、その日までの累積クラブランキングでの本人の順位を返す。
+    試合がある日にだけ順位が変わる前提（＝階段グラフ用）。種別ごと。
+    戻り値: {"singles": [{date, rank|None}, ...], "doubles": [...]}（試合日の昇順）。
+    rank=None はその時点で最低試合数に達していない（圏外）。ランキング設定は config に準ずる。
     """
-    # 直近3ヶ月の (年, 月)
-    months = []
-    y, mo = today.year, today.month
-    for _ in range(3):
-        months.append((y, mo))
-        mo -= 1
-        if mo == 0:
-            mo, y = 12, y - 1
-    months.reverse()
+    schedules = list(
+        MatchSchedule.objects
+        .filter(event__club=club, published=True, event__cancelled=False,
+                event__date__gte=start_d, event__date__lte=end_d)
+        .select_related("event")
+        .order_by("event__date", "event__id")
+    )
+    ep_ids = set()
+    for ms in schedules:
+        _collect_schedule_ep_ids(ms.schedule_json, ep_ids)
+    ep_map = {
+        ep.id: ep for ep in
+        EventParticipant.objects.filter(id__in=list(ep_ids)).select_related("member")
+    }
+
+    # gt -> 日付 -> その日の [(team1キー群, team2キー群, s1, s2), ...]（スコア確定分のみ）
+    by_gt_date = {"singles": {}, "doubles": {}}
+    for ms in schedules:
+        gt = ms.game_type or "doubles"
+        if gt not in by_gt_date or not ms.schedule_json:
+            continue
+        the_date = ms.event.date
+        score_map = _build_score_map(ms)
+        for r in (ms.schedule_json or []):
+            round_no = int(r.get("round") or 0)
+            for m in (r.get("matches") or []):
+                court_no = int(m.get("court") or 0)
+                s1, s2 = score_map.get((round_no, court_no), (None, None))
+                if s1 is None or s2 is None:
+                    continue
+                k1 = [_player_key_and_name(p, ep_map) for p in (m.get("team1") or [])]
+                k2 = [_player_key_and_name(p, ep_map) for p in (m.get("team2") or [])]
+                by_gt_date[gt].setdefault(the_date, []).append((k1, k2, int(s1), int(s2)))
 
     out = {"singles": [], "doubles": []}
-    for (yy, mm) in months:
-        first = dt.date(yy, mm, 1)
-        nxt = dt.date(yy + 1, 1, 1) if mm == 12 else dt.date(yy, mm + 1, 1)
-        last = nxt - dt.timedelta(days=1)
-        events = (
-            Event.objects
-            .filter(club=club, date__gte=first, date__lte=last, cancelled=False)
-            .order_by("date", "start_time", "id")
-        )
-        rk = build_month_rankings(events, [GameType.SINGLES, GameType.DOUBLES], config)
-        for gt in ("singles", "doubles"):
-            rank = None
-            for r in rk[gt]["ranked"]:
-                if r.get("member_id") == member_id:
-                    rank = r["rank"]
-                    break
-            out[gt].append({"label": f"{mm}月", "rank": rank, "total": len(rk[gt]["ranked"])})
+    for gt in ("singles", "doubles"):
+        stats = {}
+
+        def add(key, name, gf, ga):
+            st = stats.get(key)
+            if st is None:
+                st = stats[key] = {"name": name, "member_id": key[1] if key[0] == "m" else None,
+                                   "matches": 0, "wins": 0, "losses": 0, "draws": 0, "gf": 0, "ga": 0}
+            st["matches"] += 1
+            st["gf"] += gf
+            st["ga"] += ga
+            if gf > ga:
+                st["wins"] += 1
+            elif gf < ga:
+                st["losses"] += 1
+            else:
+                st["draws"] += 1
+
+        for the_date in sorted(by_gt_date[gt].keys()):
+            for (k1, k2, s1, s2) in by_gt_date[gt][the_date]:
+                for (key, name) in k1:
+                    add(key, name, s1, s2)
+                for (key, name) in k2:
+                    add(key, name, s2, s1)
+            ranked = _finalize_ranking(stats, config)["ranked"]
+            rank = next((r["rank"] for r in ranked if r.get("member_id") == member_id), None)
+            out[gt].append({"date": the_date, "rank": rank})
     return out
 
 
-def _rank_trend_svg(points):
+def _rank_trend_svg(points, start_d, end_d):
     """
-    ランキング推移の点列を、依存ライブラリ無しのインラインSVG折れ線グラフにする。
-    順位は小さいほど上（1位が上）。全ての点が圏外(None)なら空文字を返す。
+    試合日ごとの順位列を、依存ライブラリ無しのインラインSVG「階段グラフ」にする。
+    x=日付（期間内の位置）、y=順位（1位が上）。順位は試合日にだけ変わる前提で段状に描く。
+    圏内(rank!=None)の点が無ければ空文字。
     """
-    present = [p for p in points if p["rank"] is not None]
-    if not present:
+    ranked_pts = [p for p in points if p["rank"] is not None]
+    if not ranked_pts:
         return ""
 
-    n = len(points)
-    W, H = 320, 140
-    padL, padR, padT, padB = 30, 14, 16, 26
+    W, H = 340, 150
+    padL, padR, padT, padB = 30, 12, 14, 24
     plot_w = W - padL - padR
     plot_h = H - padT - padB
-    xs = [padL + (plot_w / 2 if n == 1 else i * plot_w / (n - 1)) for i in range(n)]
-    maxr = max(max(p["rank"] for p in present), 2)  # 1点だけでもスケール確保
+    span = max((end_d - start_d).days, 1)
+    maxr = max(max(p["rank"] for p in ranked_pts), 2)
+
+    def xv(d):
+        return padL + (d - start_d).days / span * plot_w
 
     def yv(rank):
         return padT + (rank - 1) / (maxr - 1) * plot_h
@@ -1597,33 +1643,35 @@ def _rank_trend_svg(points):
         f'<line x1="{padL}" y1="{H - padB}" x2="{W - padR}" y2="{H - padB}" stroke="#e5e7eb"/>',
         f'<text x="{padL - 4}" y="{padT + 4:.0f}" text-anchor="end" font-size="9" fill="#aaa">1位</text>',
         f'<text x="{padL - 4}" y="{H - padB:.0f}" text-anchor="end" font-size="9" fill="#aaa">{maxr}位</text>',
+        f'<text x="{padL}" y="{H - 6}" text-anchor="start" font-size="9" fill="#999">{start_d.strftime("%-m/%-d")}</text>',
+        f'<text x="{W - padR}" y="{H - 6}" text-anchor="end" font-size="9" fill="#999">現在</text>',
     ]
-    # 圏内の点を1本の折れ線で結ぶ（圏外の月は飛ばして繋ぐ）
-    seg = [(xs[i], yv(p["rank"])) for i, p in enumerate(points) if p["rank"] is not None]
-    if len(seg) >= 2:
-        parts.append(_polyline(seg))
-    # マーカー・順位ラベル・月ラベル
-    for i, p in enumerate(points):
-        parts.append(
-            f'<text x="{xs[i]:.1f}" y="{H - 8}" text-anchor="middle" font-size="10" fill="#777">{p["label"]}</text>'
-        )
-        if p["rank"] is not None:
-            cy = yv(p["rank"])
-            parts.append(f'<circle cx="{xs[i]:.1f}" cy="{cy:.1f}" r="3.5" fill="#1f7a8c"/>')
-            parts.append(
-                f'<text x="{xs[i]:.1f}" y="{cy - 7:.1f}" text-anchor="middle" font-size="10" fill="#15243F">{p["rank"]}位</text>'
-            )
-        else:
-            parts.append(
-                f'<text x="{xs[i]:.1f}" y="{padT + plot_h / 2:.0f}" text-anchor="middle" font-size="9" fill="#bbb">圏外</text>'
-            )
+    # 階段（step-after）: 各試合日で順位が変わり、次の試合日まで水平を保つ。最後は現在(右端)まで伸ばす。
+    step = []
+    prev_y = None
+    for p in ranked_pts:
+        x = xv(p["date"])
+        y = yv(p["rank"])
+        if prev_y is not None:
+            step.append((x, prev_y))   # 水平に移動
+        step.append((x, y))            # 縦に移動
+        prev_y = y
+    step.append((padL + plot_w, prev_y))  # 現在まで水平に伸ばす
+    pts = " ".join(f"{x:.1f},{y:.1f}" for x, y in step)
+    parts.append(f'<polyline points="{pts}" fill="none" stroke="#1f7a8c" stroke-width="2"/>')
+
+    # 各試合日に小マーカー
+    for p in ranked_pts:
+        parts.append(f'<circle cx="{xv(p["date"]):.1f}" cy="{yv(p["rank"]):.1f}" r="2.4" fill="#1f7a8c"/>')
+
+    # 現在（最新）の順位を強調
+    last = ranked_pts[-1]
+    lx, ly = padL + plot_w, yv(last["rank"])
+    parts.append(f'<circle cx="{lx:.1f}" cy="{ly:.1f}" r="3.6" fill="#15243F"/>')
+    parts.append(f'<text x="{lx - 2:.1f}" y="{ly - 7:.1f}" text-anchor="end" font-size="11" font-weight="700" fill="#15243F">{last["rank"]}位</text>')
+
     parts.append("</svg>")
     return "".join(parts)
-
-
-def _polyline(seg):
-    pts = " ".join(f"{x:.1f},{y:.1f}" for x, y in seg)
-    return f'<polyline points="{pts}" fill="none" stroke="#1f7a8c" stroke-width="2"/>'
 
 
 @require_http_methods(["GET"])
@@ -1780,10 +1828,12 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
         s["gp_pct"] = round((gf / (gf + ga)) * 100, 1) if (gf + ga) else 0.0
         s["diff"] = gf - ga
 
-    # 過去3ヶ月のランキング推移（種別ごと）。各戦績表の直下に出すため st に SVG を持たせる。
-    trends = _member_rank_trends(club, member.id, timezone.localdate(), ranking_config)
+    # 過去180日のランキング推移（試合日ごと・階段グラフ）。各戦績表の直下に出すため st に SVG を持たせる。
+    trend_today = timezone.localdate()
+    trend_start = trend_today - dt.timedelta(days=180)
+    trends = _member_rank_trend(club, member.id, ranking_config, trend_start, trend_today)
     for gt in ("singles", "doubles"):
-        stats[gt]["trend_svg"] = _rank_trend_svg(trends[gt])
+        stats[gt]["trend_svg"] = _rank_trend_svg(trends[gt], trend_start, trend_today)
 
     # 戻り先（来た元のページ） — referer があればそれ、無ければクラブホーム
     back_url = request.META.get("HTTP_REFERER") or reverse(
