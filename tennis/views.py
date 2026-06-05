@@ -1732,8 +1732,8 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
     メンバー個人ページ（一般・幹事共通）。
     - 名前編集（一般・幹事とも可。既存の "誰でも編集" 仕様を継承）
     - 削除ボタン（幹事モード・非固定メンバーのみ表示）
-    - 戦績集計サマリ（シングルス／ダブルス別、全期間）
-    - 試合履歴（公開済み MatchSchedule の schedule_json + MatchScore から構築）
+    - 戦績集計サマリ（シングルス／ダブルス別、クラブ統一期間＝過去 period_days 日）
+    - 試合履歴（公開済み MatchSchedule の schedule_json + MatchScore から構築・全件）
     """
     club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
     is_admin = False
@@ -1744,27 +1744,23 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
 
     member = get_object_or_404(Member, id=int(member_id), club=club)
 
-    # 集計期間（GET パラメータ。空欄は全期間）
-    start_str = (request.GET.get("start") or "").strip()
-    end_str = (request.GET.get("end") or "").strip()
-    start_d = _parse_date_yyyy_mm_dd(start_str)
-    end_d = _parse_date_yyyy_mm_dd(end_str)
+    # 戦績集計はクラブ統一設定の期間（過去 period_days 日・既定90）に揃える。
+    # 試合履歴は期間で絞らず全件表示する（個別の期間選択は廃止）。
+    ranking_config = _resolve_club_ranking_config(club)
+    period_days = int(ranking_config.get("period_days", DEFAULT_RANKING_PERIOD_DAYS))
+    today = timezone.localdate()
+    stats_start = _ranking_window_start(today, period_days)  # 戦績集計の対象開始日
 
     # このメンバーの EP id 集合
     my_ep_ids = set(
         EventParticipant.objects.filter(member=member).values_list("id", flat=True)
     )
 
-    # クラブの公開済み MatchSchedule を新しい順に（期間絞り込み・中止イベント除外）
-    schedules_qs = MatchSchedule.objects.filter(
-        event__club=club, published=True, event__cancelled=False
-    )
-    if start_d:
-        schedules_qs = schedules_qs.filter(event__date__gte=start_d)
-    if end_d:
-        schedules_qs = schedules_qs.filter(event__date__lte=end_d)
+    # クラブの公開済み MatchSchedule を新しい順に（中止イベント除外・全期間：履歴は全件）
     schedules = list(
-        schedules_qs.select_related("event").order_by("-event__date", "-event__id")
+        MatchSchedule.objects
+        .filter(event__club=club, published=True, event__cancelled=False)
+        .select_related("event").order_by("-event__date", "-event__id")
     )
 
     # 試合一覧から出てくる全 EP id を収集（対戦相手・パートナー名解決用）
@@ -1799,6 +1795,8 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
     for ms in schedules:
         score_map = _build_score_map(ms)
         game_type = ms.game_type or GameType.DOUBLES
+        # 戦績集計はクラブ統一期間内の試合だけ（履歴は全件なので gate しない）。
+        in_period = stats_start <= ms.event.date <= today
 
         for r in (ms.schedule_json or []):
             round_no = int(r.get("round") or 0)
@@ -1827,8 +1825,8 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
                     opp_team = t1
                     my_score, opp_score = s2, s1
 
-                # スコア両方ある場合のみ集計
-                if my_score is not None and opp_score is not None:
+                # スコア両方あり、かつクラブ統一期間内の試合のみ戦績に集計
+                if my_score is not None and opp_score is not None and in_period:
                     b = stats.get(game_type)
                     if b is not None:
                         b["matches"] += 1
@@ -1869,7 +1867,6 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
                 })
 
     # 勝率の定義をランキングと一致させる（count_draws ON なら引き分けを0.5勝で算入）。
-    ranking_config = _resolve_club_ranking_config(club)
     count_draws = bool(ranking_config.get("count_draws", False))
     for gt in ("singles", "doubles"):
         s = stats[gt]
@@ -1881,7 +1878,7 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
         s["diff"] = gf - ga
 
     # 過去180日のランキング推移（試合日ごと・階段グラフ）。各戦績表の直下に出すため st に SVG を持たせる。
-    trend_today = timezone.localdate()
+    trend_today = today
     trend_start = trend_today - dt.timedelta(days=180)
     trends = _member_rank_trend(club, member.id, ranking_config, trend_start, trend_today)
     for gt in ("singles", "doubles"):
@@ -1913,12 +1910,6 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
 
     no_records = not stats_blocks and not history_blocks
 
-    # 期間表示用ラベル
-    if start_d or end_d:
-        period_label = f"{start_d.strftime('%Y/%-m/%-d') if start_d else '?'} 〜 {end_d.strftime('%Y/%-m/%-d') if end_d else '?'}"
-    else:
-        period_label = "全期間"
-
     return render(request, "tennis/member_detail.html", {
         "club": club,
         "member": member,
@@ -1927,9 +1918,10 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
         "history_blocks": history_blocks,
         "no_records": no_records,
         "matches_history": matches_history,
-        "start_date": start_d,
-        "end_date": end_d,
-        "period_label": period_label,
+        # 戦績集計が対象とするクラブ統一期間（表示用）
+        "stats_period_days": period_days,
+        "stats_start_date": stats_start,
+        "stats_end_date": today,
         "back_url": back_url,
         "show_topbar": True,
         "cleanup_warnings": _run_member_auto_cleanup(club) if is_admin else [],
@@ -2006,7 +1998,8 @@ def club_home(request, club_public_token, club_admin_token=None):
 def ranking_page(request, club_public_token, club_admin_token=None):
     """
     戦績表（ランキング）ページ。一般・幹事どちらでもアクセス可。
-    - 期間：GET start/end（YYYY-MM-DD）。デフォルトは今月の1日〜末日。
+    - 期間：クラブ統一設定（過去 period_days 日・既定90）のローリング窓に固定。
+      個別の期間選択は廃止（ランキングの基準を一意に保つため）。基準変更は設定ページで。
     - 対象：当該クラブの公開済み MatchSchedule を期間で絞り、build_month_rankings で集計。
     """
     club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
@@ -2020,15 +2013,10 @@ def ranking_page(request, club_public_token, club_admin_token=None):
     period_days = int(ranking_config.get("period_days", DEFAULT_RANKING_PERIOD_DAYS))
 
     today = timezone.localdate()
-    # デフォルトは「過去 period_days 日」（クラブ設定・既定90）のローリング窓。終了は今日。
-    # 例: 今日が 6/5・90日なら 3/7 〜 6/5。推移グラフの各日の算出窓と同じ _ranking_window_start を使う。
-    default_start = _ranking_window_start(today, period_days)
-    default_end = today
-
-    start_d = _parse_date_yyyy_mm_dd((request.GET.get("start") or "").strip()) or default_start
-    end_d = _parse_date_yyyy_mm_dd((request.GET.get("end") or "").strip()) or default_end
-    if end_d < start_d:
-        end_d = start_d
+    # 期間は常にクラブ設定の「過去 period_days 日」（例: 6/5・90日なら 3/7 〜 6/5）。
+    # 推移グラフの各日の算出窓と同じ _ranking_window_start を使い、一意のランキングに揃える。
+    start_d = _ranking_window_start(today, period_days)
+    end_d = today
 
     events_qs = (
         Event.objects
@@ -2049,6 +2037,7 @@ def ranking_page(request, club_public_token, club_admin_token=None):
         "is_admin": is_admin,
         "start_date": start_d,
         "end_date": end_d,
+        "period_days": period_days,
         "ranking_doubles": ranking_doubles,
         "ranking_singles": ranking_singles,
         "ranking_config": ranking_config,
