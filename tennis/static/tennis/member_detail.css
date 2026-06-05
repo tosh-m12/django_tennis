@@ -191,3 +191,20 @@
     color: #b91c1c;
 }
 /* 分け：素の表示（背景・文字色の指定なし） */
+
+/* 過去3ヶ月のランキング推移グラフ（戦績表の直下） */
+.rank-trend {
+  margin-top: 12px;
+}
+.rank-trend-title {
+  font-size: 0.82rem;
+  color: #5B6B7A;
+  font-weight: 700;
+  margin-bottom: 4px;
+}
+.rank-trend-svg {
+  width: 100%;
+  max-width: 360px;
+  height: auto;
+  display: block;
+}
