@@ -1681,9 +1681,17 @@ def _rank_trend_svg(points, start_d, end_d):
             pts = " ".join(f"{x:.1f},{y:.1f}" for x, y in step)
             parts.append(f'<polyline points="{pts}" fill="none" stroke="#1f7a8c" stroke-width="2"/>')
 
-    # 各試合日（圏内のみ）に小マーカー
+    # 各試合日（圏内のみ）に小マーカー＋タップ用の透明ヒット領域
     for p in ranked_pts:
-        parts.append(f'<circle cx="{xv(p["date"]):.1f}" cy="{yv(p["rank"]):.1f}" r="2.4" fill="#1f7a8c"/>')
+        cx = xv(p["date"])
+        cy = yv(p["rank"])
+        parts.append(f'<circle cx="{cx:.1f}" cy="{cy:.1f}" r="2.4" fill="#1f7a8c"/>')
+        # 指でタップしやすいよう透明な広めの判定円。JSが data-* を読んで順位を表示する。
+        parts.append(
+            f'<circle class="rt-pt" cx="{cx:.1f}" cy="{cy:.1f}" r="10" '
+            f'fill="#000" fill-opacity="0" '
+            f'data-rank="{p["rank"]}" data-date="{p["date"].strftime("%-m/%-d")}"/>'
+        )
 
     # 現在が圏内なら最新順位を強調
     if now_ranked:

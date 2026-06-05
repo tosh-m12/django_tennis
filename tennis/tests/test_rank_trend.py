@@ -123,6 +123,14 @@ class RankTrendTests(TestCase):
         self.assertEqual(svg.count('r="2.4"'), 4)      # 圏内マーカーは4点のみ
         self.assertIn("7位", svg)                       # 軸下端=クラブ最下位
 
+    def test_points_have_tappable_hit_targets(self):
+        # 各圏内点にタップ判定円(rt-pt)と data-rank / data-date が出る
+        trends = _member_rank_trend(self.club, self.a.id, self._config(), self.start, self.today)
+        svg = _rank_trend_svg(trends["singles"], self.start, self.today)
+        self.assertEqual(svg.count('class="rt-pt"'), 2)   # 試合日2点ぶん
+        self.assertIn('data-rank="1"', svg)
+        self.assertIn("data-date=", svg)
+
     def test_member_page_renders_trend_below_stats(self):
         url = reverse("tennis:member_detail", args=[self.club.public_token, self.a.id])
         resp = self.client.get(url)

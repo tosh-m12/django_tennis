@@ -208,3 +208,11 @@
   height: auto;
   display: block;
 }
+/* タップで順位を表示する判定円 */
+.rank-trend-svg .rt-pt {
+  cursor: pointer;
+}
+/* 吹き出しはタップ判定を奪わない（次の点をすぐ押せるように） */
+.rank-trend-svg .rt-tip {
+  pointer-events: none;
+}
