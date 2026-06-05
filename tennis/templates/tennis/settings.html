@@ -387,22 +387,22 @@
 {% endif %}
 
 <hr>
+<h3 class="section-title">データ整理</h3>
 
-{# データ集計表への導線 #}
-<div class="data-link-area" style="margin-top:24px;">
+{# データ集計表（閲覧・ダウンロード/アップロード） #}
+<div class="data-link-area" style="margin:0 0 16px;">
   <a class="btn btn-pill btn-primary"
      href="{% url 'tennis:club_data' club.public_token club.admin_token %}">
     データ集計表を開く
   </a>
   <small class="flag-note" style="display:block; margin-top:6px;">
-    出欠・共通フラグ・固有フラグの履歴を期間で絞って一覧できます（幹事のみ）。
+    出欠・共通フラグ・固有フラグの履歴を期間で絞って一覧・編集できます（幹事のみ）。
   </small>
 </div>
 
-<hr>
-<h3 class="section-title">データ整理</h3>
+{# 重複の統合・完全削除（取り消せない操作を含む） #}
 <small style="color:#666; display:block; margin-bottom:10px;">
-  ※ 取り消せない操作を含みます。実行前に内容を確認できます。
+  ※ 以下は取り消せない操作を含みます。実行前に内容を確認できます。
 </small>
 <p style="margin:0 0 12px; display:flex; gap:8px; flex-wrap:wrap;">
   <a class="cleanup-pill" href="{% url 'tennis:club_member_cleanup' club.public_token club.admin_token %}">メンバー整理（重複の統合・完全削除）</a>
