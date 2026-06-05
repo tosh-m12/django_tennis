@@ -161,5 +161,5 @@ class RankTrendTests(TestCase):
         self.assertIn("singles", sb)
         self.assertIn("<svg", sb["singles"]["trend_svg"])
         html = resp.content.decode()
-        self.assertIn("過去180日のランキング推移", html)
+        self.assertIn("ランキング推移（過去６ヶ月）", html)
         self.assertIn("rank-trend-svg", html)
