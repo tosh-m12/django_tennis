@@ -12,16 +12,8 @@
   <link rel="apple-touch-icon" sizes="180x180" href="{% static 'tennis/logo/apple-touch-icon.png' %}">
   <meta name="theme-color" content="#3b82f6">
 
-  <link rel="stylesheet" href="{% static 'tennis/style.css' %}">
-  <link rel="stylesheet" href="{% static 'tennis/calendar.css' %}">
-  <link rel="stylesheet" href="{% static 'tennis/index.css' %}">
-  <link rel="stylesheet" href="{% static 'tennis/admin.css' %}">
-  <link rel="stylesheet" href="{% static 'tennis/base.css' %}">
-  <link rel="stylesheet" href="{% static 'tennis/event.css' %}">
-  <link rel="stylesheet" href="{% static 'tennis/schedule.css' %}">
-  <link rel="stylesheet" href="{% static 'tennis/modal.css' %}">
-  <link rel="stylesheet" href="{% static 'tennis/participants.css' %}">
-  <link rel="stylesheet" href="{% static 'tennis/responsive.css' %}">
+  {# 共通CSSは1枚に結合（manage.py bundle_css で生成）。個別編集後は再実行すること #}
+  <link rel="stylesheet" href="{% static 'tennis/app.css' %}">
 
   <script src="{% static 'tennis/ui_modal.js' %}" defer></script>
   <script src="{% static 'tennis/display_settings.js' %}" defer></script>
