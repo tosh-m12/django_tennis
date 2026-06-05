@@ -295,6 +295,7 @@ class SaveRankingSettingTests(TestCase):
             "points_draw": 1.0,
             "points_loss": 0.0,
             "min_matches": 4,
+            "period_days": 60,
         }
         p.update(over)
         return p
@@ -313,6 +314,7 @@ class SaveRankingSettingTests(TestCase):
         self.assertTrue(obj.count_draws)
         self.assertEqual(float(obj.points_win), 2.5)
         self.assertEqual(obj.min_matches, 4)
+        self.assertEqual(obj.period_days, 60)
 
     def test_wrong_admin_token_forbidden(self):
         resp = self.client.post(self.url, {
@@ -349,3 +351,13 @@ class SaveRankingSettingTests(TestCase):
         })
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(resp.json()["error"], "bad_points")
+
+    def test_bad_period_days_rejected(self):
+        for bad in (0, -5, 4000):
+            resp = self.client.post(self.url, {
+                "club_id": self.club.id,
+                "admin_token": self.club.admin_token,
+                "settings_json": json.dumps(self._payload(period_days=bad)),
+            })
+            self.assertEqual(resp.status_code, 400)
+            self.assertEqual(resp.json()["error"], "bad_period_days")

@@ -280,6 +280,8 @@ class ClubRankingSetting(models.Model):
     points_draw = models.DecimalField(max_digits=4, decimal_places=1, default=1)
     points_loss = models.DecimalField(max_digits=4, decimal_places=1, default=0)
     min_matches = models.PositiveIntegerField(default=6)
+    # 集計対象期間（日）。戦績ページの既定期間＝過去この日数。推移グラフの各日の算出窓もこの日数。
+    period_days = models.PositiveIntegerField(default=90)
 
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -291,6 +293,7 @@ class ClubRankingSetting(models.Model):
             "points_draw": float(self.points_draw),
             "points_loss": float(self.points_loss),
             "min_matches": int(self.min_matches),
+            "period_days": int(self.period_days),
         }
 
 
