@@ -73,6 +73,14 @@
               <tr><th>ゲーム率</th><td>{{ st.gp_pct }}%</td></tr>
               <tr><th>得失点</th><td>{{ st.diff }}</td></tr>
             </table>
+
+            {# 戦績表の直下：過去3ヶ月のランキング推移 #}
+            {% if st.trend_svg %}
+              <div class="rank-trend">
+                <div class="rank-trend-title">過去3ヶ月のランキング推移</div>
+                {{ st.trend_svg|safe }}
+              </div>
+            {% endif %}
           </div>
         {% endfor %}
       </div>

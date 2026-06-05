@@ -1534,6 +1534,98 @@ def _parse_int_or_none(v):
         return None
 
 
+def _member_rank_trends(club, member_id, today, config):
+    """
+    過去3ヶ月（当月含む・古い→新しい）の月次クラブランキングでの順位を種別ごとに返す。
+    戻り値: {"singles": [{label, rank|None, total}, ...3], "doubles": [...]}
+    rank=None はその月にランキング圏内（最低試合数以上）に入らなかったことを示す。
+    """
+    # 直近3ヶ月の (年, 月)
+    months = []
+    y, mo = today.year, today.month
+    for _ in range(3):
+        months.append((y, mo))
+        mo -= 1
+        if mo == 0:
+            mo, y = 12, y - 1
+    months.reverse()
+
+    out = {"singles": [], "doubles": []}
+    for (yy, mm) in months:
+        first = dt.date(yy, mm, 1)
+        nxt = dt.date(yy + 1, 1, 1) if mm == 12 else dt.date(yy, mm + 1, 1)
+        last = nxt - dt.timedelta(days=1)
+        events = (
+            Event.objects
+            .filter(club=club, date__gte=first, date__lte=last, cancelled=False)
+            .order_by("date", "start_time", "id")
+        )
+        rk = build_month_rankings(events, [GameType.SINGLES, GameType.DOUBLES], config)
+        for gt in ("singles", "doubles"):
+            rank = None
+            for r in rk[gt]["ranked"]:
+                if r.get("member_id") == member_id:
+                    rank = r["rank"]
+                    break
+            out[gt].append({"label": f"{mm}月", "rank": rank, "total": len(rk[gt]["ranked"])})
+    return out
+
+
+def _rank_trend_svg(points):
+    """
+    ランキング推移の点列を、依存ライブラリ無しのインラインSVG折れ線グラフにする。
+    順位は小さいほど上（1位が上）。全ての点が圏外(None)なら空文字を返す。
+    """
+    present = [p for p in points if p["rank"] is not None]
+    if not present:
+        return ""
+
+    n = len(points)
+    W, H = 320, 140
+    padL, padR, padT, padB = 30, 14, 16, 26
+    plot_w = W - padL - padR
+    plot_h = H - padT - padB
+    xs = [padL + (plot_w / 2 if n == 1 else i * plot_w / (n - 1)) for i in range(n)]
+    maxr = max(max(p["rank"] for p in present), 2)  # 1点だけでもスケール確保
+
+    def yv(rank):
+        return padT + (rank - 1) / (maxr - 1) * plot_h
+
+    parts = [
+        f'<svg viewBox="0 0 {W} {H}" class="rank-trend-svg" role="img" aria-label="ランキング推移">',
+        f'<line x1="{padL}" y1="{padT}" x2="{padL}" y2="{H - padB}" stroke="#e5e7eb"/>',
+        f'<line x1="{padL}" y1="{H - padB}" x2="{W - padR}" y2="{H - padB}" stroke="#e5e7eb"/>',
+        f'<text x="{padL - 4}" y="{padT + 4:.0f}" text-anchor="end" font-size="9" fill="#aaa">1位</text>',
+        f'<text x="{padL - 4}" y="{H - padB:.0f}" text-anchor="end" font-size="9" fill="#aaa">{maxr}位</text>',
+    ]
+    # 圏内の点を1本の折れ線で結ぶ（圏外の月は飛ばして繋ぐ）
+    seg = [(xs[i], yv(p["rank"])) for i, p in enumerate(points) if p["rank"] is not None]
+    if len(seg) >= 2:
+        parts.append(_polyline(seg))
+    # マーカー・順位ラベル・月ラベル
+    for i, p in enumerate(points):
+        parts.append(
+            f'<text x="{xs[i]:.1f}" y="{H - 8}" text-anchor="middle" font-size="10" fill="#777">{p["label"]}</text>'
+        )
+        if p["rank"] is not None:
+            cy = yv(p["rank"])
+            parts.append(f'<circle cx="{xs[i]:.1f}" cy="{cy:.1f}" r="3.5" fill="#1f7a8c"/>')
+            parts.append(
+                f'<text x="{xs[i]:.1f}" y="{cy - 7:.1f}" text-anchor="middle" font-size="10" fill="#15243F">{p["rank"]}位</text>'
+            )
+        else:
+            parts.append(
+                f'<text x="{xs[i]:.1f}" y="{padT + plot_h / 2:.0f}" text-anchor="middle" font-size="9" fill="#bbb">圏外</text>'
+            )
+    parts.append("</svg>")
+    return "".join(parts)
+
+
+def _polyline(seg):
+    pts = " ".join(f"{x:.1f},{y:.1f}" for x, y in seg)
+    return f'<polyline points="{pts}" fill="none" stroke="#1f7a8c" stroke-width="2"/>'
+
+
 @require_http_methods(["GET"])
 def member_detail(request, club_public_token, member_id, club_admin_token=None):
     """
@@ -1677,7 +1769,8 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
                 })
 
     # 勝率の定義をランキングと一致させる（count_draws ON なら引き分けを0.5勝で算入）。
-    count_draws = bool(_resolve_club_ranking_config(club).get("count_draws", False))
+    ranking_config = _resolve_club_ranking_config(club)
+    count_draws = bool(ranking_config.get("count_draws", False))
     for gt in ("singles", "doubles"):
         s = stats[gt]
         m = s["matches"]
@@ -1686,6 +1779,11 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
         gf, ga = s["gf"], s["ga"]
         s["gp_pct"] = round((gf / (gf + ga)) * 100, 1) if (gf + ga) else 0.0
         s["diff"] = gf - ga
+
+    # 過去3ヶ月のランキング推移（種別ごと）。各戦績表の直下に出すため st に SVG を持たせる。
+    trends = _member_rank_trends(club, member.id, timezone.localdate(), ranking_config)
+    for gt in ("singles", "doubles"):
+        stats[gt]["trend_svg"] = _rank_trend_svg(trends[gt])
 
     # 戻り先（来た元のページ） — referer があればそれ、無ければクラブホーム
     back_url = request.META.get("HTTP_REFERER") or reverse(
