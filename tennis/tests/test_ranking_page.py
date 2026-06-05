@@ -108,16 +108,22 @@ class RankingPagePeriodTests(TestCase):
         today = timezone.localdate()
         self.assertEqual(ctx["start_date"], today - datetime.timedelta(days=30))
 
-    def test_explicit_period_filters(self):
+    def test_get_period_is_ignored(self):
+        # 期間選択は廃止。GET の start/end を渡してもクラブ設定の期間に固定される。
         url = reverse("tennis:ranking", args=[self.club.public_token])
-        # 4月だけに絞れば A は ranked に出る（3試合）
-        resp = self.client.get(url, {"start": "2026-04-01", "end": "2026-04-30"})
+        today = timezone.localdate()
+        resp = self.client.get(url, {"start": "2026-01-01", "end": "2026-01-31"})
         ctx = resp.context
+        # GET を無視して常に過去90日窓
+        self.assertEqual(ctx["start_date"], today - datetime.timedelta(days=90))
+        self.assertEqual(ctx["end_date"], today)
+        # 4月の試合は90日窓内なので A は ranked（GET の1月絞りは無効）
         ranked_names = [r["name"] for r in ctx["ranking_singles"]["ranked"]]
         self.assertIn("A", ranked_names)
-        # 1月に絞ると ranked は空
-        resp2 = self.client.get(url, {"start": "2026-01-01", "end": "2026-01-31"})
-        self.assertEqual(resp2.context["ranking_singles"]["ranked"], [])
+
+    def test_period_form_removed_from_page(self):
+        url = reverse("tennis:ranking", args=[self.club.public_token])
+        self.assertNotContains(self.client.get(url), 'name="start"')
 
 
 @_NO_MANIFEST_STORAGES

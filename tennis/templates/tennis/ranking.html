@@ -13,25 +13,12 @@
     <h1 class="ranking-title">戦績表</h1>
   </header>
 
-  {# 集計期間 #}
-  <section class="ranking-period">
-    <h2 class="ranking-section-title">集計期間</h2>
-    <form method="get" class="period-filter">
-      <label>開始日
-        <input type="date" name="start" value="{{ start_date|date:'Y-m-d' }}">
-      </label>
-      <label>終了日
-        <input type="date" name="end" value="{{ end_date|date:'Y-m-d' }}">
-      </label>
-      <button type="submit" class="btn btn-pill btn-primary">適用</button>
-    </form>
-  </section>
-
-  {# 現在の集計ルール（クラブが選択中のプリセットに基づく） #}
+  {# 現在の集計ルール（クラブが選択中のプリセット・集計期間に基づく） #}
   <section class="ranking-rule-note">
     <p class="ranking-rule-head">集計ルール：<strong>{{ ranking_rule.label }}</strong></p>
     <p class="ranking-rule-desc">{{ ranking_rule.description }}</p>
     <p class="ranking-rule-detail">
+      対象期間は過去{{ period_days }}日（{{ start_date|date:'Y/n/j' }} 〜 {{ end_date|date:'Y/n/j' }}）。
       並び順は {{ ranking_rule.sort }}。最低{{ ranking_rule.min_matches }}試合以上が対象です。
       {% if ranking_rule.count_draws %}引き分けは0.5勝として勝率に算入します。{% endif %}
       {% if ranking_is_points %}勝ち点は 勝{{ ranking_rule.points_win }}・分{{ ranking_rule.points_draw }}・負{{ ranking_rule.points_loss }}。{% endif %}

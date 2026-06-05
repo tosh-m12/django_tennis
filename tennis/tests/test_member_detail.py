@@ -145,35 +145,35 @@ class MemberDetailStatsTests(TestCase):
         # ダブルスの方はパートナーが入っている
         self.assertEqual(hb["doubles"][0]["partners"], ["C"])
 
-    def test_period_filter_limits_history(self):
-        # ダブルス試合（5/1）を追加
-        ev_may = make_event(self.club, date=datetime.date(2026, 5, 1))
-        ep_a2 = make_ep(ev_may, member=self.a, attendance="yes")
-        ep_b2 = make_ep(ev_may, member=self.b, attendance="yes")
-        ms_may = make_published_schedule(
-            ev_may,
+    def test_history_shows_all_matches_ignoring_get_period(self):
+        # 別日のシングルス試合を追加
+        ev_extra = make_event(self.club, date=datetime.date(2026, 5, 1))
+        ep_a2 = make_ep(ev_extra, member=self.a, attendance="yes")
+        ep_b2 = make_ep(ev_extra, member=self.b, attendance="yes")
+        ms_extra = make_published_schedule(
+            ev_extra,
             [{"round": 1, "matches": [{"court": 1, "team1": [ep_a2.id], "team2": [ep_b2.id]}], "rests": []}],
             game_type="singles", court_count=1, round_count=1,
         )
-        make_score(ms_may, 1, 1, 6, 0)
+        make_score(ms_extra, 1, 1, 6, 0)
 
         url = reverse("tennis:member_detail", args=[self.club.public_token, self.a.id])
-        # 4月のみに絞る
+        # GET で期間を絞っても履歴は全件（期間選択は廃止＝無視される）
         resp = self.client.get(url, {"start": "2026-04-01", "end": "2026-04-30"})
         ctx = resp.context
-        # シングルスは4月の3試合のみ（5月は除外）
         hb = {k: hist for (k, _, hist) in ctx["history_blocks"]}
-        self.assertEqual(len(hb["singles"]), 3)
-        # 期間ラベルが反映されている
-        self.assertIn("2026", ctx["period_label"])
-        self.assertNotEqual(ctx["period_label"], "全期間")
+        self.assertEqual(len(hb["singles"]), 4)  # 4月3 + 5月1 すべて
 
-    def test_default_period_is_all_time(self):
+    def test_stats_use_club_period_context(self):
         url = reverse("tennis:member_detail", args=[self.club.public_token, self.a.id])
         ctx = self.client.get(url).context
-        self.assertEqual(ctx["period_label"], "全期間")
-        self.assertIsNone(ctx["start_date"])
-        self.assertIsNone(ctx["end_date"])
+        # クラブ統一期間（既定90日）の情報が context に入る
+        self.assertEqual(ctx["stats_period_days"], 90)
+        today = timezone.localdate()
+        self.assertEqual(ctx["stats_end_date"], today)
+        self.assertEqual(ctx["stats_start_date"], today - datetime.timedelta(days=90))
+        # 期間選択フォームは廃止
+        self.assertNotContains(self.client.get(url), 'name="start"')
 
     def test_singles_only_member_doubles_block_absent(self):
         """シングルスにしか記録が無いメンバーは、ダブルスのカードや履歴を出さない。"""
@@ -186,12 +186,11 @@ class MemberDetailStatsTests(TestCase):
         self.assertEqual(keys_hist, ["singles"])
         self.assertFalse(ctx["no_records"])
 
-    def test_no_records_flag_for_member_outside_period(self):
-        """期間内に記録ゼロなら no_records=True、stats/history_blocks は空。"""
-        url = reverse("tennis:member_detail", args=[self.club.public_token, self.a.id])
-        # 試合は 2026/4 のみ → 1月で絞ると全て対象外
-        resp = self.client.get(url, {"start": "2026-01-01", "end": "2026-01-31"})
-        ctx = resp.context
+    def test_no_records_flag_for_member_without_matches(self):
+        """試合が1つも無いメンバーは no_records=True、stats/history_blocks は空。"""
+        c = make_member(self.club, "C", member_no=3)
+        url = reverse("tennis:member_detail", args=[self.club.public_token, c.id])
+        ctx = self.client.get(url).context
         self.assertEqual(ctx["stats_blocks"], [])
         self.assertEqual(ctx["history_blocks"], [])
         self.assertTrue(ctx["no_records"])
