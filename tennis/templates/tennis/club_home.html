@@ -62,7 +62,14 @@
      data-is-admin="{% if is_admin %}1{% else %}0{% endif %}">
 </div>
 
-<h3>イベントスケジュール</h3>
+<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;">
+  <h3 style="margin:0;">イベントスケジュール</h3>
+  {% if club.is_demo %}
+    <span style="font-weight:800;background:#f59e0b;color:#fff;
+          padding:4px 18px;border-radius:999px;font-size:26px;line-height:1;
+          letter-spacing:.06em;">DEMO</span>
+  {% endif %}
+</div>
 
 <div class="calendar-nav cal-header">
   {% if is_admin %}
