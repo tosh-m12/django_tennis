@@ -532,6 +532,11 @@
     border-radius: 6px;
     border: 1px solid #555;
     background: #fff;
+    /* flex 中央寄せ：名前が長くても中心を軸に左右両端へ均等に溢れさせる
+       （text-align:center だと溢れた1行は右だけにはみ出すため） */
+    display: flex;
+    justify-content: center;
+    align-items: center;
     text-align: center;
     font-size: 0.95rem;
     font-weight: 600;
@@ -1522,6 +1527,11 @@ th {
     border-radius: 6px;
     border: 1px solid #555;
     background: #fff;
+    /* flex 中央寄せ：名前が長くても中心を軸に左右両端へ均等に溢れさせる
+       （text-align:center だと溢れた1行は右だけにはみ出すため） */
+    display: flex;
+    justify-content: center;
+    align-items: center;
     text-align: center;
     font-size: 0.95rem;
     font-weight: 600;
