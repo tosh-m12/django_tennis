@@ -43,8 +43,9 @@ DEMO_CLUB_NAME = "デモテニスクラブ"
 # 無操作のデモクラブを離脱とみなして削除するまでの時間（分）。
 DEMO_TTL_MINUTES = 30
 
-# 常駐メンバー10名（固定メンバー）。実在風の人名は避け、歴代プロテニス選手名を使う。
+# 常駐メンバー20名（固定メンバー）。実在風の人名は避け、歴代プロテニス選手名（男女混合）を使う。
 DEMO_MEMBERS = [
+    # 男子
     "フェデラー",
     "ナダル",
     "ジョコビッチ",
@@ -55,6 +56,17 @@ DEMO_MEMBERS = [
     "マッケンロー",
     "ベッカー",
     "エドベリ",
+    # 女子
+    "グラフ",
+    "ナブラチロワ",
+    "セレナ",
+    "ヴィーナス",
+    "ヒンギス",
+    "シャラポワ",
+    "エナン",
+    "クライシュテルス",
+    "セレシュ",
+    "ウォズニアッキ",
 ]
 
 # 決定的に作るための固定シード。
@@ -144,20 +156,20 @@ def _seed_demo_club(club: Club) -> Club:
         _make_scored_event(
             club, members, d, GameType.DOUBLES,
             rng=rng, skill_by_member_id=skill_by_member_id,
-            num_rounds=6, num_courts=2, fill_ratio=1.0,
+            num_rounds=6, num_courts=4, fill_ratio=1.0,
         )
     for d in singles_days:
         _make_scored_event(
             club, members, d, GameType.SINGLES,
             rng=rng, skill_by_member_id=skill_by_member_id,
-            num_rounds=6, num_courts=3, fill_ratio=1.0,
+            num_rounds=6, num_courts=5, fill_ratio=1.0,
         )
 
     # ---- 「今日」の公開済みイベント（スコア一部空欄＝訪問者が入力して体験）----
     _make_scored_event(
         club, members, today, GameType.DOUBLES,
         rng=rng, skill_by_member_id=skill_by_member_id,
-        num_rounds=6, num_courts=2, fill_ratio=0.6,
+        num_rounds=6, num_courts=4, fill_ratio=0.6,
         title="本日の練習（スコア入力を試せます）",
     )
 
