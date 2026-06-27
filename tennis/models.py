@@ -22,6 +22,11 @@ class Club(models.Model):
 
     is_active = models.BooleanField(default=True)
 
+    # デモ用クラブの印。/demo はこのフラグが立った1クラブへ誘導する。
+    is_demo = models.BooleanField(default=False)
+    # デモの最終シード日。日付が変わっていたら /demo アクセス時に初期化（毎日リセット）。
+    demo_seeded_on = models.DateField(null=True, blank=True)
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
