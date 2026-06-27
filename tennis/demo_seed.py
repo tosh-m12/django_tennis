@@ -175,15 +175,30 @@ def _seed_demo_club(club: Club) -> Club:
 
     # ---- 直近の出欠受付イベント（対戦表なし＝訪問者が名前追加・出欠を試せる）----
     # /demo は当月カレンダーを表示するので、この案内イベントは当月内に収めて見つけやすくする。
+    upcoming_date = _upcoming_date_in_month(today)
     Event.objects.create(
         club=club,
         title="次回の練習（名前を追加してみてください）",
         place="市民コート",
-        date=_upcoming_date_in_month(today),
+        date=upcoming_date,
         start_time=dt.time(9, 0),
         end_time=dt.time(12, 0),
     )
     # 固定メンバーは「未登録行」として表示されるので EP は作らない（訪問者の追加余地を残す）。
+
+    # ---- 当月残り〜翌月の予定（対戦表なしのダミースケジュール）----
+    # カレンダーを次月に進めても予定が並ぶように、将来日に練習予定を散らす。
+    for d in _future_practice_days(today, rng, exclude={upcoming_date}):
+        gt = rng.choice([GameType.DOUBLES, GameType.SINGLES])
+        label = "練習（ダブルス）" if gt == GameType.DOUBLES else "練習（シングルス）"
+        Event.objects.create(
+            club=club,
+            title=label,
+            place=rng.choice(["市民コート", "中央公園コート", "river side テニスクラブ"]),
+            date=d,
+            start_time=dt.time(9, 0),
+            end_time=dt.time(12, 0),
+        )
 
     club.save(update_fields=["name", "is_demo", "is_active", "updated_at"])
     return club
@@ -203,6 +218,43 @@ def _upcoming_date_in_month(today: dt.date) -> dt.date:
     if month_end > today:
         return month_end
     return today + dt.timedelta(days=1)
+
+
+def _month_end(d: dt.date) -> dt.date:
+    """d が属する月の末日。"""
+    if d.month == 12:
+        first_next = dt.date(d.year + 1, 1, 1)
+    else:
+        first_next = dt.date(d.year, d.month + 1, 1)
+    return first_next - dt.timedelta(days=1)
+
+
+def _future_practice_days(today: dt.date, rng: random.Random, *, exclude: set) -> list[dt.date]:
+    """当月残り（翌日〜月末）から数件、翌月から多めに、練習予定日を散らして返す。"""
+    days: list[dt.date] = []
+
+    # 当月の残り（翌日〜当月末）から最大3件。
+    cur_pool = [d for d in _date_range(today + dt.timedelta(days=1), _month_end(today)) if d not in exclude]
+    rng.shuffle(cur_pool)
+    days.extend(cur_pool[:3])
+
+    # 翌月から7件。
+    if today.month == 12:
+        nm_first = dt.date(today.year + 1, 1, 1)
+    else:
+        nm_first = dt.date(today.year, today.month + 1, 1)
+    next_pool = [d for d in _date_range(nm_first, _month_end(nm_first)) if d not in exclude]
+    rng.shuffle(next_pool)
+    days.extend(next_pool[:7])
+
+    return sorted(days)
+
+
+def _date_range(start: dt.date, end: dt.date) -> list[dt.date]:
+    """start〜end（両端含む）の日付リスト。"""
+    if end < start:
+        return []
+    return [start + dt.timedelta(days=i) for i in range((end - start).days + 1)]
 
 
 def _spread_days(today: dt.date, *, count: int, span: int, start_offset: int, rng: random.Random) -> list[dt.date]:
