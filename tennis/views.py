@@ -757,13 +757,33 @@ def index(request):
 @require_http_methods(["GET"])
 def demo_entry(request):
     """
-    /demo : デモクラブ（メンバーモード）へ誘導する入口。
-    アクセス時にシード日が今日でなければベースラインへ初期化（毎日リセット）。
+    /demo : 訪問者（セッション）ごとに専用のデモクラブを発行してメンバーホームへ誘導する。
+    - 同じ人が再訪・更新しても、セッションが生きていれば同じクラブを使う。
+    - アクセス都度、無操作が続いた他のデモクラブを掃除（離脱とみなしてリセット）。
     """
-    from .demo_seed import ensure_demo_fresh
+    from .demo_seed import create_seeded_demo_club, sweep_stale_demo_clubs
 
-    club = ensure_demo_fresh()
+    now = timezone.now()
+    sweep_stale_demo_clubs(now)
+
+    club = None
+    cid = request.session.get("demo_club_id")
+    if cid:
+        club = Club.objects.filter(id=cid, is_demo=True, is_active=True).first()
+
+    if club is None:
+        club = create_seeded_demo_club(now=now)
+        request.session["demo_club_id"] = club.id
+    else:
+        Club.objects.filter(pk=club.pk).update(demo_last_seen=now)
+
     return redirect("tennis:club_home", club_public_token=club.public_token)
+
+
+def _touch_demo_club(club):
+    """デモクラブのページ閲覧時に最終アクセス時刻を更新（操作中のクラブが掃除されないように）。"""
+    if getattr(club, "is_demo", False):
+        Club.objects.filter(pk=club.pk).update(demo_last_seen=timezone.now())
 
 
 def club_settings(request, club_public_token, club_admin_token):
@@ -1754,6 +1774,8 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
             return HttpResponseBadRequest("admin token mismatch")
         is_admin = True
 
+    _touch_demo_club(club)
+
     member = get_object_or_404(Member, id=int(member_id), club=club)
 
     # 戦績集計はクラブ統一設定の期間（過去 period_days 日・既定90）に揃える。
@@ -1948,6 +1970,8 @@ def club_home(request, club_public_token, club_admin_token=None):
     """
     club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
 
+    _touch_demo_club(club)
+
     is_admin = False
     admin_token = ""
     if club_admin_token and club.admin_token == club_admin_token:
@@ -2020,6 +2044,8 @@ def ranking_page(request, club_public_token, club_admin_token=None):
         if club.admin_token != club_admin_token:
             return HttpResponseBadRequest("admin token mismatch")
         is_admin = True
+
+    _touch_demo_club(club)
 
     ranking_config = _resolve_club_ranking_config(club)
     period_days = int(ranking_config.get("period_days", DEFAULT_RANKING_PERIOD_DAYS))
@@ -2351,6 +2377,8 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
     # ============================================================
     club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
     event = get_object_or_404(Event, id=int(event_id), club=club)
+
+    _touch_demo_club(club)
 
     is_admin = False
     if club_admin_token is not None:

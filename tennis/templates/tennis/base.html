@@ -130,6 +130,15 @@
 
   {# ★固定トップバー分だけ下げる #}
   <div class="container{% if show_topbar %} has-fixed-topbar{% endif %}">
+    {# デモサイトの目印：全ページ共通で右上に大きく表示 #}
+    {% if club.is_demo %}
+      <div class="demo-badge-row" style="display:flex;justify-content:flex-end;margin:0 0 10px;">
+        <span style="font-weight:800;background:#f59e0b;color:#fff;
+              padding:4px 18px;border-radius:999px;font-size:26px;line-height:1;
+              letter-spacing:.06em;">DEMO</span>
+      </div>
+    {% endif %}
+
     {# 自動削除予告バナー（幹事モード時のみ・cleanup_warnings がある場合） #}
     {% if cleanup_warnings %}
       <div class="cleanup-warning-banner" role="alert">

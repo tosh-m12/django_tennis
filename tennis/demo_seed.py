@@ -1,22 +1,22 @@
 """
-デモクラブ（deucenet.app/demo）のシード・毎日リセット処理。
+デモクラブ（deucenet.app/demo）のシード処理。
 
 方針:
-- is_demo=True のクラブを 1 つだけ持ち、/demo はそこへ誘導する。
-- メンバー10名（固定メンバー）を常駐させる。
+- /demo は訪問者（セッション）ごとに専用の is_demo クラブを発行する（他人と干渉しない）。
+- 各クラブにメンバー10名（歴代プロ選手名）を固定メンバーとして登録。
 - 過去90日内にダブルス/シングルスの「公開済み対戦表＋スコア」を仕込み、
   戦績ランキングがそのまま生成される状態にする。
 - 「今日」の公開済みイベント（スコア一部空欄）と「直近」の出欠受付イベントを置き、
   訪問者がメンバーモードのまま「名前追加→出欠→スコア入力→ランキング反映」を体験できる。
-- 訪問者が増やしたデータは毎日リセットでベースラインへ戻す（クラブ行とトークンは保持）。
+- 一定時間アクセスが無いデモクラブは離脱とみなし自動削除（sweep）する。
 
-シードは固定シードの乱数で決定的（毎日同じ初期状態）に作る。
+シードは固定シードの乱数で決定的（毎回同じ初期状態）に作る。
 
 性能/堅牢性:
 - 本番(Railway)はアプリとPostgresが別サービスで1往復が重いため、INSERTは bulk_create で
   まとめてラウンドトリップ数を抑える（Web リクエスト内で gunicorn timeout に達しないように）。
-- 「シード済みフラグ」と実データの作成は同一トランザクションで行い、失敗時は
-  フラグごとロールバックして次アクセスで再試行できるようにする（空のまま固定されない）。
+- クラブ作成〜シードは同一トランザクションで行い、失敗時はクラブごとロールバックする
+  （空のクラブが残らない）。
 """
 from __future__ import annotations
 
@@ -38,71 +38,74 @@ from .models import (
 )
 from .utils import generate_doubles_schedule, generate_singles_schedule
 
-DEMO_CLUB_NAME = "デモテニスサークル"
+DEMO_CLUB_NAME = "デモテニスクラブ"
 
-# 常駐メンバー10名（固定メンバー）。
+# 無操作のデモクラブを離脱とみなして削除するまでの時間（分）。
+DEMO_TTL_MINUTES = 30
+
+# 常駐メンバー10名（固定メンバー）。実在風の人名は避け、歴代プロテニス選手名を使う。
 DEMO_MEMBERS = [
-    "佐藤 大輔",
-    "鈴木 健一",
-    "高橋 翔",
-    "田中 由紀",
-    "渡辺 彩",
-    "伊藤 拓也",
-    "山本 真央",
-    "中村 蓮",
-    "小林 結衣",
-    "加藤 涼",
+    "フェデラー",
+    "ナダル",
+    "ジョコビッチ",
+    "マレー",
+    "サンプラス",
+    "アガシ",
+    "ボルグ",
+    "マッケンロー",
+    "ベッカー",
+    "エドベリ",
 ]
 
 # 決定的に作るための固定シード。
 _SEED = 20260627
 
 
-def get_or_create_demo_club() -> Club:
-    """is_demo のクラブを返す（無ければ枠だけ作る。データ投入は reseed 側）。"""
-    club = Club.objects.filter(is_demo=True, is_active=True).order_by("id").first()
-    if club is None:
-        club = Club.objects.create(name=DEMO_CLUB_NAME, is_demo=True)
+@transaction.atomic
+def create_seeded_demo_club(now=None) -> Club:
+    """新しいデモクラブを 1 つ作り、ベースライン（メンバー＋ダミー実績）を投入して返す。"""
+    if now is None:
+        now = timezone.now()
+    club = Club.objects.create(
+        name=DEMO_CLUB_NAME,
+        is_demo=True,
+        demo_last_seen=now,
+    )
+    _seed_demo_club(club)
     return club
 
 
-def ensure_demo_fresh() -> Club:
-    """
-    /demo アクセス時に呼ぶ。クラブを用意し、必要なら（当日未シード or 空）リセットする。
-    select_for_update で 1 プロセスだけがシードし、同時アクセスの二重実行を防ぐ。
-    シード失敗時はトランザクションごとロールバックされるため「空のまま固定」されない。
-    """
-    club = get_or_create_demo_club()
-    today = timezone.localdate()
+def sweep_stale_demo_clubs(now=None, ttl_minutes: int = DEMO_TTL_MINUTES) -> int:
+    """無操作が続いたデモクラブを削除（離脱とみなしてリセット）。削除件数を返す。"""
+    from django.db.models import Q
 
-    # 速い事前チェック（ロック無し）。当日シード済みかつ中身があれば何もしない。
-    if club.demo_seeded_on == today and Member.objects.filter(club=club).exists():
-        return club
-
-    with transaction.atomic():
-        club = Club.objects.select_for_update().get(pk=club.pk)
-        need = (club.demo_seeded_on != today) or (
-            not Member.objects.filter(club=club).exists()
-        )
-        if need:
-            reseed_demo_club(club)
-    club.refresh_from_db()
-    return club
+    if now is None:
+        now = timezone.now()
+    cutoff = now - dt.timedelta(minutes=ttl_minutes)
+    # demo_last_seen が cutoff より前、または未設定（古い取り残し）を対象。
+    stale = Club.objects.filter(is_demo=True).filter(
+        Q(demo_last_seen__lt=cutoff) | Q(demo_last_seen__isnull=True)
+    )
+    count = stale.count()
+    if count:
+        stale.delete()  # Event/Member 等はカスケード削除
+    return count
 
 
 @transaction.atomic
-def reseed_demo_club(club: Club | None = None) -> Club:
-    """デモクラブの中身を全消去してベースラインを作り直す。クラブ行とトークンは保持。"""
-    if club is None:
-        club = get_or_create_demo_club()
+def reseed_demo_club(club: Club) -> Club:
+    """既存デモクラブの中身を全消去してベースラインを作り直す（手動リセット/テスト用）。"""
+    Event.objects.filter(club=club).delete()
+    Member.objects.filter(club=club).delete()
+    _seed_demo_club(club)
+    return club
 
+
+def _seed_demo_club(club: Club) -> Club:
+    """club にベースライン（ルール・固定メンバー10名・過去実績・体験用イベント）を投入。"""
     club.name = DEMO_CLUB_NAME
     club.is_demo = True
     club.is_active = True
-
-    # 既存データ全消去（Event 削除で EP/対戦表/スコアもカスケード）。
-    Event.objects.filter(club=club).delete()
-    Member.objects.filter(club=club).delete()
 
     rng = random.Random(_SEED)
 
@@ -170,8 +173,7 @@ def reseed_demo_club(club: Club | None = None) -> Club:
     )
     # 固定メンバーは「未登録行」として表示されるので EP は作らない（訪問者の追加余地を残す）。
 
-    club.demo_seeded_on = today
-    club.save(update_fields=["name", "is_demo", "is_active", "demo_seeded_on", "updated_at"])
+    club.save(update_fields=["name", "is_demo", "is_active", "updated_at"])
     return club
 
 
