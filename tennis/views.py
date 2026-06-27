@@ -754,6 +754,18 @@ def index(request):
     return render(request, "tennis/index.html", {"show_topbar": False})
 
 
+@require_http_methods(["GET"])
+def demo_entry(request):
+    """
+    /demo : デモクラブ（メンバーモード）へ誘導する入口。
+    アクセス時にシード日が今日でなければベースラインへ初期化（毎日リセット）。
+    """
+    from .demo_seed import ensure_demo_fresh
+
+    club = ensure_demo_fresh()
+    return redirect("tennis:club_home", club_public_token=club.public_token)
+
+
 def club_settings(request, club_public_token, club_admin_token):
     club = get_object_or_404(
         Club,

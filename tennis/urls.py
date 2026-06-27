@@ -18,6 +18,10 @@ urlpatterns = [
     # ============================================================
     path("", views.index, name="index"),
 
+    # デモサイト入口（deucenet.app/demo）
+    path("demo", views.demo_entry, name="demo"),
+    path("demo/", views.demo_entry),
+
     # ============================================================
     # Club pages (token-based)
     # ============================================================
