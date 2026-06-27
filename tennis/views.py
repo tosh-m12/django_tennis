@@ -761,7 +761,7 @@ def demo_entry(request):
     - 同じ人が再訪・更新しても、セッションが生きていれば同じクラブを使う。
     - アクセス都度、無操作が続いた他のデモクラブを掃除（離脱とみなしてリセット）。
     """
-    from .demo_seed import create_seeded_demo_club, sweep_stale_demo_clubs
+    from .demo_seed import CURRENT_SEED_VERSION, create_seeded_demo_club, sweep_stale_demo_clubs
 
     now = timezone.now()
     sweep_stale_demo_clubs(now)
@@ -770,6 +770,11 @@ def demo_entry(request):
     cid = request.session.get("demo_club_id")
     if cid:
         club = Club.objects.filter(id=cid, is_demo=True, is_active=True).first()
+
+    # ベースライン版が古い専用クラブは作り直す（メンバー数や予定の更新を既存セッションへ反映）。
+    if club is not None and club.demo_seed_version != CURRENT_SEED_VERSION:
+        club.delete()
+        club = None
 
     if club is None:
         club = create_seeded_demo_club(now=now)

@@ -28,6 +28,8 @@ class Club(models.Model):
     demo_seeded_on = models.DateField(null=True, blank=True)
     # デモ最終アクセス時刻。一定時間アクセスが無いデモクラブは離脱とみなし自動削除する。
     demo_last_seen = models.DateTimeField(null=True, blank=True)
+    # デモのベースライン版。コード側の現行版と異なる古いクラブは /demo 再訪時に作り直す。
+    demo_seed_version = models.IntegerField(default=0)
 
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)

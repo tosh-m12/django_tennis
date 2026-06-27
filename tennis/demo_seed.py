@@ -43,6 +43,10 @@ DEMO_CLUB_NAME = "デモテニスクラブ"
 # 無操作のデモクラブを離脱とみなして削除するまでの時間（分）。
 DEMO_TTL_MINUTES = 30
 
+# デモのベースライン版。メンバーやダミー実績の作り方を変えたら +1 する。
+# 版が古い専用クラブは /demo 再訪時に作り直され、既存セッションも最新化される。
+CURRENT_SEED_VERSION = 2
+
 # 常駐メンバー20名（固定メンバー）。実在風の人名は避け、歴代プロテニス選手名（男女混合）を使う。
 DEMO_MEMBERS = [
     # 男子
@@ -82,6 +86,7 @@ def create_seeded_demo_club(now=None) -> Club:
         name=DEMO_CLUB_NAME,
         is_demo=True,
         demo_last_seen=now,
+        demo_seed_version=CURRENT_SEED_VERSION,
     )
     _seed_demo_club(club)
     return club
