@@ -36,7 +36,9 @@ from .models import (
     ClubRankingSetting,
     EventDisplaySetting,
     ClubMemberClass,
+    ClubOrganizer,
 )
+from . import organizer_email
 
 # ============================================================
 # Config
@@ -745,11 +747,11 @@ def index(request):
             return HttpResponseBadRequest("クラブ名は必須です。")
 
         club = Club.objects.create(name=name)
-        return redirect(
+        url = reverse(
             "tennis:club_home_admin",
-            club_public_token=club.public_token,
-            club_admin_token=club.admin_token
-        )
+            args=[club.public_token, club.admin_token],
+        ) + "?welcome=1"
+        return redirect(url)
 
     return render(request, "tennis/index.html", {"show_topbar": False})
 
@@ -828,6 +830,16 @@ def club_settings(request, club_public_token, club_admin_token):
         .filter(club=club)
         .order_by("member_no", "id")
     )
+
+    # 各メンバーの幹事メール状態（区分ドロップダウン・済/未バッジ用）
+    org_by_member = {
+        o.member_id: o
+        for o in ClubOrganizer.objects.filter(club=club, member__isnull=False)
+    }
+    for m in members:
+        o = org_by_member.get(m.id)
+        m.is_organizer = o is not None
+        m.email_confirmed = bool(o and o.is_confirmed)
 
     classes = list(
         ClubMemberClass.objects.filter(club=club, is_active=True)
@@ -1949,10 +1961,19 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
 
     no_records = not stats_blocks and not history_blocks
 
+    # 幹事モードのときだけ、この人の幹事メール状態を渡す（公開ページには一切出さない）
+    organizer = None
+    if is_admin:
+        organizer = ClubOrganizer.objects.filter(club=club, member=member).first()
+
     return render(request, "tennis/member_detail.html", {
         "club": club,
         "member": member,
         "is_admin": is_admin,
+        "organizer": organizer,
+        "is_organizer": organizer is not None,
+        "organizer_email_masked": organizer.masked_email if organizer else "",
+        "organizer_confirmed": bool(organizer and organizer.is_confirmed),
         "stats_blocks": stats_blocks,
         "history_blocks": history_blocks,
         "no_records": no_records,
@@ -2031,6 +2052,8 @@ def club_home(request, club_public_token, club_admin_token=None):
             "admin_url": admin_url,
             "show_topbar": True,
             "cleanup_warnings": _run_member_auto_cleanup(club) if is_admin else [],
+            # 作成直後だけメール登録モーダルを出す（?welcome=1）
+            "show_welcome_email_modal": is_admin and request.GET.get("welcome") == "1",
         },
     )
 
@@ -4478,3 +4501,208 @@ def delete_event_flag(request):
         event_flag.delete()
 
     return JsonResponse({"ok": True})
+
+
+# ============================================================
+# 幹事メール（ClubOrganizer）
+# ============================================================
+
+def _client_ip(request) -> str:
+    xff = request.META.get("HTTP_X_FORWARDED_FOR", "")
+    if xff:
+        return xff.split(",")[0].strip()
+    return request.META.get("REMOTE_ADDR", "") or ""
+
+
+def _looks_like_email(email: str) -> bool:
+    if "@" not in email:
+        return False
+    local, _, domain = email.partition("@")
+    return bool(local) and "." in domain
+
+
+@require_POST
+def club_set_member_organizer(request):
+    """
+    メンバーの区分（幹事/メンバー）を切り替える（設定・幹事のみ）。
+    - 幹事化：ClubOrganizer 行を作成＋ is_fixed=True 強制。
+    - メンバー化：ClubOrganizer 行を削除（最後の幹事は外せない）。is_fixed は自動で外さない。
+    """
+    club_id = request.POST.get("club_id")
+    admin_token = (request.POST.get("admin_token") or "").strip()
+    member_id = request.POST.get("member_id")
+    role = (request.POST.get("role") or "").strip()  # "organizer" | "member"
+
+    if not club_id or not admin_token or not member_id or role not in ("organizer", "member"):
+        return JsonResponse({"ok": False, "error": "missing"}, status=400)
+
+    club = get_object_or_404(Club, id=int(club_id), is_active=True)
+    blocked = _require_club_admin_token(request, club)
+    if blocked:
+        return blocked
+
+    member = get_object_or_404(Member, id=int(member_id), club=club)
+
+    if role == "organizer":
+        org, _created = ClubOrganizer.objects.get_or_create(club=club, member=member)
+        if not member.is_fixed:
+            member.is_fixed = True
+            member.save(update_fields=["is_fixed", "updated_at"])
+    else:
+        # 最後の幹事は外せない（全員メンバー化で復旧不能になる事故を防ぐ）
+        if ClubOrganizer.objects.filter(club=club).count() <= 1:
+            return JsonResponse(
+                {"ok": False, "error": "last_organizer", "message": "最後の幹事は外せません。"},
+                status=400,
+            )
+        ClubOrganizer.objects.filter(club=club, member=member).delete()
+        org = None
+
+    return JsonResponse({
+        "ok": True,
+        "member_id": member.id,
+        "is_organizer": org is not None,
+        "email_confirmed": bool(org and org.is_confirmed),
+        "email_masked": org.masked_email if org else "",
+    })
+
+
+@require_POST
+def organizer_set_email(request):
+    """
+    幹事の復旧メールを登録/変更（個人ページ・幹事モード）。
+    - メンバーを幹事に自動昇格（get_or_create ＋ is_fixed）。
+    - email を保存し confirmed_at をクリア → 確認メール送信。
+    """
+    club_id = request.POST.get("club_id")
+    admin_token = (request.POST.get("admin_token") or "").strip()
+    member_id = request.POST.get("member_id")
+    email = organizer_email.normalize_email(request.POST.get("email"))
+
+    if not club_id or not admin_token or not member_id:
+        return JsonResponse({"ok": False, "error": "missing"}, status=400)
+    if not _looks_like_email(email):
+        return JsonResponse({"ok": False, "error": "bad_email", "message": "メールアドレスを確認してください。"}, status=400)
+
+    club = get_object_or_404(Club, id=int(club_id), is_active=True)
+    blocked = _require_club_admin_token(request, club)
+    if blocked:
+        return blocked
+
+    # 同一アドレスへの確認メール乱発を防ぐ
+    if not organizer_email.throttle_ok("confirm", email, limit=5, window_seconds=3600):
+        return JsonResponse({"ok": False, "error": "throttled", "message": "送信が多すぎます。少し待ってください。"}, status=429)
+
+    member = get_object_or_404(Member, id=int(member_id), club=club)
+
+    org, _created = ClubOrganizer.objects.get_or_create(club=club, member=member)
+    if not member.is_fixed:
+        member.is_fixed = True
+        member.save(update_fields=["is_fixed", "updated_at"])
+
+    org.email = email
+    org.confirmed_at = None
+    org.save(update_fields=["email", "confirmed_at", "updated_at"])
+
+    organizer_email.send_confirmation_email(request, org)
+
+    return JsonResponse({
+        "ok": True,
+        "email_masked": org.masked_email,
+        "email_confirmed": False,
+        "message": "確認メールを送りました。メール内のリンクを開くと登録完了です。",
+    })
+
+
+@require_http_methods(["GET"])
+def verify_email(request, token):
+    """幹事メールの確認ページ（公開・署名トークンをリンクから受ける）。"""
+    data, err = organizer_email.read_confirm_token(token)
+    ctx = {"show_topbar": False}
+    if err or not data:
+        ctx["ok"] = False
+        ctx["reason"] = "expired" if err == "expired" else "invalid"
+        return render(request, "tennis/verify_email.html", ctx)
+
+    org = ClubOrganizer.objects.filter(id=data.get("oid")).select_related("club").first()
+    token_email = organizer_email.normalize_email(data.get("email"))
+    if not org or organizer_email.normalize_email(org.email) != token_email:
+        # メールが変更された等でトークンが古い
+        ctx["ok"] = False
+        ctx["reason"] = "invalid"
+        return render(request, "tennis/verify_email.html", ctx)
+
+    if not org.confirmed_at:
+        org.confirmed_at = timezone.now()
+        org.save(update_fields=["confirmed_at", "updated_at"])
+
+    ctx["ok"] = True
+    ctx["club_name"] = org.club.name
+    return render(request, "tennis/verify_email.html", ctx)
+
+
+@require_http_methods(["GET", "POST"])
+def recover(request):
+    """
+    公開の復旧ページ（トークン不要）。
+    メールを入力 → 確認済み ClubOrganizer に合致すれば、その登録アドレスにだけURLを再送。
+    合致有無に関わらず同じ完了画面を出す（列挙防止）。レート制限あり。
+    """
+    if request.method == "GET":
+        return render(request, "tennis/recover.html", {"show_topbar": False})
+
+    email = organizer_email.normalize_email(request.POST.get("email"))
+    if not _looks_like_email(email):
+        return render(request, "tennis/recover.html", {"show_topbar": False, "error": "メールアドレスを確認してください。"})
+
+    ip = _client_ip(request)
+    ok_email = organizer_email.throttle_ok("recover_email", email, limit=3, window_seconds=3600)
+    ok_ip = organizer_email.throttle_ok("recover_ip", ip, limit=10, window_seconds=3600)
+
+    if ok_email and ok_ip:
+        organizers = list(
+            ClubOrganizer.objects
+            .filter(email=email, confirmed_at__isnull=False, club__is_active=True)
+            .select_related("club")
+        )
+        if organizers:
+            organizer_email.send_recovery_email(request, email, organizers)
+
+    # 合致・レート制限に関わらず同じ応答（存在秘匿）
+    return render(request, "tennis/recover_done.html", {"show_topbar": False})
+
+
+@require_POST
+def organizer_self_register(request):
+    """
+    作成後モーダル：作成者本人を「幹事メンバー」として登録し、確認メールを送る。
+    - name の固定メンバーを作成 → ClubOrganizer(email) を作成 → 確認メール。
+    """
+    club_id = request.POST.get("club_id")
+    admin_token = (request.POST.get("admin_token") or "").strip()
+    name = (request.POST.get("display_name") or "").strip()
+    email = organizer_email.normalize_email(request.POST.get("email"))
+
+    if not club_id or not admin_token or not name:
+        return JsonResponse({"ok": False, "error": "missing"}, status=400)
+    if not _looks_like_email(email):
+        return JsonResponse({"ok": False, "error": "bad_email", "message": "メールアドレスを確認してください。"}, status=400)
+
+    club = get_object_or_404(Club, id=int(club_id), is_active=True)
+    blocked = _require_club_admin_token(request, club)
+    if blocked:
+        return blocked
+
+    if not organizer_email.throttle_ok("confirm", email, limit=5, window_seconds=3600):
+        return JsonResponse({"ok": False, "error": "throttled", "message": "送信が多すぎます。少し待ってください。"}, status=429)
+
+    member = Member.objects.create(
+        club=club,
+        member_no=_next_member_no(club),
+        display_name=name,
+        is_fixed=True,
+    )
+    org = ClubOrganizer.objects.create(club=club, member=member, email=email)
+    organizer_email.send_confirmation_email(request, org)
+
+    return JsonResponse({"ok": True, "message": "確認メールを送りました。"})

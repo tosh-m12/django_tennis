@@ -676,6 +676,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const addUrl = hooks.dataset.addUrl;
     const renameUrl = hooks.dataset.renameUrl;
     const toggleFixedUrl = hooks.dataset.toggleFixedUrl;
+    const setOrganizerUrl = hooks.dataset.setOrganizerUrl;
 
     const input = document.getElementById("member-add-input");
     const addBtn = document.getElementById("member-add-btn");
@@ -746,6 +747,59 @@ document.addEventListener("DOMContentLoaded", () => {
         icon.classList.toggle("check-off", !next);
       }
     });
+
+    // 区分（幹事/メンバー）ドロップダウン
+    if (setOrganizerUrl) {
+      table.addEventListener("change", async (e) => {
+        const sel = e.target.closest("select.member-organizer-select");
+        if (!sel) return;
+        const tr = sel.closest("tr[data-member-id]");
+        if (!tr) return;
+
+        const memberId = tr.dataset.memberId;
+        const role = sel.value; // "organizer" | "member"
+        const prev = sel.dataset.prev || "member";
+
+        const fd = new FormData();
+        fd.append("club_id", clubId);
+        fd.append("admin_token", adminToken);
+        fd.append("member_id", memberId);
+        fd.append("role", role);
+
+        const data = await post(setOrganizerUrl, fd);
+        if (!data.ok) {
+          alert(data.message || "変更に失敗しました。");
+          sel.value = prev; // 元に戻す
+          return;
+        }
+        sel.dataset.prev = role;
+
+        // メールバッジ更新
+        const badge = tr.querySelector(".member-email-badge");
+        if (badge) {
+          if (!data.is_organizer) {
+            badge.textContent = "—";
+            badge.className = "member-email-badge is-none";
+          } else if (data.email_confirmed) {
+            badge.textContent = "済";
+            badge.className = "member-email-badge is-confirmed";
+          } else {
+            badge.textContent = "未";
+            badge.className = "member-email-badge is-pending";
+          }
+        }
+
+        // 幹事化したら固定トグルもON表示に揃える（サーバ側で is_fixed=True 済）
+        if (role === "organizer") {
+          const fbtn = tr.querySelector(".member-fixed-toggle");
+          if (fbtn && !fbtn.classList.contains("is-on")) {
+            fbtn.classList.add("is-on");
+            const icon2 = fbtn.querySelector(".check-icon");
+            if (icon2) { icon2.classList.add("check-on"); icon2.classList.remove("check-off"); }
+          }
+        }
+      });
+    }
   })();
 
   // ============================================================

@@ -22,6 +22,10 @@ urlpatterns = [
     path("demo", views.demo_entry, name="demo"),
     path("demo/", views.demo_entry),
 
+    # 幹事メール：公開ページ（トークン不要）
+    path("recover/", views.recover, name="recover"),
+    path("verify/<str:token>/", views.verify_email, name="verify_email"),
+
     # ============================================================
     # Club pages (token-based)
     # ============================================================
@@ -185,6 +189,11 @@ urlpatterns = [
     path("api/club/rename_member/", views.club_rename_member, name="club_rename_member"),
     path("api/club/toggle_member_fixed/", views.club_toggle_member_fixed, name="club_toggle_member_fixed"),
     path("api/club/delete_member/", views.club_delete_member, name="club_delete_member"),
+
+    # -- 幹事メール（ClubOrganizer）
+    path("api/club/set_member_organizer/", views.club_set_member_organizer, name="club_set_member_organizer"),
+    path("api/organizer/set_email/", views.organizer_set_email, name="organizer_set_email"),
+    path("api/organizer/self_register/", views.organizer_self_register, name="organizer_self_register"),
 
     # NOTE: 既存URL互換のため prefix を変更しない（現状維持）
     path(
