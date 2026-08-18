@@ -116,3 +116,10 @@ def set_admin_session(client, event_id: int) -> None:
     session = client.session
     session[f"tennis_event_admin:{event_id}"] = True
     session.save()
+
+
+def set_member_session(client, club_id: int) -> None:
+    """テストクライアントに公開クラブセッションを立てる。"""
+    session = client.session
+    session[f"tennis_club_member:{club_id}"] = True
+    session.save()

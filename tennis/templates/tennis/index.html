@@ -5,6 +5,9 @@
 {% block title %}DeuceNet - トップ{% endblock %}
 
 {% block extra_head %}
+  {% if turnstile_enabled %}
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  {% endif %}
 {% endblock %}
 
 {% block header %}{% endblock %}
@@ -39,6 +42,13 @@
         value="{{ request.POST.club_name|default:'' }}"
       >
     </div>
+
+    {% if turnstile_enabled %}
+      <div class="cf-turnstile"
+           data-sitekey="{{ turnstile_site_key }}"
+           data-action="club-create"
+           style="display:flex;justify-content:center;margin:18px 0;"></div>
+    {% endif %}
 
     <div class="modal-actions">
       <button type="submit" class="btn btn-pill btn-primary">サークルを登録</button>

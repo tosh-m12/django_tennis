@@ -73,8 +73,10 @@ class RankingPagePeriodTests(TestCase):
         self.club = make_club()
         # このテストは3試合前提（期間フィルタの検証が目的）。旧来の最低3試合に設定。
         ClubRankingSetting.objects.create(club=self.club, preset="winrate", min_matches=3)
-        # 4月に3試合（A全勝）
-        self.event_apr = make_event(self.club, date=datetime.date(2026, 4, 5))
+        # ローリング90日窓内に3試合（A全勝）
+        self.event_apr = make_event(
+            self.club, date=timezone.localdate() - datetime.timedelta(days=20)
+        )
         a = make_member(self.club, "A", member_no=1)
         b = make_member(self.club, "B", member_no=2)
         ep_a = make_ep(self.event_apr, member=a, attendance="yes")
@@ -117,7 +119,7 @@ class RankingPagePeriodTests(TestCase):
         # GET を無視して常に過去90日窓
         self.assertEqual(ctx["start_date"], today - datetime.timedelta(days=90))
         self.assertEqual(ctx["end_date"], today)
-        # 4月の試合は90日窓内なので A は ranked（GET の1月絞りは無効）
+        # 直近の試合は90日窓内なので A は ranked（GET の1月絞りは無効）
         ranked_names = [r["name"] for r in ctx["ranking_singles"]["ranked"]]
         self.assertIn("A", ranked_names)
 

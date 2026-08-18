@@ -23,6 +23,7 @@ from .factories import (
     make_member,
     make_ep,
     make_published_schedule,
+    set_member_session,
 )
 
 
@@ -38,6 +39,7 @@ class UpdateParticipantNameTests(TestCase):
         self.ep = make_ep(self.event, member=self.member, attendance="yes")
         # 同じメンバーの別イベント参加（伝播確認用）
         self.ep_other = make_ep(self.other_event, member=self.member, attendance="yes")
+        set_member_session(self.client, self.club.id)
 
     def test_fixed_member_rename_propagates_clubwide(self):
         resp = self.client.post(self.url, {
