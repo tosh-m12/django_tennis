@@ -18,6 +18,7 @@ from .factories import (
     make_member,
     make_published_schedule,
     make_score,
+    set_member_session,
 )
 
 
@@ -70,7 +71,9 @@ class MemberDetailStatsTests(TestCase):
 
     def setUp(self):
         self.club = make_club()
-        self.event = make_event(self.club, date=datetime.date(2026, 4, 1))
+        self.event = make_event(
+            self.club, date=timezone.localdate() - datetime.timedelta(days=20)
+        )
         self.a = make_member(self.club, "A", member_no=1)
         self.b = make_member(self.club, "B", member_no=2)
         self.ep_a = make_ep(self.event, member=self.a, attendance="yes")
@@ -122,7 +125,9 @@ class MemberDetailStatsTests(TestCase):
 
     def test_history_split_singles_doubles(self):
         # ダブルスのイベントを追加して履歴が分かれることを確認
-        ev_d = make_event(self.club, date=datetime.date(2026, 5, 1))
+        ev_d = make_event(
+            self.club, date=timezone.localdate() - datetime.timedelta(days=10)
+        )
         ep_a_d = make_ep(ev_d, member=self.a, attendance="yes")
         ep_b_d = make_ep(ev_d, member=self.b, attendance="yes")
         ep_c_d = make_ep(ev_d, display_name="C", attendance="yes")
@@ -147,7 +152,9 @@ class MemberDetailStatsTests(TestCase):
 
     def test_history_shows_all_matches_ignoring_get_period(self):
         # 別日のシングルス試合を追加
-        ev_extra = make_event(self.club, date=datetime.date(2026, 5, 1))
+        ev_extra = make_event(
+            self.club, date=timezone.localdate() - datetime.timedelta(days=5)
+        )
         ep_a2 = make_ep(ev_extra, member=self.a, attendance="yes")
         ep_b2 = make_ep(ev_extra, member=self.b, attendance="yes")
         ms_extra = make_published_schedule(
@@ -204,6 +211,7 @@ class UpdateMemberDisplayNameTests(TestCase):
         self.event = make_event(self.club, date=timezone.localdate())
         self.ep = make_ep(self.event, member=self.m, attendance="yes")
         self.url = reverse("tennis:update_member_display_name")
+        set_member_session(self.client, self.club.id)
 
     def test_rename_propagates_to_eps(self):
         resp = self.client.post(self.url, {
@@ -232,11 +240,12 @@ class UpdateMemberDisplayNameTests(TestCase):
         self.assertEqual(resp.status_code, 400)
         self.assertEqual(resp.json()["error"], "missing_params")
 
-    def test_other_club_member_404(self):
+    def test_other_club_member_requires_that_club_session(self):
         other = make_club()
         resp = self.client.post(self.url, {
             "club_id": other.id,
             "member_id": self.m.id,
             "display_name": "X",
         })
-        self.assertEqual(resp.status_code, 404)
+        self.assertEqual(resp.status_code, 403)
+        self.assertEqual(resp.json()["error"], "club_access_required")

@@ -14,6 +14,7 @@ import os
 from pathlib import Path
 
 import dj_database_url
+from django.core.exceptions import ImproperlyConfigured
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -32,20 +33,23 @@ def env_bool(name: str, default: bool = False) -> bool:
         return default
     return v in ("1", "true", "t", "yes", "y", "on")
 
+def env_int(name: str, default: int) -> int:
+    value = (os.getenv(name) or "").strip()
+    return int(value) if value else int(default)
+
 
 # ============================================================
 # Core
 # ============================================================
 
-# 本番は必ず環境変数優先（Railwayで安全に運用するため）
-# ローカル開発では未設定でも動くようにデフォルト値も用意
-SECRET_KEY = env_str(
-    "DJANGO_SECRET_KEY",
-    "django-insecure-c@@+13zbt$x!abfun-8w+oiq1$lqnzrjzk(#cxn@&cu4*)$sdv",
-)
-
 # Railway本番は DEBUG を切る（ローカルでは env で DEBUG=1 など）
 DEBUG = env_bool("DEBUG", default=True)
+
+# 本番では公開済みの固定値へフォールバックしない。起動時に設定漏れを検出する。
+_configured_secret_key = env_str("DJANGO_SECRET_KEY", "")
+if not DEBUG and not _configured_secret_key:
+    raise ImproperlyConfigured("DJANGO_SECRET_KEY is required when DEBUG is false")
+SECRET_KEY = _configured_secret_key or "django-insecure-local-development-only"
 
 # 例: "INFO" / "DEBUG"
 LOGGING_LEVEL = env_str("LOGGING_LEVEL", "DEBUG" if DEBUG else "INFO")
@@ -115,6 +119,30 @@ REDIRECT_HOSTS = [h for h in REDIRECT_HOSTS if h and h != CANONICAL_HOST]
 # Reverse proxy 配下（Railway）で https 判定を正しくする
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 
+# Cloudflareからオリジンへ付与する秘密ヘッダー。設定準備後に明示的に有効化する。
+ORIGIN_VERIFY_ENABLED = env_bool("ORIGIN_VERIFY_ENABLED", default=False)
+ORIGIN_VERIFY_SECRET = env_str("ORIGIN_VERIFY_SECRET", "")
+
+# Turnstileはキー設定と画面確認が完了するまで無効。Siteverifyは有効時に必須。
+TURNSTILE_ENABLED = env_bool("TURNSTILE_ENABLED", default=False)
+TURNSTILE_SITE_KEY = env_str("TURNSTILE_SITE_KEY", "")
+TURNSTILE_SECRET_KEY = env_str("TURNSTILE_SECRET_KEY", "")
+TURNSTILE_EXPECTED_HOSTNAME = env_str("TURNSTILE_EXPECTED_HOSTNAME", CANONICAL_HOST)
+TURNSTILE_TIMEOUT_SECONDS = env_int("TURNSTILE_TIMEOUT_SECONDS", 5)
+if TURNSTILE_ENABLED and (not TURNSTILE_SITE_KEY or not TURNSTILE_SECRET_KEY):
+    raise ImproperlyConfigured(
+        "TURNSTILE_ENABLED requires TURNSTILE_SITE_KEY and TURNSTILE_SECRET_KEY"
+    )
+
+# API・作成入口のレート制限。Redis接続後に本番で有効化する。
+APP_RATE_LIMIT_ENABLED = env_bool("APP_RATE_LIMIT_ENABLED", default=False)
+WRITE_RATE_LIMIT = env_int("WRITE_RATE_LIMIT", 120)
+WRITE_RATE_WINDOW_SECONDS = env_int("WRITE_RATE_WINDOW_SECONDS", 60)
+CLUB_CREATE_RATE_LIMIT = env_int("CLUB_CREATE_RATE_LIMIT", 3)
+CLUB_CREATE_RATE_WINDOW_SECONDS = env_int("CLUB_CREATE_RATE_WINDOW_SECONDS", 3600)
+DEMO_CREATE_RATE_LIMIT = env_int("DEMO_CREATE_RATE_LIMIT", 3)
+DEMO_CREATE_RATE_WINDOW_SECONDS = env_int("DEMO_CREATE_RATE_WINDOW_SECONDS", 600)
+
 
 # ============================================================
 # Application definition
@@ -132,10 +160,12 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
+    "tennis_project.middleware.OriginVerifyMiddleware",
     "tennis_project.middleware.CanonicalHostRedirectMiddleware",  # 旧ドメイン→正規ドメインへ301
     "django.middleware.gzip.GZipMiddleware",  # 動的HTMLレスポンスを gzip 圧縮（静的は WhiteNoise が担当）
     "whitenoise.middleware.WhiteNoiseMiddleware",  # static 配信
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "tennis_project.middleware.WriteRateLimitMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -176,6 +206,27 @@ DATABASES = {
         ssl_require=False,
     )
 }
+
+REDIS_URL = env_str("REDIS_URL", "")
+if not DEBUG and APP_RATE_LIMIT_ENABLED and not REDIS_URL:
+    raise ImproperlyConfigured(
+        "REDIS_URL is required when APP_RATE_LIMIT_ENABLED is true in production"
+    )
+if REDIS_URL:
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.redis.RedisCache",
+            "LOCATION": REDIS_URL,
+        }
+    }
+else:
+    # 開発・テスト用。本番の複数ワーカーではREDIS_URLを必須とする。
+    CACHES = {
+        "default": {
+            "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            "LOCATION": "deucenet-local",
+        }
+    }
 
 
 # ============================================================
