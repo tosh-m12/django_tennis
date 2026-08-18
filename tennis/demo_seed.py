@@ -45,7 +45,7 @@ DEMO_TTL_MINUTES = 30
 
 # デモのベースライン版。メンバーやダミー実績の作り方を変えたら +1 する。
 # 版が古い専用クラブは /demo 再訪時に作り直され、既存セッションも最新化される。
-CURRENT_SEED_VERSION = 2
+CURRENT_SEED_VERSION = 3
 
 # 常駐メンバー20名（固定メンバー）。実在風の人名は避け、歴代プロテニス選手名（男女混合）を使う。
 DEMO_MEMBERS = [
@@ -175,38 +175,39 @@ def _seed_demo_club(club: Club) -> Club:
     doubles_days = _spread_days(today, count=12, span=85, start_offset=3, rng=rng)
     singles_days = _spread_days(today, count=8, span=80, start_offset=6, rng=rng)
 
-    for d in doubles_days:
-        _make_scored_event(
-            club, members, d, GameType.DOUBLES,
-            rng=rng, skill_by_member_id=skill_by_member_id,
-            num_rounds=6, num_courts=4, fill_ratio=1.0,
+    scored_specs = [
+        (d, GameType.DOUBLES, 6, 4, 1.0, None) for d in doubles_days
+    ] + [
+        (d, GameType.SINGLES, 6, 5, 1.0, None) for d in singles_days
+    ] + [
+        (
+            today,
+            GameType.DOUBLES,
+            6,
+            4,
+            0.6,
+            "本日の練習（スコア入力を試せます）",
         )
-    for d in singles_days:
-        _make_scored_event(
-            club, members, d, GameType.SINGLES,
-            rng=rng, skill_by_member_id=skill_by_member_id,
-            num_rounds=6, num_courts=5, fill_ratio=1.0,
-        )
-
-    # ---- 「今日」の公開済みイベント（スコア一部空欄＝訪問者が入力して体験）----
-    _make_scored_event(
-        club, members, today, GameType.DOUBLES,
-        rng=rng, skill_by_member_id=skill_by_member_id,
-        num_rounds=6, num_courts=4, fill_ratio=0.6,
-        title="本日の練習（スコア入力を試せます）",
+    ]
+    _bulk_seed_scored_events(
+        club,
+        members,
+        scored_specs,
+        rng=rng,
+        skill_by_member_id=skill_by_member_id,
     )
 
     # ---- 直近の出欠受付イベント（対戦表なし＝訪問者が名前追加・出欠を試せる）----
     # /demo は当月カレンダーを表示するので、この案内イベントは当月内に収めて見つけやすくする。
     upcoming_date = _upcoming_date_in_month(today)
-    Event.objects.create(
+    planned_events = [Event(
         club=club,
         title="次回の練習（名前を追加してみてください）",
         place="市民コート",
         date=upcoming_date,
         start_time=dt.time(9, 0),
         end_time=dt.time(12, 0),
-    )
+    )]
     # 固定メンバーは「未登録行」として表示されるので EP は作らない（訪問者の追加余地を残す）。
 
     # ---- 当月残り〜翌月の予定（対戦表なしのダミースケジュール）----
@@ -214,14 +215,15 @@ def _seed_demo_club(club: Club) -> Club:
     for d in _future_practice_days(today, rng, exclude={upcoming_date}):
         gt = rng.choice([GameType.DOUBLES, GameType.SINGLES])
         label = "練習（ダブルス）" if gt == GameType.DOUBLES else "練習（シングルス）"
-        Event.objects.create(
+        planned_events.append(Event(
             club=club,
             title=label,
             place=rng.choice(["市民コート", "中央公園コート", "river side テニスクラブ"]),
             date=d,
             start_time=dt.time(9, 0),
             end_time=dt.time(12, 0),
-        )
+        ))
+    Event.objects.bulk_create(planned_events)
 
     club.save(update_fields=["name", "is_demo", "is_active", "updated_at"])
     return club
@@ -288,6 +290,102 @@ def _spread_days(today: dt.date, *, count: int, span: int, start_offset: int, rn
     rng.shuffle(pool)
     offsets = sorted(pool[:count])
     return [today - dt.timedelta(days=o) for o in offsets]
+
+
+def _bulk_seed_scored_events(
+    club: Club,
+    members: list[Member],
+    specs: list[tuple[dt.date, str, int, int, float, str | None]],
+    *,
+    rng: random.Random,
+    skill_by_member_id: dict[int, int],
+) -> list[Event]:
+    """スコア付きイベント一式を種類ごとに一括INSERTする。"""
+    events = []
+    for date, game_type, _rounds, _courts, _fill, title in specs:
+        label = (
+            "練習（ダブルス）"
+            if game_type == GameType.DOUBLES
+            else "練習（シングルス）"
+        )
+        events.append(Event(
+            club=club,
+            title=title or label,
+            place=rng.choice(["市民コート", "中央公園コート", "river side テニスクラブ"]),
+            date=date,
+            start_time=dt.time(9, 0),
+            end_time=dt.time(12, 0),
+        ))
+    Event.objects.bulk_create(events)
+
+    participants = [
+        EventParticipant(
+            event=event,
+            member=member,
+            display_name=member.display_name,
+            attendance="yes",
+            participates_match=True,
+        )
+        for event in events
+        for member in members
+    ]
+    EventParticipant.objects.bulk_create(participants)
+
+    participants_by_event: dict[int, list[EventParticipant]] = {}
+    for participant in participants:
+        participants_by_event.setdefault(participant.event_id, []).append(participant)
+
+    schedules = []
+    schedule_payloads = []
+    for event, spec in zip(events, specs):
+        _date, game_type, num_rounds, num_courts, fill_ratio, _title = spec
+        event_participants = participants_by_event[event.id]
+        ep_ids = [participant.id for participant in event_participants]
+        if game_type == GameType.SINGLES:
+            payload = generate_singles_schedule(ep_ids, num_rounds, num_courts)
+        else:
+            payload = generate_doubles_schedule(ep_ids, num_rounds, num_courts)
+        schedules.append(MatchSchedule(
+            event=event,
+            schedule_json=payload,
+            game_type=game_type,
+            court_count=num_courts,
+            round_count=num_rounds,
+            published=True,
+            locked=True,
+        ))
+        schedule_payloads.append((event_participants, payload, fill_ratio))
+    MatchSchedule.objects.bulk_create(schedules)
+
+    scores = []
+    for schedule, (event_participants, payload, fill_ratio) in zip(
+        schedules, schedule_payloads
+    ):
+        skill_by_ep_id = {
+            participant.id: skill_by_member_id[participant.member_id]
+            for participant in event_participants
+        }
+        for round_data in payload:
+            round_no = int(round_data.get("round") or 0)
+            for match in (round_data.get("matches") or []):
+                if rng.random() > fill_ratio:
+                    continue
+                court_no = int(match.get("court") or 0)
+                side_a, side_b = _gen_score(
+                    match.get("team1") or [],
+                    match.get("team2") or [],
+                    skill_by_ep_id,
+                    rng,
+                )
+                scores.append(MatchScore(
+                    match_schedule=schedule,
+                    round_no=round_no,
+                    court_no=court_no,
+                    side_a_score=side_a,
+                    side_b_score=side_b,
+                ))
+    MatchScore.objects.bulk_create(scores)
+    return events
 
 
 def _make_scored_event(
