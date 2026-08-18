@@ -764,7 +764,9 @@ def demo_entry(request):
     from .demo_seed import CURRENT_SEED_VERSION, create_seeded_demo_club, sweep_stale_demo_clubs
 
     now = timezone.now()
-    sweep_stale_demo_clubs(now)
+    # 掃除は1アクセス1件に制限する。大量の期限切れデモを同期削除すると、
+    # 初回表示が gunicorn timeout に達してデモ自体を開けなくなるため。
+    sweep_stale_demo_clubs(now, batch_size=1)
 
     club = None
     cid = request.session.get("demo_club_id")

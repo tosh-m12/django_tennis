@@ -643,5 +643,12 @@ def _mark_event_participants_on_member_delete(sender, instance, **kwargs):
     - club_delete_member ビュー / Django admin / QuerySet.delete() のいずれの
       削除経路でも pre_delete が発火するため、経路に依存せず印が付く。
     """
-    EventParticipant.objects.filter(member=instance).update(member_deleted=True)
+    origin = kwargs.get("origin")
+    origin_model = getattr(origin, "model", None)
 
+    # Club 全体の削除では EventParticipant も直後に消えるため、退会印は不要。
+    # デモクラブ掃除時にメンバー数だけ UPDATE が増えるのを防ぐ。
+    if isinstance(origin, Club) or origin_model is Club:
+        return
+
+    EventParticipant.objects.filter(member=instance).update(member_deleted=True)
