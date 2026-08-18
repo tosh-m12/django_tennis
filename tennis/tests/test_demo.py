@@ -30,14 +30,31 @@ class DemoCleanupTests(TestCase):
         self.assertEqual(deleted, 1)
         self.assertEqual(Club.objects.filter(id__in=[c.id for c in stale]).count(), 2)
 
-    def test_demo_entry_only_sweeps_one_stale_club(self):
+    def test_demo_entry_does_not_sweep_stale_clubs(self):
         stale = [self._make_stale_demo(f"デモ{i}") for i in range(3)]
 
         response = self.client.get(reverse("tennis:demo"))
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(Club.objects.filter(id__in=[c.id for c in stale]).count(), 2)
+        self.assertEqual(Club.objects.filter(id__in=[c.id for c in stale]).count(), 3)
         self.assertTrue(Club.objects.filter(is_demo=True, id=self.client.session["demo_club_id"]).exists())
+
+    def test_demo_entry_replaces_outdated_session_without_deleting_old_club(self):
+        old_club = Club.objects.create(
+            name="旧デモ",
+            is_demo=True,
+            demo_last_seen=timezone.now(),
+            demo_seed_version=0,
+        )
+        session = self.client.session
+        session["demo_club_id"] = old_club.id
+        session.save()
+
+        response = self.client.get(reverse("tennis:demo"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Club.objects.filter(id=old_club.id).exists())
+        self.assertNotEqual(self.client.session["demo_club_id"], old_club.id)
 
     def test_club_cascade_skips_redundant_member_history_updates(self):
         club = make_club()

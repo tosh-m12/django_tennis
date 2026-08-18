@@ -759,14 +759,11 @@ def demo_entry(request):
     """
     /demo : 訪問者（セッション）ごとに専用のデモクラブを発行してメンバーホームへ誘導する。
     - 同じ人が再訪・更新しても、セッションが生きていれば同じクラブを使う。
-    - アクセス都度、無操作が続いた他のデモクラブを掃除（離脱とみなしてリセット）。
+    - 期限切れデモの掃除はWebリクエスト外の管理コマンドで行う。
     """
-    from .demo_seed import CURRENT_SEED_VERSION, create_seeded_demo_club, sweep_stale_demo_clubs
+    from .demo_seed import CURRENT_SEED_VERSION, create_seeded_demo_club
 
     now = timezone.now()
-    # 掃除は1アクセス1件に制限する。大量の期限切れデモを同期削除すると、
-    # 初回表示が gunicorn timeout に達してデモ自体を開けなくなるため。
-    sweep_stale_demo_clubs(now, batch_size=1)
 
     club = None
     cid = request.session.get("demo_club_id")
@@ -775,7 +772,8 @@ def demo_entry(request):
 
     # ベースライン版が古い専用クラブは作り直す（メンバー数や予定の更新を既存セッションへ反映）。
     if club is not None and club.demo_seed_version != CURRENT_SEED_VERSION:
-        club.delete()
+        # Club削除は関連データが多く、本番DBではWebリクエストのタイムアウト要因になる。
+        # 古いクラブは管理コマンドの掃除対象として残し、新しい専用クラブへ切り替える。
         club = None
 
     if club is None:
