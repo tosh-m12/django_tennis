@@ -8,8 +8,8 @@ from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 from django.utils import timezone
 
-from tennis.demo_seed import sweep_stale_demo_clubs
-from tennis.models import Club, EventParticipant
+from tennis.demo_seed import create_seeded_demo_club, sweep_stale_demo_clubs
+from tennis.models import Club, EventParticipant, MatchSchedule, MatchScore
 
 from .factories import make_club, make_ep, make_event, make_member
 
@@ -72,3 +72,13 @@ class DemoCleanupTests(TestCase):
         ]
         self.assertEqual(redundant_updates, [])
         self.assertFalse(EventParticipant.objects.exists())
+
+    def test_demo_seed_uses_bounded_database_round_trips(self):
+        with CaptureQueriesContext(connection) as queries:
+            club = create_seeded_demo_club()
+
+        self.assertLessEqual(len(queries), 30)
+        self.assertEqual(club.members.count(), 20)
+        self.assertEqual(club.events.count(), 32)
+        self.assertEqual(MatchSchedule.objects.filter(event__club=club).count(), 21)
+        self.assertTrue(MatchScore.objects.filter(match_schedule__event__club=club).exists())
