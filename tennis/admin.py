@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.urls import reverse
+from django.utils import timezone
 from django.utils.html import format_html
 
 from .models import Club, Event, Member, EventParticipant, ClubFlagDefinition, EventFlagDefinition, ParticipantFlag, \
@@ -16,15 +17,19 @@ class ClubAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "name",
+        "created_date",
         "club_home_urls",
         "public_token",
         "admin_token",
         "is_active",
-        "created_at",
     )
     search_fields = ("name", "public_token", "admin_token")
     list_filter = ("is_active",)
     readonly_fields = ("public_token", "admin_token", "created_at", "updated_at")
+
+    @admin.display(description="作成日", ordering="created_at")
+    def created_date(self, obj: Club):
+        return timezone.localtime(obj.created_at).strftime("%Y/%m/%d")
 
     @admin.display(description="Home URLs")
     def club_home_urls(self, obj: Club):
