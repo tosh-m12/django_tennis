@@ -4,7 +4,7 @@ from django.utils import timezone
 from django.utils.html import format_html
 
 from .models import Club, Event, Member, EventParticipant, ClubFlagDefinition, EventFlagDefinition, ParticipantFlag, \
-    MatchSchedule, MatchScheduleDraft, MatchScore, Substitution, AuditLog
+    MatchSchedule, MatchScheduleDraft, MatchScore, Substitution, AuditLog, ClubOrganizer, EmailThrottle
 
 
 # ============================================================
@@ -298,3 +298,18 @@ class AuditLogAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None):
         return False
+
+
+@admin.register(ClubOrganizer)
+class ClubOrganizerAdmin(admin.ModelAdmin):
+    list_display = ("id", "club", "member", "email", "confirmed_at", "created_at")
+    list_filter = ("club",)
+    search_fields = ("email", "club__name")
+    readonly_fields = ("created_at", "updated_at")
+
+
+@admin.register(EmailThrottle)
+class EmailThrottleAdmin(admin.ModelAdmin):
+    list_display = ("id", "scope", "key", "created_at")
+    list_filter = ("scope",)
+    search_fields = ("key",)

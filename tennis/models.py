@@ -18,6 +18,9 @@ class Club(models.Model):
 
     # V1：クラブ単位トークンのみ
     public_token = models.CharField(max_length=64, unique=True, editable=False)
+    # 幹事画面URLの経路専用。既存クラブは導入時点の public_token を引き継ぐ。
+    # public_token を再発行しても幹事URLが変わらないよう、別管理する。
+    admin_path_token = models.CharField(max_length=64, unique=True, editable=False)
     admin_token = models.CharField(max_length=64, unique=True, editable=False)
 
     is_active = models.BooleanField(default=True)
@@ -47,6 +50,8 @@ class Club(models.Model):
     def save(self, *args, **kwargs):
         if not self.public_token:
             self.public_token = uuid.uuid4().hex
+        if not self.admin_path_token:
+            self.admin_path_token = self.public_token
         if not self.admin_token:
             self.admin_token = uuid.uuid4().hex
         super().save(*args, **kwargs)
@@ -629,6 +634,81 @@ class AuditLog(models.Model):
 
     def __str__(self) -> str:
         return f"{self.created_at} {self.actor_token_kind} {self.action}"
+
+
+# ============================================================
+# ClubOrganizer（幹事＋復旧メール）
+#  - 「誰が幹事か＋復旧メール」の唯一の source of truth
+#  - member は任意（作成者は名簿行を持つが、持たない運用も許容）
+#  - email は登録前は空。confirmed_at が入って初めて「確認済み＝復旧対象」
+# ============================================================
+
+class ClubOrganizer(models.Model):
+    club = models.ForeignKey(Club, on_delete=models.CASCADE, related_name="organizers")
+    member = models.ForeignKey(
+        "Member",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="organizer_roles",
+    )
+
+    # 未登録の間は空。確認メールのリンクを踏むと confirmed_at が入る。
+    email = models.EmailField(blank=True, default="")
+    # 確認済みメールの変更中だけ使う。確認が済むまで email は旧アドレスを保持する。
+    pending_email = models.EmailField(blank=True, default="")
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            # 1メンバー＝1幹事行（member が NULL の作成者行は対象外）
+            models.UniqueConstraint(
+                fields=["club", "member"],
+                condition=Q(member__isnull=False),
+                name="uniq_organizer_per_member",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["club"]),
+            models.Index(fields=["email"]),
+        ]
+
+    @property
+    def is_confirmed(self) -> bool:
+        return self.confirmed_at is not None
+
+    @property
+    def masked_email(self) -> str:
+        """h•••@example.com 形式。公開ページには出さず、幹事モードでの確認用。"""
+        if not self.email:
+            return ""
+        local, sep, domain = self.email.partition("@")
+        if not sep:
+            return "•••"
+        return f"{local[:1]}•••@{domain}"
+
+    def __str__(self) -> str:
+        return f"{self.club_id}:member={self.member_id}:{self.email or '(no email)'}"
+
+
+# ============================================================
+# EmailThrottle（送信レート制限：復旧・確認メールの乱発防止）
+#  - gunicorn 複数worker でも効くよう DB 記録型
+#  - scope+key（例: recover_email / recover_ip）ごとに一定時間の送信回数を数える
+# ============================================================
+
+class EmailThrottle(models.Model):
+    scope = models.CharField(max_length=32)
+    key = models.CharField(max_length=255)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["scope", "key", "created_at"]),
+        ]
 
 
 # ============================================================

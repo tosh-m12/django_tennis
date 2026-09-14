@@ -5,6 +5,8 @@
 {% block title %}DeuceNet - トップ{% endblock %}
 
 {% block extra_head %}
+  <meta name="description" content="テニスサークルの練習会スケジュール、出欠、対戦表、個人・クラブ戦績をURLひとつで管理できます。">
+  <link rel="stylesheet" href="{% static 'tennis/index.css' %}">
   {% if turnstile_enabled %}
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   {% endif %}
@@ -13,54 +15,289 @@
 {% block header %}{% endblock %}
 
 {% block content %}
-<div style="max-width:720px; margin:0 auto; text-align:center; padding:80px 16px;">
+<main class="landing-page">
+  <section class="landing-register" aria-labelledby="register-title">
+    <h1 class="sr-only" id="register-title">Deuce Net</h1>
+    <picture>
+      <source srcset="{% static 'tennis/logo/wordmark.webp' %}" type="image/webp">
+      <img class="brand-logo" src="{% static 'tennis/logo/wordmark.png' %}" alt="Deuce Net">
+    </picture>
+    <p class="brand-tagline">テニスサークルの出欠管理・対戦表・戦績集計を、URLひとつで。</p>
 
-  <h1 class="sr-only">Deuce Net</h1>
-  <picture>
-    <source srcset="{% static 'tennis/logo/wordmark.webp' %}" type="image/webp">
-    <img class="brand-logo" src="{% static 'tennis/logo/wordmark.png' %}" alt="Deuce Net">
-  </picture>
-  <p class="brand-tagline">テニスサークルの出欠管理・対戦表・戦績集計を、URLひとつで。</p>
+    <form method="post" id="club-registration-start" novalidate>
+      {% csrf_token %}
 
-  {% if error %}
-    <div class="alert alert-danger" style="margin:12px auto; max-width:420px; text-align:left;">
-      {{ error }}
+      <div class="field-group">
+        <label class="sr-only" for="club-name">サークル名</label>
+        <input
+          id="club-name"
+          type="text"
+          name="club_name"
+          class="club-name-input"
+          placeholder="サークル名を記入してください"
+          required
+          autofocus
+          maxlength="200"
+          value="{{ club_name|default:'' }}"
+        >
+      </div>
+
+      <div class="modal-actions landing-register-actions">
+        <button type="submit" class="btn btn-pill btn-primary">サークルを登録</button>
+      </div>
+    </form>
+
+    <div class="landing-register-demo">
+      <a href="{% url 'tennis:demo' %}">デモサイトを見る</a>
     </div>
-  {% endif %}
 
-  <form method="post">
-    {% csrf_token %}
-
-    <div class="field-group">
-      <input
-        type="text"
-        name="club_name"
-        class="club-name-input"
-        placeholder="サークル名を記入してください"
-        required
-        autofocus
-        value="{{ request.POST.club_name|default:'' }}"
-      >
+    <div class="landing-register-recover">
+      <a href="{% url 'tennis:recover' %}">クラブのURLを忘れた方はこちら</a>
     </div>
+  </section>
 
-    {% if turnstile_enabled %}
-      <div class="cf-turnstile"
-           data-sitekey="{{ turnstile_site_key }}"
-           data-action="club-create"
-           style="display:flex;justify-content:center;margin:18px 0;"></div>
-    {% endif %}
+  <div
+    id="club-registration-modal"
+    class="club-registration-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="club-registration-modal-title"
+    {% if not show_registration_modal %}hidden{% endif %}
+  >
+    <div class="club-registration-modal-box">
+      <h2 id="club-registration-modal-title">幹事情報の登録</h2>
+      <p>確認メールを送ります。</p>
 
-    <div class="modal-actions">
-      <button type="submit" class="btn btn-pill btn-primary">サークルを登録</button>
+      <form method="post" id="club-registration-form">
+        {% csrf_token %}
+        <input type="hidden" name="club_name" id="registration-club-name" value="{{ club_name|default:'' }}">
+
+        <div class="club-registration-field">
+          <label for="registration-display-name">お名前</label>
+          <input
+            type="text"
+            id="registration-display-name"
+            name="display_name"
+            maxlength="100"
+            autocomplete="name"
+            required
+            value="{{ display_name|default:'' }}"
+          >
+        </div>
+
+        <div class="club-registration-field">
+          <label for="registration-email">メールアドレス</label>
+          <input
+            type="email"
+            id="registration-email"
+            name="email"
+            maxlength="254"
+            autocomplete="email"
+            required
+            value="{{ email|default:'' }}"
+          >
+        </div>
+
+        {% if registration_error %}
+          <p class="club-registration-error" role="alert">{{ registration_error }}</p>
+        {% endif %}
+
+        {% if turnstile_enabled %}
+          <div class="cf-turnstile"
+               data-sitekey="{{ turnstile_site_key }}"
+               data-action="club-create"
+               style="display:flex;justify-content:center;margin:18px 0;"></div>
+        {% endif %}
+
+        <div class="club-registration-modal-actions">
+          <button type="button" class="btn btn-pill" id="club-registration-back">戻る</button>
+          <button type="submit" class="btn btn-pill btn-primary" id="club-registration-submit">登録する</button>
+        </div>
+      </form>
     </div>
-  </form>
-
-  <div style="margin-top:64px;">
-    <a href="{% url 'tennis:demo' %}"
-       style="color:#2563eb;text-decoration:none;font-size:15px;">
-      デモサイトを見る
-    </a>
   </div>
 
-</div>
+  <div class="landing-features">
+    <section class="landing-story-intro" aria-labelledby="overview-title">
+      <div class="landing-shell landing-story-intro-copy">
+        <p class="landing-story-kicker">DEUCENET</p>
+        <h2 id="overview-title">テニスサークルの運営を、<br>URLひとつで。</h2>
+        <p>練習前から試合後まで、いつもの流れがそのままつながります。</p>
+      </div>
+
+      <figure class="landing-story-world" aria-label="DeuceNetでつながるサークル運営の全体像">
+        <img class="landing-story-court" src="{% static 'tennis/landing/tennis-court.png' %}"
+             alt="" width="1659" height="948">
+        <img class="landing-story-scene landing-story-scene-attendance"
+             src="{% static 'tennis/landing/attendance-illustration.png' %}"
+             alt="出欠を示すチェックマークを持つテニスサークルのメンバー"
+             width="1334" height="871">
+        <img class="landing-story-scene landing-story-scene-matchup"
+             src="{% static 'tennis/landing/matchup-illustration.png' %}"
+             alt="参加者からダブルスの組み合わせを作る対戦ボード"
+             width="1211" height="808">
+        <img class="landing-story-scene landing-story-scene-score"
+             src="{% static 'tennis/landing/score-entry-illustration.png' %}"
+             alt="試合結果を示すラケットとスコアボード"
+             width="1536" height="1024">
+        <img class="landing-story-scene landing-story-scene-stats"
+             src="{% static 'tennis/landing/club-stats-illustration.png' %}"
+             alt="クラブ全体の戦績とランキングを見るメンバー"
+             width="1137" height="870">
+        <img class="landing-story-scene landing-story-scene-personal"
+             src="{% static 'tennis/landing/personal-stats-illustration.png' %}"
+             alt="個人戦績が伸びていくプレーヤーとグラフ"
+             width="1094" height="1136">
+      </figure>
+
+    </section>
+
+    <div class="landing-story-flow">
+      <svg class="landing-story-line" viewBox="0 0 1200 2920" preserveAspectRatio="none" aria-hidden="true">
+        <defs>
+          <linearGradient id="story-line-gradient" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="#3887f6"/>
+            <stop offset="0.48" stop-color="#35b8ff"/>
+            <stop offset="0.55" stop-color="#ff8a7f"/>
+            <stop offset="1" stop-color="#f66f72"/>
+          </linearGradient>
+          <filter id="story-line-glow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="7" result="blur"/>
+            <feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge>
+          </filter>
+        </defs>
+        <path d="M600 0 C260 210 260 490 600 690 S940 1120 600 1390 S260 1840 600 2110 S940 2580 600 2920"
+              fill="none" stroke="url(#story-line-gradient)" stroke-width="5"
+              vector-effect="non-scaling-stroke" filter="url(#story-line-glow)"/>
+      </svg>
+
+      <section class="landing-story-step landing-story-step-blue" aria-labelledby="attendance-title">
+        <div class="landing-story-step-inner">
+          <figure class="landing-story-visual">
+            <img src="{% static 'tennis/landing/attendance-illustration.png' %}"
+                 alt="出欠を示すチェックマークを持つテニスサークルのメンバー"
+                 width="1334" height="871">
+          </figure>
+          <div class="landing-story-copy">
+            <p class="landing-story-moment">練習前　練習会スケジュール＆出欠管理</p>
+            <h2 id="attendance-title">予定を公開すると、<br>出欠が集まる。</h2>
+            <p>メンバーは共有URLを開き、参加状況をその場で更新。幹事は一覧を見るだけです。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="landing-story-step landing-story-step-coral landing-story-step-reverse" aria-labelledby="matchups-title">
+        <div class="landing-story-step-inner">
+          <figure class="landing-story-visual">
+            <img src="{% static 'tennis/landing/matchup-illustration.png' %}"
+                 alt="参加者からダブルスの組み合わせを作る対戦ボード"
+                 width="1211" height="808">
+          </figure>
+          <div class="landing-story-copy">
+            <p class="landing-story-moment">当日</p>
+            <h2 id="matchups-title">参加者がそろったら、<br>対戦表を生成。</h2>
+            <p>出席メンバーの中から組み合わせを作り、そのまま同じURLで全員に共有できます。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="landing-story-step landing-story-step-blue landing-story-step-stats" aria-labelledby="stats-title">
+        <div class="landing-story-step-inner">
+          <div class="landing-story-results" aria-label="スコアから個人戦績とクラブ戦績へつながるイメージ">
+            <figure class="landing-story-result landing-story-result-score">
+              <img src="{% static 'tennis/landing/score-entry-illustration.png' %}"
+                   alt="4対3のスコアボード" width="1536" height="1024">
+            </figure>
+            <figure class="landing-story-result landing-story-result-personal">
+              <img src="{% static 'tennis/landing/personal-stats-illustration.png' %}"
+                   alt="個人戦績が伸びていくプレーヤーとグラフ" width="1094" height="1136">
+            </figure>
+            <figure class="landing-story-result landing-story-result-club">
+              <img src="{% static 'tennis/landing/club-stats-illustration.png' %}"
+                   alt="クラブ戦績とランキングを見るメンバー" width="1137" height="870">
+            </figure>
+          </div>
+          <div class="landing-story-copy">
+            <p class="landing-story-moment">試合後　個人＆クラブ戦績管理</p>
+            <h2 id="stats-title">スコアを入れると、<br>戦績が育つ。</h2>
+            <p>試合結果から、個人の勝率とクラブ全体のランキングを自動でまとめます。</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="landing-story-step landing-story-step-coral landing-story-step-reverse landing-story-step-login" aria-labelledby="login-title">
+        <div class="landing-story-step-inner">
+          <div class="landing-story-share" aria-label="共有URLを開くだけで使える仕組み">
+            <div class="landing-story-share-ball" aria-hidden="true"></div>
+            <p>deucenet.app/c/…</p>
+            <div class="landing-story-share-people" aria-hidden="true">
+              <span></span><span></span><span></span><span></span>
+            </div>
+          </div>
+          <div class="landing-story-copy">
+            <p class="landing-story-moment">いつでも</p>
+            <h2 id="login-title">メンバーは、<br>ログイン不要！</h2>
+            <p>この流れを、共有されたURLからそのまま使えます。</p>
+            <p class="landing-story-note">※幹事はメール登録が必要です。</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  const startForm = document.getElementById("club-registration-start");
+  const modal = document.getElementById("club-registration-modal");
+  const clubName = document.getElementById("club-name");
+  const modalClubName = document.getElementById("registration-club-name");
+  const displayName = document.getElementById("registration-display-name");
+  const backButton = document.getElementById("club-registration-back");
+  const registrationForm = document.getElementById("club-registration-form");
+  const submitButton = document.getElementById("club-registration-submit");
+
+  if (!startForm || !modal || !clubName || !modalClubName) return;
+
+  function openModal() {
+    modalClubName.value = clubName.value.trim();
+    modal.hidden = false;
+    document.body.classList.add("club-registration-modal-open");
+    window.setTimeout(() => displayName && displayName.focus(), 0);
+  }
+
+  function closeModal() {
+    modal.hidden = true;
+    document.body.classList.remove("club-registration-modal-open");
+    clubName.focus();
+  }
+
+  startForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+    clubName.value = clubName.value.trim();
+    if (!clubName.checkValidity()) {
+      clubName.reportValidity();
+      return;
+    }
+    openModal();
+  });
+
+  backButton.addEventListener("click", closeModal);
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && !modal.hidden) closeModal();
+  });
+
+  registrationForm.addEventListener("submit", function () {
+    modalClubName.value = clubName.value.trim();
+    submitButton.disabled = true;
+    submitButton.textContent = "登録中…";
+  });
+
+  if (!modal.hidden) {
+    document.body.classList.add("club-registration-modal-open");
+  }
+})();
+</script>
 {% endblock %}

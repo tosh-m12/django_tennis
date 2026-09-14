@@ -63,6 +63,61 @@
     });
   }
 
+  // ---- 登録メールアドレスの登録/変更（幹事モードのみ） ----
+  const emailSection = document.getElementById("organizer-email-section");
+  if (emailSection) {
+    const setEmailUrl = (emailSection.dataset.setEmailUrl || "").trim();
+    const emailInput = document.getElementById("organizer-email-input");
+    const status = document.getElementById("organizer-email-status");
+    const saveBtn = document.getElementById("organizer-email-save-btn");
+    const msg = document.getElementById("organizer-email-msg");
+
+    if (saveBtn && emailInput) {
+      saveBtn.addEventListener("click", async () => {
+        const email = (emailInput.value || "").trim();
+        if (!email) { emailInput.focus(); return; }
+
+        const fd = new FormData();
+        fd.append("club_id", clubId);
+        fd.append("member_id", memberId);
+        fd.append("admin_token", adminToken);
+        fd.append("email", email);
+
+        saveBtn.disabled = true;
+        try {
+          const r = await fetch(setEmailUrl, {
+            method: "POST",
+            credentials: "include",
+            headers: { "X-CSRFToken": csrftoken },
+            body: fd,
+          });
+          const data = await r.json().catch(() => ({}));
+          if (!r.ok || !data.ok) {
+            if (msg) { msg.textContent = data.message || "登録に失敗しました。"; msg.style.color = "#b91c1c"; }
+            saveBtn.disabled = false;
+            return;
+          }
+          emailInput.value = data.pending_email || data.email || email;
+          if (status) {
+            status.replaceChildren();
+            if (data.pending_email || !data.email_confirmed) {
+              const badge = document.createElement("span");
+              badge.className = "member-email-badge is-pending";
+              badge.textContent = "未確認";
+              status.appendChild(badge);
+            }
+          }
+          saveBtn.disabled = false;
+          if (msg) { msg.textContent = data.message || "確認メールを送りました。"; msg.style.color = "#059669"; }
+        } catch (err) {
+          console.error(err);
+          if (msg) { msg.textContent = "登録に失敗しました（ネットワーク）。"; msg.style.color = "#b91c1c"; }
+          saveBtn.disabled = false;
+        }
+      });
+    }
+  }
+
   // ---- 削除（幹事モードのみ） ----
   const deleteBtn = document.getElementById("member-delete-btn");
   if (deleteBtn && deleteUrl && adminToken) {

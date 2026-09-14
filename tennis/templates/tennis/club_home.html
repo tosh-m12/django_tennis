@@ -67,7 +67,7 @@
 <div class="calendar-nav cal-header">
   {% if is_admin %}
     <a class="cal-nav-btn cal-prev"
-       href="{% url 'tennis:club_home_admin' club.public_token admin_token %}?year={{ prev_year }}&month={{ prev_month }}">‹</a>
+       href="{% url 'tennis:club_home_admin' club.admin_path_token admin_token %}?year={{ prev_year }}&month={{ prev_month }}">‹</a>
   {% else %}
     <a class="cal-nav-btn cal-prev"
        href="{% url 'tennis:club_home' club.public_token %}?year={{ prev_year }}&month={{ prev_month }}">‹</a>
@@ -78,7 +78,7 @@
 
     {% if is_admin %}
       <a class="cal-today-btn"
-         href="{% url 'tennis:club_home_admin' club.public_token admin_token %}?year={{ today.year }}&month={{ today.month }}">本日</a>
+         href="{% url 'tennis:club_home_admin' club.admin_path_token admin_token %}?year={{ today.year }}&month={{ today.month }}">本日</a>
     {% else %}
       <a class="cal-today-btn"
          href="{% url 'tennis:club_home' club.public_token %}?year={{ today.year }}&month={{ today.month }}">本日</a>
@@ -87,7 +87,7 @@
 
   {% if is_admin %}
     <a class="cal-nav-btn cal-next"
-       href="{% url 'tennis:club_home_admin' club.public_token admin_token %}?year={{ next_year }}&month={{ next_month }}">›</a>
+       href="{% url 'tennis:club_home_admin' club.admin_path_token admin_token %}?year={{ next_year }}&month={{ next_month }}">›</a>
   {% else %}
     <a class="cal-nav-btn cal-next"
        href="{% url 'tennis:club_home' club.public_token %}?year={{ next_year }}&month={{ next_month }}">›</a>
@@ -122,7 +122,7 @@
                   {# 幹事：常にリンクあり（中止でも編集可） / 一般：通常イベントはリンクあり #}
                   {% if is_admin %}
                     <a class="cal-event-link"
-                       href="{% url 'tennis:event_admin' club.public_token admin_token ev.id %}">{{ ev.title }}</a>
+                       href="{% url 'tennis:event_admin' club.admin_path_token admin_token ev.id %}">{{ ev.title }}</a>
                   {% else %}
                     <a class="cal-event-link"
                        href="{% url 'tennis:event_public' club.public_token ev.id %}">{{ ev.title }}</a>

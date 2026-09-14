@@ -29,7 +29,7 @@
           <div class="topbar-title">
             {% if club %}
               <a class="topbar-logo-link"
-                 href="{% if is_admin %}{% url 'tennis:club_home_admin' club.public_token club.admin_token %}{% else %}{% url 'tennis:club_home' club.public_token %}{% endif %}">
+                 href="{% if is_admin %}{% url 'tennis:club_home_admin' club.admin_path_token club.admin_token %}{% else %}{% url 'tennis:club_home' club.public_token %}{% endif %}">
                 <picture>
                   <source srcset="{% static 'tennis/logo/wordmark.webp' %}" type="image/webp">
                   <img class="topbar-wordmark" src="{% static 'tennis/logo/wordmark.png' %}" alt="Deuce Net">
@@ -63,10 +63,10 @@
 
               {# 「もどる」：club_home では JS が非表示にする（設定のみ残す） #}
               {% if is_admin %}
-                <a href="{% url 'tennis:club_home_admin' club.public_token club.admin_token %}"
+                <a href="{% url 'tennis:club_home_admin' club.admin_path_token club.admin_token %}"
                    class="topbar-link"
                    id="topbar-back-link"
-                   data-home-url="{% url 'tennis:club_home_admin' club.public_token club.admin_token %}">
+                   data-home-url="{% url 'tennis:club_home_admin' club.admin_path_token club.admin_token %}">
                   ホーム
                 </a>
               {% else %}
@@ -83,7 +83,7 @@
             {# 戦績表（一般・幹事どちらでも・戦績ページ自身では表示しない） #}
               {% if club and current_page != "ranking" %}
                 {% if is_admin %}
-                  <a href="{% url 'tennis:ranking_admin' club.public_token club.admin_token %}"
+                  <a href="{% url 'tennis:ranking_admin' club.admin_path_token club.admin_token %}"
                      class="topbar-link"
                      id="topbar-ranking-link">
                     戦績
@@ -99,7 +99,7 @@
 
             {# 幹事のみ「設定」 #}
               {% if is_admin and club %}
-                <a href="{% url 'tennis:club_settings' club.public_token club.admin_token %}"
+                <a href="{% url 'tennis:club_settings' club.admin_path_token club.admin_token %}"
                   class="topbar-link"
                   id="topbar-settings-link">
                   設定
@@ -109,7 +109,7 @@
             {# ヘルプ（幹事は管理者ヘルプ、一般はユーザヘルプ） #}
               {% if club %}
                 {% if is_admin %}
-                  <a href="{% url 'tennis:club_admin_help' club.public_token club.admin_token %}"
+                  <a href="{% url 'tennis:club_admin_help' club.admin_path_token club.admin_token %}"
                     class="topbar-link"
                     id="topbar-help-link">
                     ヘルプ
@@ -158,6 +158,11 @@
       <source srcset="{% static 'tennis/logo/wordmark.webp' %}" type="image/webp">
       <img class="site-footer-logo" src="{% static 'tennis/logo/wordmark.png' %}" alt="Deuce Net">
     </picture>
+    <nav class="site-footer-links" aria-label="フッターナビゲーション">
+      <a href="{% url 'tennis:index' %}">トップ</a>
+      <a href="{% url 'tennis:privacy' %}">プライバシー</a>
+      <a href="{% url 'tennis:terms' %}">利用規約</a>
+    </nav>
     <p class="site-footer-copyright">© {% now "Y" %} DeuceNet</p>
   </footer>
 

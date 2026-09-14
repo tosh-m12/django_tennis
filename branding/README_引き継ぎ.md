@@ -1,7 +1,7 @@
 # Deuce Net ブランド／ロゴ 引き継ぎ（VS Code側・実装用）
 
 このフォルダ（`django_tennis/branding/`）は、マーケ側で確定したブランド資産の受け渡し用です。
-元データ・検討経緯は `…/projects/side/tennis_marketing/06_ロゴ案/`（`final/` が確定版）。
+元データ・検討経緯は `…/projects/personal/deucenet_marketing/06_ロゴ案/`（`final/` が確定版）。
 
 ---
 

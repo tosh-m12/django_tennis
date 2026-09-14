@@ -155,6 +155,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "anymail",
     "tennis",
 ]
 
@@ -260,11 +261,41 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # WhiteNoise 推奨（manifest 必須の本番運用）
 STORAGES = {
-    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+    "staticfiles": {
+        "BACKEND": (
+            "django.contrib.staticfiles.storage.StaticFilesStorage"
+            if DEBUG
+            else "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        )
+    },
 }
 
 # どうしても manifest 不整合を一時回避したい場合だけ True にする（基本は触らない）
 # WHITENOISE_MANIFEST_STRICT = env_bool("WHITENOISE_MANIFEST_STRICT", default=True)
+
+
+# ============================================================
+# Email (Resend via django-anymail)
+# ============================================================
+# Railway は送信SMTPポートを制限するため、HTTP API 型(HTTPS)の Resend を使う。
+# RESEND_API_KEY が未設定ならローカル開発時だけコンソールへ出力する。
+# 本番ではメール必須操作を拒否し、送信できないまま登録やURL変更が
+# 成功扱いになる事故を防ぐ。
+# 本番は Railway の環境変数に RESEND_API_KEY をセットするだけで有効化される。
+
+RESEND_API_KEY = env_str("RESEND_API_KEY", "")
+EMAIL_DELIVERY_ENABLED = bool(RESEND_API_KEY) or DEBUG
+
+# 送信元は認証済みドメイン deucenet.app 配下のアドレス
+DEFAULT_FROM_EMAIL = env_str("DEFAULT_FROM_EMAIL", "Deucenet <no-reply@deucenet.app>")
+SERVER_EMAIL = DEFAULT_FROM_EMAIL
+
+if RESEND_API_KEY:
+    EMAIL_BACKEND = "anymail.backends.resend.EmailBackend"
+    ANYMAIL = {"RESEND_API_KEY": RESEND_API_KEY}
+else:
+    # キー未設定：実送信せず、メール内容を標準出力に流す
+    EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 
 # ============================================================

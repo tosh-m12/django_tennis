@@ -1,6 +1,7 @@
 # tennis/urls.py
 from django.contrib import admin
 from django.urls import path
+from django.views.generic import TemplateView
 
 from . import views
 
@@ -18,9 +19,25 @@ urlpatterns = [
     # ============================================================
     path("", views.index, name="index"),
 
+    # サービス案内・法務ページ（クラブトークン不要）
+    path(
+        "privacy/",
+        TemplateView.as_view(template_name="tennis/privacy.html"),
+        name="privacy",
+    ),
+    path(
+        "terms/",
+        TemplateView.as_view(template_name="tennis/terms.html"),
+        name="terms",
+    ),
+
     # デモサイト入口（deucenet.app/demo）
     path("demo", views.demo_entry, name="demo"),
     path("demo/", views.demo_entry),
+
+    # 幹事メール：公開ページ（トークン不要）
+    path("recover/", views.recover, name="recover"),
+    path("verify/<str:token>/", views.verify_email, name="verify_email"),
 
     # ============================================================
     # Club pages (token-based)
@@ -174,6 +191,7 @@ urlpatterns = [
 
     # -- club name
     path("api/club/rename_club/", views.club_rename_club, name="club_rename_club"),
+    path("api/club/reset_url/", views.club_reset_url, name="club_reset_url"),
 
     # -- events (settings calendar)
     path("api/club/create_event/", views.club_create_event, name="club_create_event"),
@@ -185,6 +203,11 @@ urlpatterns = [
     path("api/club/rename_member/", views.club_rename_member, name="club_rename_member"),
     path("api/club/toggle_member_fixed/", views.club_toggle_member_fixed, name="club_toggle_member_fixed"),
     path("api/club/delete_member/", views.club_delete_member, name="club_delete_member"),
+
+    # -- 幹事メール（ClubOrganizer）
+    path("api/club/set_member_organizer/", views.club_set_member_organizer, name="club_set_member_organizer"),
+    path("api/organizer/set_email/", views.organizer_set_email, name="organizer_set_email"),
+    path("api/organizer/self_register/", views.organizer_self_register, name="organizer_self_register"),
 
     # NOTE: 既存URL互換のため prefix を変更しない（現状維持）
     path(

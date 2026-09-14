@@ -578,6 +578,20 @@ th {
   display: block;
   margin: 0 auto;
 }
+.site-footer-links {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 22px;
+  margin-top: 16px;
+}
+.site-footer-links a {
+  color: #64748b;
+  font-size: 0.78rem;
+}
+.site-footer-links a:hover {
+  color: #2563eb;
+}
 .site-footer-copyright {
   margin: 10px 0 0;
   color: #9aa6b2;

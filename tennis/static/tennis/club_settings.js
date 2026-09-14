@@ -676,6 +676,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const addUrl = hooks.dataset.addUrl;
     const renameUrl = hooks.dataset.renameUrl;
     const toggleFixedUrl = hooks.dataset.toggleFixedUrl;
+    const setOrganizerUrl = hooks.dataset.setOrganizerUrl;
 
     const input = document.getElementById("member-add-input");
     const addBtn = document.getElementById("member-add-btn");
@@ -746,6 +747,78 @@ document.addEventListener("DOMContentLoaded", () => {
         icon.classList.toggle("check-off", !next);
       }
     });
+
+    // 幹事チェック
+    if (setOrganizerUrl) {
+      table.addEventListener("click", async (e) => {
+        const btn = e.target.closest("button.member-organizer-toggle");
+        if (!btn || btn.disabled) return;
+        const tr = btn.closest("tr[data-member-id]");
+        if (!tr) return;
+
+        const memberId = tr.dataset.memberId;
+        const next = !btn.classList.contains("is-on");
+        const role = next ? "organizer" : "member";
+
+        const fd = new FormData();
+        fd.append("club_id", clubId);
+        fd.append("admin_token", adminToken);
+        fd.append("member_id", memberId);
+        fd.append("role", role);
+
+        btn.disabled = true;
+        try {
+          const data = await post(setOrganizerUrl, fd);
+          if (!data.ok) {
+            alert(data.message || "変更に失敗しました。");
+            return;
+          }
+
+          btn.classList.toggle("is-on", data.is_organizer);
+          btn.setAttribute("aria-pressed", data.is_organizer ? "true" : "false");
+          const icon = btn.querySelector(".check-icon");
+          if (icon) {
+            icon.classList.toggle("check-on", data.is_organizer);
+            icon.classList.toggle("check-off", !data.is_organizer);
+          }
+
+          const emailCell = tr.querySelector(".member-organizer-email");
+          if (emailCell) {
+            emailCell.replaceChildren();
+            if (data.is_organizer) {
+              const link = document.createElement("a");
+              link.className = "member-email-link";
+              link.href = emailCell.dataset.memberUrl || "#";
+              link.textContent = data.email || "登録する";
+              emailCell.appendChild(link);
+            }
+          }
+
+          const statusCell = tr.querySelector(".member-organizer-status");
+          if (statusCell) {
+            statusCell.replaceChildren();
+            if (data.is_organizer && data.email_unconfirmed) {
+              const badge = document.createElement("span");
+              badge.className = "member-email-badge is-pending";
+              badge.textContent = "未確認";
+              statusCell.appendChild(badge);
+            }
+          }
+
+          // 幹事化したら固定トグルもON表示に揃える（サーバ側で is_fixed=True 済）
+          if (data.is_organizer) {
+            const fbtn = tr.querySelector(".member-fixed-toggle");
+            if (fbtn && !fbtn.classList.contains("is-on")) {
+              fbtn.classList.add("is-on");
+              const icon2 = fbtn.querySelector(".check-icon");
+              if (icon2) { icon2.classList.add("check-on"); icon2.classList.remove("check-off"); }
+            }
+          }
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    }
   })();
 
   // ============================================================
@@ -1080,5 +1153,58 @@ document.addEventListener("DOMContentLoaded", () => {
     });
 
     syncMemberSelectOptions();
+  })();
+
+  // ============================================================
+  // URLリセット（メンバー用／幹事用）
+  // ============================================================
+  (function initUrlReset() {
+    const hooks = document.getElementById("url-reset-hooks");
+    if (!hooks) return;
+
+    const clubId = (hooks.dataset.clubId || "").trim();
+    const adminToken = (hooks.dataset.adminToken || "").trim();
+    const resetUrl = (hooks.dataset.resetUrl || "").trim();
+    if (!clubId || !adminToken || !resetUrl) return;
+
+    document.querySelectorAll("button.url-reset-btn[data-reset-kind]").forEach((btn) => {
+      btn.addEventListener("click", async () => {
+        const kind = (btn.dataset.resetKind || "").trim();
+        const isAdmin = kind === "admin";
+        const targetLabel = isAdmin ? "幹事用URL" : "メンバー用URL";
+        const warning = isAdmin
+          ? "現在の幹事用URLは、登録済みの全幹事分を含めて直ちに使えなくなります。再発行しますか？"
+          : "現在のメンバー用URLは直ちに使えなくなります。再発行しますか？";
+        if (!window.confirm(warning)) return;
+
+        const fd = new FormData();
+        fd.append("club_id", clubId);
+        fd.append("admin_token", adminToken);
+        fd.append("reset_kind", kind);
+
+        btn.disabled = true;
+        try {
+          const resp = await fetch(resetUrl, {
+            method: "POST",
+            credentials: "include",
+            headers: { "X-CSRFToken": csrftoken || "" },
+            body: fd,
+          });
+          const data = await resp.json().catch(() => ({}));
+          if (!resp.ok || !data.ok) {
+            throw new Error(data.message || "再発行に失敗しました。");
+          }
+
+          window.UI?.showMessage?.(data.message || `${targetLabel}を再発行しました。`, 2200);
+          if (isAdmin && data.settings_url) {
+            window.setTimeout(() => window.location.replace(data.settings_url), 1400);
+          }
+        } catch (err) {
+          console.error(err);
+          window.UI?.showMessage?.(err.message || "再発行に失敗しました。", 2600);
+          btn.disabled = false;
+        }
+      });
+    });
   })();
 });

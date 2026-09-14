@@ -128,8 +128,9 @@
   /* ★設定ページ：メンバー管理表は中身幅で止める（必要なら横スクロール） */
   #members-table {
     display: inline-table !important;
-    width: fit-content !important;
-    max-width: 100% !important;
+    width: 810px !important;
+    min-width: 810px !important;
+    max-width: none !important;
     margin-left: 0 !important;
     margin-right: auto !important;
   }
@@ -284,4 +285,3 @@
   }
 
 }
-

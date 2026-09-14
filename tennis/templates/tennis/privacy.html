@@ -1,0 +1,65 @@
+{% extends "tennis/base.html" %}
+{% load static %}
+
+{% block title %}プライバシーポリシー | Deuce Net{% endblock %}
+{% block extra_head %}
+  <meta name="description" content="Deuce Netのプライバシーポリシーです。取り扱う情報と利用目的をご案内します。">
+{% endblock %}
+{% block header %}{% endblock %}
+
+{% block content %}
+<main class="public-document">
+  <a class="document-brand" href="{% url 'tennis:index' %}">
+    <picture>
+      <source srcset="{% static 'tennis/logo/wordmark.webp' %}" type="image/webp">
+      <img src="{% static 'tennis/logo/wordmark.png' %}" alt="Deuce Net">
+    </picture>
+  </a>
+  <header class="document-header">
+    <p class="landing-kicker">PRIVACY</p>
+    <h1>プライバシーポリシー</h1>
+    <p>Deuce Netで取り扱う情報と、その使い方を定めます。</p>
+  </header>
+
+  <div class="document-body">
+    <section>
+      <h2>1. 取得する情報</h2>
+      <p>クラブ名、メンバーの表示名、開催予定、出欠、コメント、試合結果など、利用者が本サービスへ入力した情報を取得します。幹事がメールアドレスを登録した場合は、そのメールアドレスも取得します。</p>
+      <p>また、サービスの安全な運用のため、IPアドレス、ブラウザ情報、アクセス日時、Cookieやセッション情報などを取得する場合があります。</p>
+    </section>
+
+    <section>
+      <h2>2. 利用目的</h2>
+      <ul>
+        <li>入力された情報の保存、表示、集計</li>
+        <li>クラブURLの確認や復旧に関するメールの送信</li>
+        <li>不正利用の防止、障害対応、セキュリティの確保</li>
+        <li>利用状況の把握とサービスの改善</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>3. 外部サービス</h2>
+      <p>本サービスは、配信、データ保存、セキュリティ確認、メール送信のために外部サービスを利用します。各サービスで扱われる情報には、それぞれの提供者のプライバシーポリシーが適用されます。</p>
+      <p>今後広告を掲載する場合、Googleなどの広告配信事業者がCookie等を使用し、利用者の興味に応じた広告を表示することがあります。Googleによる情報の取り扱いは、<a href="https://policies.google.com/technologies/partner-sites?hl=ja" rel="noopener noreferrer" target="_blank">Googleの案内</a>で確認できます。</p>
+    </section>
+
+    <section>
+      <h2>4. 第三者への提供</h2>
+      <p>法令に基づく場合を除き、本人の同意なく個人情報を第三者へ提供しません。ただし、上記の利用目的に必要な範囲で、業務を委託する事業者へ情報を取り扱わせる場合があります。</p>
+    </section>
+
+    <section>
+      <h2>5. 情報の管理と削除</h2>
+      <p>取得した情報は、漏えい、紛失、改ざんを防ぐため、必要な安全管理を行います。クラブの幹事は、管理画面からクラブデータの確認、ダウンロード、整理を行えます。</p>
+    </section>
+
+    <section>
+      <h2>6. ポリシーの変更</h2>
+      <p>サービス内容や法令の変更に応じて、本ポリシーを改定することがあります。重要な変更は、本サービス上でお知らせします。</p>
+    </section>
+
+    <p class="document-date">制定日：2026年9月9日</p>
+  </div>
+</main>
+{% endblock %}
