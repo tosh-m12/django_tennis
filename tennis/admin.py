@@ -18,6 +18,7 @@ class ClubAdmin(admin.ModelAdmin):
         "id",
         "name",
         "created_date",
+        "last_accessed_datetime",
         "club_home_urls",
         "public_token",
         "admin_token",
@@ -25,11 +26,23 @@ class ClubAdmin(admin.ModelAdmin):
     )
     search_fields = ("name", "public_token", "admin_token")
     list_filter = ("is_active",)
-    readonly_fields = ("public_token", "admin_token", "created_at", "updated_at")
+    readonly_fields = (
+        "public_token",
+        "admin_token",
+        "last_accessed_at",
+        "created_at",
+        "updated_at",
+    )
 
     @admin.display(description="作成日", ordering="created_at")
     def created_date(self, obj: Club):
         return timezone.localtime(obj.created_at).strftime("%Y/%m/%d")
+
+    @admin.display(description="最終アクセス日時", ordering="last_accessed_at", empty_value="—")
+    def last_accessed_datetime(self, obj: Club):
+        if obj.last_accessed_at is None:
+            return None
+        return timezone.localtime(obj.last_accessed_at).strftime("%Y/%m/%d %H:%M")
 
     @admin.display(description="Home URLs")
     def club_home_urls(self, obj: Club):

@@ -1,10 +1,18 @@
 """プロジェクト共通ミドルウェア。"""
+import logging
+
 from django.conf import settings
+from django.core.cache import cache
 from django.core.exceptions import ImproperlyConfigured, MiddlewareNotUsed
 from django.http import JsonResponse, HttpResponse, HttpResponsePermanentRedirect
+from django.utils import timezone
 from django.utils.crypto import constant_time_compare
 
+from tennis.models import Club
 from tennis.security import rate_limit_exceeded
+
+
+log = logging.getLogger(__name__)
 
 
 class OriginVerifyMiddleware:
@@ -55,6 +63,52 @@ class CanonicalHostRedirectMiddleware:
                 f"https://{self.canonical}{request.get_full_path()}"
             )
         return self.get_response(request)
+
+
+class ClubAccessMiddleware:
+    """クラブ画面への最終アクセスを、同じURLごと5分に1回まで記録する。"""
+
+    WRITE_INTERVAL_SECONDS = 300
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        response = self.get_response(request)
+        if response.status_code >= 400:
+            return response
+
+        match = getattr(request, "resolver_match", None)
+        kwargs = getattr(match, "kwargs", {}) or {}
+        club_path_token = kwargs.get("club_public_token")
+        if not club_path_token:
+            return response
+
+        admin_token = kwargs.get("club_admin_token")
+        access_kind = "admin" if admin_token else "public"
+        cache_key = f"club-last-access:{access_kind}:{club_path_token}"
+
+        try:
+            if not cache.add(cache_key, True, timeout=self.WRITE_INTERVAL_SECONDS):
+                return response
+
+            lookup = {"is_active": True}
+            if admin_token:
+                lookup.update(
+                    admin_path_token=club_path_token,
+                    admin_token=admin_token,
+                )
+            else:
+                lookup["public_token"] = club_path_token
+
+            updated = Club.objects.filter(**lookup).update(last_accessed_at=timezone.now())
+            if not updated:
+                cache.delete(cache_key)
+        except Exception:
+            # 記録の失敗で利用者の画面表示を止めない。
+            log.exception("Failed to record club access")
+
+        return response
 
 
 class WriteRateLimitMiddleware:
