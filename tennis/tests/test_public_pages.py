@@ -1,6 +1,6 @@
 from unittest import mock
 
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from tennis.models import Club, ClubOrganizer, EmailThrottle, Member
@@ -86,6 +86,23 @@ class PublicPagesTests(TestCase):
         self.assertEqual(Member.objects.count(), 0)
         self.assertEqual(ClubOrganizer.objects.count(), 0)
         self.assertEqual(EmailThrottle.objects.count(), 0)
+
+    @override_settings(EMAIL_DELIVERY_ENABLED=False)
+    def test_missing_production_email_config_leaves_no_partial_club(self):
+        response = self.client.post(
+            reverse("tennis:index"),
+            {
+                "club_name": "青空テニス",
+                "display_name": "山田 太郎",
+                "email": "taro@example.com",
+            },
+        )
+
+        self.assertEqual(response.status_code, 503)
+        self.assertContains(response, "現在メールを送信できません。", status_code=503)
+        self.assertFalse(Club.objects.exists())
+        self.assertFalse(Member.objects.exists())
+        self.assertFalse(ClubOrganizer.objects.exists())
 
     def test_invalid_email_leaves_no_partial_club(self):
         response = self.client.post(

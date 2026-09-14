@@ -819,6 +819,9 @@ def index(request):
         if not _looks_like_email(email):
             context["registration_error"] = "メールアドレスを確認してください。"
             return render(request, "tennis/index.html", context)
+        if not organizer_email.delivery_enabled():
+            context["registration_error"] = "現在メールを送信できません。時間をおいてからもう一度お試しください。"
+            return render(request, "tennis/index.html", context, status=503)
 
         try:
             with transaction.atomic():
@@ -4758,6 +4761,16 @@ def club_reset_url(request):
         if blocked:
             return blocked
 
+        if not organizer_email.delivery_enabled():
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "error": "email_unavailable",
+                    "message": "現在メールを送信できないため、URLをリセットできません。",
+                },
+                status=503,
+            )
+
         confirmed_emails = list(
             ClubOrganizer.objects.filter(
                 club=club,
@@ -4913,6 +4926,11 @@ def organizer_set_email(request):
     blocked = _require_club_admin_token(request, club)
     if blocked:
         return blocked
+    if not organizer_email.delivery_enabled():
+        return JsonResponse(
+            {"ok": False, "error": "email_unavailable", "message": "現在メールを送信できません。時間をおいて再度お試しください。"},
+            status=503,
+        )
 
     # 同一アドレスへの確認メール乱発を防ぐ
     if not organizer_email.throttle_ok("confirm", email, limit=5, window_seconds=3600):
@@ -5018,6 +5036,13 @@ def recover(request):
     email = organizer_email.normalize_email(request.POST.get("email"))
     if not _looks_like_email(email):
         return render(request, "tennis/recover.html", {"show_topbar": False, "error": "メールアドレスを確認してください。"})
+    if not organizer_email.delivery_enabled():
+        return render(
+            request,
+            "tennis/recover.html",
+            {"show_topbar": False, "error": "現在メールを送信できません。時間をおいて再度お試しください。"},
+            status=503,
+        )
 
     ip = _client_ip(request)
     ok_email = organizer_email.throttle_ok("recover_email", email, limit=3, window_seconds=3600)
@@ -5056,17 +5081,30 @@ def organizer_self_register(request):
     blocked = _require_club_admin_token(request, club)
     if blocked:
         return blocked
+    if not organizer_email.delivery_enabled():
+        return JsonResponse(
+            {"ok": False, "error": "email_unavailable", "message": "現在メールを送信できません。時間をおいて再度お試しください。"},
+            status=503,
+        )
 
     if not organizer_email.throttle_ok("confirm", email, limit=5, window_seconds=3600):
         return JsonResponse({"ok": False, "error": "throttled", "message": "送信が多すぎます。少し待ってください。"}, status=429)
 
-    member = Member.objects.create(
-        club=club,
-        member_no=_next_member_no(club),
-        display_name=name,
-        is_fixed=True,
-    )
-    org = ClubOrganizer.objects.create(club=club, member=member, email=email)
-    organizer_email.send_confirmation_email(request, org)
+    try:
+        with transaction.atomic():
+            member = Member.objects.create(
+                club=club,
+                member_no=_next_member_no(club),
+                display_name=name,
+                is_fixed=True,
+            )
+            org = ClubOrganizer.objects.create(club=club, member=member, email=email)
+            organizer_email.send_confirmation_email(request, org)
+    except Exception:
+        log.exception("Failed to register organizer email")
+        return JsonResponse(
+            {"ok": False, "error": "email_failed", "message": "確認メールを送信できませんでした。時間をおいて再度お試しください。"},
+            status=503,
+        )
 
     return JsonResponse({"ok": True, "message": "確認メールを送りました。"})

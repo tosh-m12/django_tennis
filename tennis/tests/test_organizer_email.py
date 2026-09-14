@@ -1,7 +1,7 @@
 from unittest import mock
 
 from django.core import mail
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
@@ -290,6 +290,26 @@ class OrganizerEmailTests(TestCase):
                 )
                 self.assertEqual(response.status_code, 409)
                 self.assertEqual(response.json()["error"], "confirmed_email_required")
+
+        self.club.refresh_from_db()
+        self.assertEqual(self.club.public_token, old_public_token)
+        self.assertEqual(self.club.admin_token, old_admin_token)
+        send_email.assert_not_called()
+
+    @override_settings(EMAIL_DELIVERY_ENABLED=False)
+    @mock.patch("tennis.views.organizer_email.send_url_reset_email")
+    def test_url_reset_does_not_change_tokens_when_email_delivery_is_unavailable(self, send_email):
+        old_public_token = self.club.public_token
+        old_admin_token = self.club.admin_token
+
+        for reset_kind in ("public", "admin"):
+            with self.subTest(reset_kind=reset_kind):
+                response = self.admin_post(
+                    "tennis:club_reset_url",
+                    {"reset_kind": reset_kind},
+                )
+                self.assertEqual(response.status_code, 503)
+                self.assertEqual(response.json()["error"], "email_unavailable")
 
         self.club.refresh_from_db()
         self.assertEqual(self.club.public_token, old_public_token)

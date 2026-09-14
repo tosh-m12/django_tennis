@@ -5,7 +5,8 @@
 - 送信レート制限（EmailThrottle・DB記録型）
 
 送信元は settings.DEFAULT_FROM_EMAIL（no-reply@deucenet.app）。
-RESEND_API_KEY 未設定時はコンソールバックエンドに流れる（settings 参照）。
+ローカルではコンソール送信を許可するが、本番で RESEND_API_KEY が未設定なら
+メール必須操作を実行しない（settings 参照）。
 """
 
 from datetime import timedelta
@@ -24,6 +25,11 @@ CONFIRM_MAX_AGE = 60 * 60 * 48  # 確認リンクの有効期限：48時間
 
 def normalize_email(email: str) -> str:
     return (email or "").strip().lower()
+
+
+def delivery_enabled() -> bool:
+    """現在の環境で利用者へメールを届けられる設定か。"""
+    return bool(getattr(settings, "EMAIL_DELIVERY_ENABLED", False))
 
 
 # ------------------------------------------------------------
@@ -59,6 +65,8 @@ def _abs(request, name, args):
 
 def send_confirmation_email(request, organizer, target_email: str | None = None) -> None:
     """幹事メール登録の確認メール。指定先（省略時は organizer.email）へ送る。"""
+    if not delivery_enabled():
+        raise RuntimeError("Email delivery is not configured")
     target_email = normalize_email(target_email or organizer.email)
     token = make_confirm_token(organizer.id, target_email)
     url = _abs(request, "tennis:verify_email", [token])
@@ -74,6 +82,8 @@ def send_confirmation_email(request, organizer, target_email: str | None = None)
 
 def send_recovery_email(request, email: str, organizers) -> None:
     """確認済み ClubOrganizer 群に対応するクラブURLを、その登録アドレスに再送。"""
+    if not delivery_enabled():
+        raise RuntimeError("Email delivery is not configured")
     blocks = []
     for org in organizers:
         club = org.club
@@ -95,6 +105,8 @@ def send_recovery_email(request, email: str, organizers) -> None:
 
 def send_url_reset_email(request, email: str, club, reset_kind: str) -> None:
     """URL再発行後、確認済み幹事へ新しいURLを通知する。"""
+    if not delivery_enabled():
+        raise RuntimeError("Email delivery is not configured")
     if reset_kind == "admin":
         label = "幹事用URL"
         url = _abs(request, "tennis:club_home_admin", [club.admin_path_token, club.admin_token])

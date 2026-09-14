@@ -272,11 +272,13 @@ STORAGES = {
 # Email (Resend via django-anymail)
 # ============================================================
 # Railway は送信SMTPポートを制限するため、HTTP API 型(HTTPS)の Resend を使う。
-# RESEND_API_KEY が未設定なら送らずコンソール出力にフォールバック
-#   → ローカル開発や本番の配線前でも安全に動く。
+# RESEND_API_KEY が未設定ならローカル開発時だけコンソールへ出力する。
+# 本番ではメール必須操作を拒否し、送信できないまま登録やURL変更が
+# 成功扱いになる事故を防ぐ。
 # 本番は Railway の環境変数に RESEND_API_KEY をセットするだけで有効化される。
 
 RESEND_API_KEY = env_str("RESEND_API_KEY", "")
+EMAIL_DELIVERY_ENABLED = bool(RESEND_API_KEY) or DEBUG
 
 # 送信元は認証済みドメイン deucenet.app 配下のアドレス
 DEFAULT_FROM_EMAIL = env_str("DEFAULT_FROM_EMAIL", "Deucenet <no-reply@deucenet.app>")
