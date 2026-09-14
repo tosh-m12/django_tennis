@@ -261,7 +261,13 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 
 # WhiteNoise 推奨（manifest 必須の本番運用）
 STORAGES = {
-    "staticfiles": {"BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage"},
+    "staticfiles": {
+        "BACKEND": (
+            "django.contrib.staticfiles.storage.StaticFilesStorage"
+            if DEBUG
+            else "whitenoise.storage.CompressedManifestStaticFilesStorage"
+        )
+    },
 }
 
 # どうしても manifest 不整合を一時回避したい場合だけ True にする（基本は触らない）
