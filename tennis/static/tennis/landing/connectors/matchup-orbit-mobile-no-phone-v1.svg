@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 580" fill="none">
+  <defs>
+    <linearGradient id="blue" x1="108" y1="0" x2="82" y2="580" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7DD8FF"/><stop offset="1" stop-color="#247EF2"/>
+    </linearGradient>
+    <linearGradient id="coral" x1="112" y1="0" x2="138" y2="580" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FF8A77"/><stop offset="1" stop-color="#FFB09F"/>
+    </linearGradient>
+    <radialGradient id="ball" cx="35%" cy="28%" r="72%">
+      <stop stop-color="#F5FF87"/><stop offset=".55" stop-color="#CFF022"/><stop offset="1" stop-color="#8CB900"/>
+    </radialGradient>
+    <filter id="glow" x="-70%" y="-20%" width="240%" height="140%">
+      <feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="ballGlow" x="-100%" y="-100%" width="300%" height="300%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3" result="b"/><feFlood flood-color="#DFFF35" flood-opacity=".7"/><feComposite in2="b" operator="in"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <g stroke-linecap="round" filter="url(#glow)">
+    <path d="M126 0C63 72 76 150 43 223C17 280 31 352 83 410C127 460 108 520 92 580" stroke="url(#blue)" stroke-width="3"/>
+    <path d="M143 0C82 78 91 151 58 229C31 293 48 357 96 416C137 466 123 522 108 580" stroke="#48A9FF" stroke-width="2.4"/>
+    <path d="M160 4C108 87 112 159 75 237C47 297 63 365 109 422C149 471 143 527 126 576" stroke="#87D6FF" stroke-width="1.7"/>
+    <path d="M108 0C30 68 50 153 27 215C5 274 13 343 67 400C112 448 91 518 75 580" stroke="#5EBBFF" stroke-width="1.7" stroke-dasharray="7 13" opacity=".78"/>
+    <path d="M177 7C130 92 132 170 92 246C62 304 79 371 123 430C160 479 158 529 145 573" stroke="#B9E9FF" stroke-width="1.3" opacity=".85"/>
+
+    <path d="M94 0C157 72 144 150 177 223C203 280 189 352 137 410C93 460 112 520 128 580" stroke="url(#coral)" stroke-width="3"/>
+    <path d="M77 0C138 78 129 151 162 229C189 293 172 357 124 416C83 466 97 522 112 580" stroke="#FF7969" stroke-width="2.4"/>
+    <path d="M60 4C112 87 108 159 145 237C173 297 157 365 111 422C71 471 77 527 94 576" stroke="#FFB19F" stroke-width="1.7"/>
+    <path d="M112 0C190 68 170 153 193 215C215 274 207 343 153 400C108 448 129 518 145 580" stroke="#6CBFFF" stroke-width="1.7" stroke-dasharray="7 13" opacity=".75"/>
+    <path d="M43 7C90 92 88 170 128 246C158 304 141 371 97 430C60 479 62 529 75 573" stroke="#FFC6B8" stroke-width="1.3" opacity=".85"/>
+
+    <path d="M170 15C132 112 72 196 91 287C108 369 172 428 105 571" stroke="#65BCFF" stroke-width="1.15" opacity=".75"/>
+    <path d="M52 12C91 107 153 190 133 281C115 362 51 427 118 570" stroke="#FF9D8B" stroke-width="1.05" stroke-dasharray="6 12" opacity=".64"/>
+  </g>
+
+  <g filter="url(#ballGlow)">
+    <g transform="translate(151 94) rotate(14)"><circle r="10" fill="url(#ball)" stroke="#E9FF39" stroke-width="1.6"/><path d="M-8-6C-3-4-3 4-8 6M8-6C3-4 3 4 8 6" stroke="white" stroke-width="1.4"/></g>
+    <g transform="translate(77 168) rotate(18)"><circle r="13" fill="url(#ball)" stroke="#E9FF39" stroke-width="2"/><path d="M-10-8C-4-5-4 5-10 8M10-8C4-5 4 5 10 8" stroke="white" stroke-width="1.8"/></g>
+    <g transform="translate(42 288) rotate(-17)"><circle r="16" fill="url(#ball)" stroke="#E9FF39" stroke-width="2"/><path d="M-12-10C-5-6-5 6-12 10M12-10C5-6 5 6 12 10" stroke="white" stroke-width="2"/></g>
+    <g transform="translate(91 405) rotate(23)"><circle r="13" fill="url(#ball)" stroke="#E9FF39" stroke-width="2"/><path d="M-10-8C-4-5-4 5-10 8M10-8C4-5 4 5 10 8" stroke="white" stroke-width="1.8"/></g>
+    <g transform="translate(157 455) rotate(-16)"><circle r="10" fill="url(#ball)" stroke="#E9FF39" stroke-width="1.6"/><path d="M-8-6C-3-4-3 4-8 6M8-6C3-4 3 4 8 6" stroke="white" stroke-width="1.4"/></g>
+    <g transform="translate(108 505) rotate(-20)"><circle r="13" fill="url(#ball)" stroke="#E9FF39" stroke-width="2"/><path d="M-10-8C-4-5-4 5-10 8M10-8C4-5 4 5 10 8" stroke="white" stroke-width="1.8"/></g>
+  </g>
+</svg>

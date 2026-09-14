@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1050 430" fill="none">
+  <defs>
+    <linearGradient id="blue" x1="40" y1="330" x2="530" y2="245" gradientUnits="userSpaceOnUse"><stop stop-color="#7DD8FF"/><stop offset="1" stop-color="#247EF2"/></linearGradient>
+    <linearGradient id="coral" x1="525" y1="245" x2="1030" y2="330" gradientUnits="userSpaceOnUse"><stop stop-color="#FF8A77"/><stop offset="1" stop-color="#FFB09F"/></linearGradient>
+    <radialGradient id="ball" cx="35%" cy="28%" r="72%"><stop stop-color="#F5FF87"/><stop offset=".55" stop-color="#CFF022"/><stop offset="1" stop-color="#8CB900"/></radialGradient>
+    <filter id="glow" x="-30%" y="-80%" width="160%" height="260%"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="ballGlow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur in="SourceAlpha" stdDeviation="3" result="b"/><feFlood flood-color="#DFFF35" flood-opacity=".7"/><feComposite in2="b" operator="in"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <g stroke-linecap="round" filter="url(#glow)">
+    <!-- loose orbits around the two plinths -->
+    <path d="M18 338C92 401 259 414 408 351" stroke="#55B4FF" stroke-width="2.1"/>
+    <path d="M42 316C130 374 278 386 421 331" stroke="#A7E3FF" stroke-width="1.2" stroke-dasharray="6 12" opacity=".78"/>
+    <path d="M642 344C793 412 961 403 1038 337" stroke="#FF8A77" stroke-width="2.1"/>
+    <path d="M631 326C776 385 924 378 1012 317" stroke="#79C8FF" stroke-width="1.2" stroke-dasharray="6 12" opacity=".72"/>
+
+    <path d="M18 350C138 284 250 299 365 269C431 252 482 239 526 247" stroke="url(#blue)" stroke-width="3"/>
+    <path d="M27 365C148 308 260 322 371 286C438 264 482 251 526 253" stroke="#48A9FF" stroke-width="2.4"/>
+    <path d="M45 382C171 337 276 343 386 301C445 278 487 264 527 260" stroke="#87D6FF" stroke-width="1.7"/>
+    <path d="M14 329C127 250 245 272 352 252C424 239 478 231 526 241" stroke="#5EBBFF" stroke-width="1.7" stroke-dasharray="7 13" opacity=".78"/>
+    <path d="M90 397C196 369 288 369 392 321C453 293 492 276 529 267" stroke="#B9E9FF" stroke-width="1.3" opacity=".85"/>
+
+    <path d="M528 247C590 229 648 249 716 278C811 319 907 299 1037 350" stroke="url(#coral)" stroke-width="3"/>
+    <path d="M528 253C594 241 650 264 718 292C816 333 914 315 1030 366" stroke="#FF7969" stroke-width="2.4"/>
+    <path d="M529 260C598 255 656 278 728 307C825 346 920 333 1016 382" stroke="#FFB19F" stroke-width="1.7"/>
+    <path d="M526 241C586 214 645 229 707 259C800 303 906 279 1042 329" stroke="#6CBFFF" stroke-width="1.7" stroke-dasharray="7 13" opacity=".75"/>
+    <path d="M529 267C602 270 662 293 737 322C831 359 916 351 992 398" stroke="#FFC6B8" stroke-width="1.3" opacity=".85"/>
+
+    <!-- two stray strands cross the bundle, as in the slide artwork -->
+    <path d="M94 392C248 366 375 304 511 270C627 241 774 302 1008 388" stroke="#65BCFF" stroke-width="1.15" opacity=".75"/>
+    <path d="M1006 371C862 344 744 294 616 276C510 261 382 306 115 382" stroke="#FF9D8B" stroke-width="1.05" stroke-dasharray="6 12" opacity=".64"/>
+  </g>
+  <g filter="url(#ballGlow)">
+    <g transform="translate(304 287) rotate(18)"><circle r="13" fill="url(#ball)" stroke="#E9FF39" stroke-width="2"/><path d="M-10-8C-4-5-4 5-10 8M10-8C4-5 4 5 10 8" stroke="white" stroke-width="1.8"/></g>
+    <g transform="translate(526 251) rotate(-17)"><circle r="16" fill="url(#ball)" stroke="#E9FF39" stroke-width="2"/><path d="M-12-10C-5-6-5 6-12 10M12-10C5-6 5 6 12 10" stroke="white" stroke-width="2"/></g>
+    <g transform="translate(737 298) rotate(23)"><circle r="13" fill="url(#ball)" stroke="#E9FF39" stroke-width="2"/><path d="M-10-8C-4-5-4 5-10 8M10-8C4-5 4 5 10 8" stroke="white" stroke-width="1.8"/></g>
+    <g transform="translate(915 317) rotate(-20)"><circle r="13" fill="url(#ball)" stroke="#E9FF39" stroke-width="2"/><path d="M-10-8C-4-5-4 5-10 8M10-8C4-5 4 5 10 8" stroke="white" stroke-width="1.8"/></g>
+    <g transform="translate(182 375) rotate(14)"><circle r="10" fill="url(#ball)" stroke="#E9FF39" stroke-width="1.6"/><path d="M-8-6C-3-4-3 4-8 6M8-6C3-4 3 4 8 6" stroke="white" stroke-width="1.4"/></g>
+    <g transform="translate(827 367) rotate(-16)"><circle r="10" fill="url(#ball)" stroke="#E9FF39" stroke-width="1.6"/><path d="M-8-6C-3-4-3 4-8 6M8-6C3-4 3 4 8 6" stroke="white" stroke-width="1.4"/></g>
+  </g>
+</svg>

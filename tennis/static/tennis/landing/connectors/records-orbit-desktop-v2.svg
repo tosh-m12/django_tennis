@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 980 900" fill="none">
+  <defs>
+    <linearGradient id="blue" x1="490" y1="405" x2="0" y2="800" gradientUnits="userSpaceOnUse"><stop stop-color="#2B83F4"/><stop offset="1" stop-color="#81DAFF"/></linearGradient>
+    <linearGradient id="coral" x1="490" y1="405" x2="980" y2="800" gradientUnits="userSpaceOnUse"><stop stop-color="#FF7766"/><stop offset="1" stop-color="#FFB4A3"/></linearGradient>
+    <radialGradient id="ball" cx="35%" cy="28%" r="72%"><stop stop-color="#F5FF87"/><stop offset=".55" stop-color="#CFF022"/><stop offset="1" stop-color="#8CB900"/></radialGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="3.5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+    <filter id="ballGlow" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur in="SourceAlpha" stdDeviation="3" result="b"/><feFlood flood-color="#DFFF35" flood-opacity=".7"/><feComposite in2="b" operator="in"/><feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <g stroke-linecap="round" filter="url(#glow)">
+    <!-- partial rings: the strands pass around each platform rather than stopping at it -->
+    <path d="M292 373C343 430 636 436 688 373" stroke="#73C8FF" stroke-width="1.7" stroke-dasharray="7 13" opacity=".75"/>
+    <path d="M309 389C383 447 603 448 671 390" stroke="#FF9B89" stroke-width="1.35" opacity=".66"/>
+
+    <!-- The strands begin beneath the score platform, then spread independently. -->
+    <path d="M444 386C449 459 421 525 366 594C294 683 184 733 18 781" stroke="url(#blue)" stroke-width="3"/>
+    <path d="M458 390C459 467 428 535 375 607C303 704 195 752 32 803" stroke="#4EA9FF" stroke-width="2.3"/>
+    <path d="M472 391C469 478 437 548 386 620C315 720 216 771 62 823" stroke="#8BD9FF" stroke-width="1.6"/>
+    <path d="M430 382C439 449 412 511 355 579C281 667 167 715 8 756" stroke="#69C1FF" stroke-width="1.7" stroke-dasharray="7 13" opacity=".78"/>
+    <path d="M480 396C472 493 439 565 395 632C330 728 242 790 105 842" stroke="#C1ECFF" stroke-width="1.2" opacity=".9"/>
+
+    <path d="M536 386C531 459 559 525 614 594C686 683 796 733 962 781" stroke="url(#coral)" stroke-width="3"/>
+    <path d="M522 390C521 467 552 535 605 607C677 704 785 752 948 803" stroke="#FF7F6E" stroke-width="2.3"/>
+    <path d="M508 391C511 478 543 548 594 620C665 720 764 771 918 823" stroke="#FFB19F" stroke-width="1.6"/>
+    <path d="M550 382C541 449 568 511 625 579C699 667 813 715 972 756" stroke="#70C5FF" stroke-width="1.7" stroke-dasharray="7 13" opacity=".74"/>
+    <path d="M500 396C508 493 541 565 585 632C650 728 738 790 875 842" stroke="#FFD0C4" stroke-width="1.2" opacity=".9"/>
+
+    <!-- crossing strands keep the bundle organic instead of a diagrammatic Y -->
+    <path d="M535 390C520 475 492 541 438 617C353 738 230 789 44 831" stroke="#FF9A87" stroke-width="1.2" stroke-dasharray="6 12" opacity=".6"/>
+    <path d="M445 389C461 477 491 543 545 617C633 738 753 787 936 829" stroke="#69C4FF" stroke-width="1.2" stroke-dasharray="6 12" opacity=".64"/>
+
+    <!-- Small ground-level sweeps make each bundle appear to pass around its platform. -->
+    <path d="M12 799C118 837 235 834 342 794" stroke="#4CA8FF" stroke-width="2"/>
+    <path d="M30 776C139 817 250 808 355 775" stroke="#9CDEFF" stroke-width="1.2" stroke-dasharray="7 13" opacity=".72"/>
+    <path d="M968 799C862 837 745 834 638 794" stroke="#FF8B79" stroke-width="2"/>
+    <path d="M950 776C841 817 730 808 625 775" stroke="#76C9FF" stroke-width="1.2" stroke-dasharray="7 13" opacity=".68"/>
+  </g>
+  <g filter="url(#ballGlow)">
+    <g transform="translate(449 456) rotate(-16)"><circle r="13" fill="url(#ball)" stroke="#E9FF39" stroke-width="2"/><path d="M-10-8C-4-5-4 5-10 8M10-8C4-5 4 5 10 8" stroke="white" stroke-width="1.8"/></g>
+    <g transform="translate(370 596) rotate(21)"><circle r="13" fill="url(#ball)" stroke="#E9FF39" stroke-width="2"/><path d="M-10-8C-4-5-4 5-10 8M10-8C4-5 4 5 10 8" stroke="white" stroke-width="1.8"/></g>
+    <g transform="translate(228 744) rotate(-20)"><circle r="13" fill="url(#ball)" stroke="#E9FF39" stroke-width="2"/><path d="M-10-8C-4-5-4 5-10 8M10-8C4-5 4 5 10 8" stroke="white" stroke-width="1.8"/></g>
+    <g transform="translate(531 456) rotate(-23)"><circle r="13" fill="url(#ball)" stroke="#E9FF39" stroke-width="2"/><path d="M-10-8C-4-5-4 5-10 8M10-8C4-5 4 5 10 8" stroke="white" stroke-width="1.8"/></g>
+    <g transform="translate(610 596) rotate(18)"><circle r="13" fill="url(#ball)" stroke="#E9FF39" stroke-width="2"/><path d="M-10-8C-4-5-4 5-10 8M10-8C4-5 4 5 10 8" stroke="white" stroke-width="1.8"/></g>
+    <g transform="translate(752 744) rotate(-18)"><circle r="13" fill="url(#ball)" stroke="#E9FF39" stroke-width="2"/><path d="M-10-8C-4-5-4 5-10 8M10-8C4-5 4 5 10 8" stroke="white" stroke-width="1.8"/></g>
+    <g transform="translate(294 692) rotate(16)"><circle r="10" fill="url(#ball)" stroke="#E9FF39" stroke-width="1.6"/><path d="M-8-6C-3-4-3 4-8 6M8-6C3-4 3 4 8 6" stroke="white" stroke-width="1.4"/></g>
+    <g transform="translate(690 693) rotate(-14)"><circle r="10" fill="url(#ball)" stroke="#E9FF39" stroke-width="1.6"/><path d="M-8-6C-3-4-3 4-8 6M8-6C3-4 3 4 8 6" stroke="white" stroke-width="1.4"/></g>
+  </g>
+</svg>

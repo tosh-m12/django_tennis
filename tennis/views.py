@@ -796,38 +796,38 @@ def index(request):
             window_seconds=settings.CLUB_CREATE_RATE_WINDOW_SECONDS,
         ):
             context["registration_error"] = "登録回数が上限に達しました。時間を置いてお試しください。"
-            response = render(request, "tennis/index.html", context, status=429)
+            response = render(request, "tennis/index_mobile_first_preview.html", context, status=429)
             response["Retry-After"] = str(settings.CLUB_CREATE_RATE_WINDOW_SECONDS)
             return response
 
         if not verify_turnstile(request, expected_action="club-create"):
             context["registration_error"] = "確認に失敗しました。もう一度お試しください。"
-            return render(request, "tennis/index.html", context, status=400)
+            return render(request, "tennis/index_mobile_first_preview.html", context, status=400)
 
         if not club_name:
             context["registration_error"] = "サークル名を入力してください。"
-            return render(request, "tennis/index.html", context)
+            return render(request, "tennis/index_mobile_first_preview.html", context)
         if len(club_name) > Club._meta.get_field("name").max_length:
             context["registration_error"] = "サークル名が長すぎます。"
-            return render(request, "tennis/index.html", context)
+            return render(request, "tennis/index_mobile_first_preview.html", context)
         if not display_name:
             context["registration_error"] = "お名前を入力してください。"
-            return render(request, "tennis/index.html", context)
+            return render(request, "tennis/index_mobile_first_preview.html", context)
         if len(display_name) > Member._meta.get_field("display_name").max_length:
             context["registration_error"] = "お名前が長すぎます。"
-            return render(request, "tennis/index.html", context)
+            return render(request, "tennis/index_mobile_first_preview.html", context)
         if not _looks_like_email(email):
             context["registration_error"] = "メールアドレスを確認してください。"
-            return render(request, "tennis/index.html", context)
+            return render(request, "tennis/index_mobile_first_preview.html", context)
         if not organizer_email.delivery_enabled():
             context["registration_error"] = "現在メールを送信できません。時間をおいてからもう一度お試しください。"
-            return render(request, "tennis/index.html", context, status=503)
+            return render(request, "tennis/index_mobile_first_preview.html", context, status=503)
 
         try:
             with transaction.atomic():
                 if not organizer_email.throttle_ok("confirm", email, limit=5, window_seconds=3600):
                     context["registration_error"] = "送信が多すぎます。少し待ってからお試しください。"
-                    return render(request, "tennis/index.html", context, status=429)
+                    return render(request, "tennis/index_mobile_first_preview.html", context, status=429)
 
                 club = Club.objects.create(name=club_name)
                 member = Member.objects.create(
@@ -845,7 +845,7 @@ def index(request):
         except Exception:
             log.exception("Failed to create club registration")
             context["registration_error"] = "登録できませんでした。時間をおいてからもう一度お試しください。"
-            return render(request, "tennis/index.html", context, status=503)
+            return render(request, "tennis/index_mobile_first_preview.html", context, status=503)
 
         url = reverse(
             "tennis:club_home_admin",
@@ -853,7 +853,7 @@ def index(request):
         )
         return redirect(url)
 
-    return render(request, "tennis/index.html", {
+    return render(request, "tennis/index_mobile_first_preview.html", {
         "show_topbar": False,
         "turnstile_enabled": settings.TURNSTILE_ENABLED,
         "turnstile_site_key": settings.TURNSTILE_SITE_KEY,

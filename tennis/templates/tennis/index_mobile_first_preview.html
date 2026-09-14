@@ -1,0 +1,308 @@
+{% extends "tennis/base.html" %}
+{% load static %}
+
+{% block title %}DeuceNet - トップ{% endblock %}
+
+{% block extra_head %}
+  <meta name="description" content="テニスサークルの練習会スケジュール、出欠、対戦表、個人・クラブ戦績をURLひとつで管理できます。">
+  <link rel="stylesheet" href="{% static 'tennis/index.css' %}">
+  <link rel="stylesheet" href="{% static 'tennis/index_mobile_first_preview.css' %}?v=68">
+  {% if turnstile_enabled %}
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  {% endif %}
+{% endblock %}
+
+{% block header %}{% endblock %}
+
+{% block content %}
+<main class="mobile-first-page">
+  <section class="mobile-first-hero" aria-labelledby="mobile-first-title">
+    <div class="mobile-first-shell">
+      <picture>
+        <source srcset="{% static 'tennis/logo/wordmark.webp' %}" type="image/webp">
+        <img class="mobile-first-logo" src="{% static 'tennis/logo/wordmark.png' %}" alt="Deuce Net">
+      </picture>
+
+      <div class="mobile-first-orange-rule" aria-hidden="true"></div>
+      <h1 id="mobile-first-title">テニスサークル運営を<br><strong>URLひとつで</strong></h1>
+      <div class="mobile-first-orange-rule mobile-first-orange-rule-secondary" aria-hidden="true"></div>
+      <p class="mobile-first-hero-lead">出欠・対戦表・スコア・戦績管理</p>
+
+      <form method="post" action="{% url 'tennis:index' %}" class="mobile-first-form" id="club-registration-start" novalidate>
+        {% csrf_token %}
+        <label class="sr-only" for="club-name">サークル名</label>
+        <input
+          id="club-name"
+          type="text"
+          name="club_name"
+          placeholder="サークル名を入力"
+          maxlength="200"
+          required
+          autofocus
+          value="{{ club_name|default:'' }}"
+        >
+        <button type="submit" class="mobile-first-action mobile-first-action-primary mobile-first-action-register">サークルを登録</button>
+        <a class="mobile-first-action mobile-first-action-secondary mobile-first-action-demo" href="{% url 'tennis:demo' %}">デモを試す</a>
+      </form>
+    </div>
+
+  </section>
+
+  <div
+    id="club-registration-modal"
+    class="club-registration-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="club-registration-modal-title"
+    {% if not show_registration_modal %}hidden{% endif %}
+  >
+    <div class="club-registration-modal-box">
+      <h2 id="club-registration-modal-title">幹事情報の登録</h2>
+      <p>確認メールを送ります。</p>
+
+      <form method="post" id="club-registration-form">
+        {% csrf_token %}
+        <input type="hidden" name="club_name" id="registration-club-name" value="{{ club_name|default:'' }}">
+
+        <div class="club-registration-field">
+          <label for="registration-display-name">お名前</label>
+          <input
+            type="text"
+            id="registration-display-name"
+            name="display_name"
+            maxlength="100"
+            autocomplete="name"
+            required
+            value="{{ display_name|default:'' }}"
+          >
+        </div>
+
+        <div class="club-registration-field">
+          <label for="registration-email">メールアドレス</label>
+          <input
+            type="email"
+            id="registration-email"
+            name="email"
+            maxlength="254"
+            autocomplete="email"
+            required
+            value="{{ email|default:'' }}"
+          >
+        </div>
+
+        {% if registration_error %}
+          <p class="club-registration-error" role="alert">{{ registration_error }}</p>
+        {% endif %}
+
+        {% if turnstile_enabled %}
+          <div class="cf-turnstile"
+               data-sitekey="{{ turnstile_site_key }}"
+               data-action="club-create"
+               style="display:flex;justify-content:center;margin:18px 0;"></div>
+        {% endif %}
+
+        <div class="club-registration-modal-actions">
+          <button type="button" class="btn btn-pill" id="club-registration-back">戻る</button>
+          <button type="submit" class="btn btn-pill btn-primary" id="club-registration-submit">登録する</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <section class="mobile-first-section mobile-first-hub" aria-labelledby="mobile-first-hub-title">
+    <header class="mobile-first-section-heading">
+      <p class="mobile-first-section-number">01</p>
+      <h2 id="mobile-first-hub-title">サークル運営に必要な<br>5つの機能を、ひとつに</h2>
+    </header>
+
+    <div class="mobile-first-hub-visual" aria-label="DeuceNetの5つの機能">
+      <figure class="mobile-first-node mobile-first-node-attendance">
+        <figcaption>出欠管理</figcaption>
+        <img src="{% static 'tennis/landing/overview_v25/attendance.png' %}" alt="" width="1309" height="1201">
+      </figure>
+      <figure class="mobile-first-node mobile-first-node-matchup">
+        <figcaption>対戦表生成</figcaption>
+        <img src="{% static 'tennis/landing/overview_v25/matchup-round-list-v2.png' %}" alt="" width="1491" height="1055">
+      </figure>
+      <figure class="mobile-first-node mobile-first-node-score">
+        <figcaption>スコア記録</figcaption>
+        <img src="{% static 'tennis/landing/overview_v25/score.png' %}" alt="" width="1536" height="1024">
+      </figure>
+      <figure class="mobile-first-node mobile-first-node-personal">
+        <figcaption>個人戦績</figcaption>
+        <img src="{% static 'tennis/landing/overview_v25/personal.png' %}" alt="" width="1492" height="1054">
+      </figure>
+      <figure class="mobile-first-node mobile-first-node-club">
+        <figcaption>クラブ戦績</figcaption>
+        <img src="{% static 'tennis/landing/overview_v25/club.png' %}" alt="" width="1385" height="1136">
+      </figure>
+    </div>
+  </section>
+
+  <section class="mobile-first-section mobile-first-matchups" aria-labelledby="mobile-first-matchups-title">
+    <header class="mobile-first-section-heading">
+      <p class="mobile-first-section-number">02</p>
+      <h2 id="mobile-first-matchups-title">その日の出席者リストから<br>対戦表を自動生成</h2>
+      <p>幹事が試合参加メンバーを確認、<br>コート面数とラウンド数を指定すると<br>対戦表が瞬時に生成</p>
+    </header>
+
+    <div class="mobile-first-process" aria-label="当日出席者から対戦表生成へつながる流れ">
+      <div class="mobile-first-mobile-composite">
+        <img src="{% static 'tennis/landing/composites/matchup-orbit-mobile-reflection-v2.png' %}"
+             alt="当日出席者から対戦表生成へ、複数の光の線とテニスボールが白い床面を巡ってつながる様子"
+             width="1024" height="1536">
+        <span class="mobile-first-mobile-label mobile-first-mobile-label-attendance">当日出席者</span>
+        <span class="mobile-first-mobile-label mobile-first-mobile-label-matchup">対戦表生成</span>
+      </div>
+      <div class="mobile-first-desktop-composite mobile-first-matchup-composite">
+        <img class="mobile-first-composite-art"
+             src="{% static 'tennis/landing/composites/matchup-orbit-integrated-current-v2.png' %}"
+             alt="当日出席者と対戦表生成がDeuceNetを介して複数の光の線でつながる様子"
+             width="1772" height="888">
+        <span class="mobile-first-composite-label mobile-first-label-attendance">当日出席者</span>
+        <span class="mobile-first-composite-label mobile-first-label-matchup">対戦表生成</span>
+      </div>
+      <img class="mobile-first-weave mobile-first-matchup-weave"
+           src="{% static 'tennis/landing/connectors/matchup-orbit-desktop-v2.svg' %}" alt="" aria-hidden="true">
+      <figure>
+        <span>当日出席者</span>
+        <img src="{% static 'tennis/landing/overview_v25/attendance.png' %}"
+             alt="出席するテニスサークルのメンバー" width="1309" height="1201">
+      </figure>
+      <div class="mobile-first-process-line" aria-hidden="true">
+        <img src="{% static 'tennis/landing/connectors/matchup-orbit-mobile-no-phone-v1.svg' %}" alt="" width="220" height="580">
+      </div>
+      <figure>
+        <span>対戦表生成</span>
+        <img src="{% static 'tennis/landing/overview_v25/matchup-round-list-v2.png' %}"
+             alt="自動生成された対戦表" width="1491" height="1055">
+      </figure>
+    </div>
+  </section>
+
+  <section class="mobile-first-section mobile-first-records" aria-labelledby="mobile-first-records-title">
+    <header class="mobile-first-section-heading">
+      <p class="mobile-first-section-number">03</p>
+      <h2 id="mobile-first-records-title">クラブ内ランキング、<br>個人戦績も管理可能</h2>
+      <p>練習試合の結果をデータとして蓄積し、<br>自動で個人戦績や<br>クラブ内ランキング分析</p>
+    </header>
+
+    <div class="mobile-first-record-flow" aria-label="スコア記録から個人戦績とクラブ戦績につながる流れ">
+      <div class="mobile-first-record-mobile-composite">
+        <img src="{% static 'tennis/landing/composites/records-orbit-mobile-reflection-v1.png' %}"
+             alt="スコア記録から個人戦績とクラブ戦績へ、複数の光の線とテニスボールが白い床面を巡ってつながる様子"
+             width="1024" height="1536">
+        <span class="mobile-first-record-mobile-label mobile-first-record-mobile-label-score">スコア記録</span>
+        <span class="mobile-first-record-mobile-label mobile-first-record-mobile-label-personal">個人戦績</span>
+        <span class="mobile-first-record-mobile-label mobile-first-record-mobile-label-club">クラブ戦績</span>
+      </div>
+      <div class="mobile-first-desktop-composite mobile-first-record-composite">
+        <img class="mobile-first-composite-art"
+             src="{% static 'tennis/landing/composites/records-orbit-integrated-v1.png' %}"
+             alt="スコア記録から個人戦績とクラブ戦績へ複数の光の線とテニスボールが広がる様子"
+             width="1672" height="941">
+        <span class="mobile-first-composite-label mobile-first-label-score">スコア記録</span>
+        <span class="mobile-first-composite-label mobile-first-label-personal">個人戦績</span>
+        <span class="mobile-first-composite-label mobile-first-label-club">クラブ戦績</span>
+      </div>
+      <img class="mobile-first-weave mobile-first-records-weave"
+           src="{% static 'tennis/landing/connectors/records-orbit-desktop-v2.svg' %}" alt="" aria-hidden="true">
+      <figure class="mobile-first-record-score">
+        <span>スコア記録</span>
+        <img src="{% static 'tennis/landing/overview_v25/score.png' %}"
+             alt="練習試合のスコア記録" width="1536" height="1024">
+      </figure>
+      <div class="mobile-first-record-branch" aria-hidden="true">
+        <img src="{% static 'tennis/landing/connectors/records-branch-v25-v1.png' %}" alt="" width="1448" height="1086">
+      </div>
+      <div class="mobile-first-record-results">
+        <figure>
+          <span>個人戦績</span>
+          <img src="{% static 'tennis/landing/overview_v25/personal.png' %}"
+               alt="プレーヤーの個人戦績" width="1492" height="1054">
+        </figure>
+        <figure>
+          <span>クラブ戦績</span>
+          <img src="{% static 'tennis/landing/overview_v25/club.png' %}"
+               alt="クラブ内のランキング" width="1385" height="1136">
+        </figure>
+      </div>
+    </div>
+  </section>
+
+  <section class="mobile-first-section mobile-first-login" aria-labelledby="mobile-first-login-title">
+    <header class="mobile-first-section-heading">
+      <p class="mobile-first-section-number">04</p>
+      <h2 id="mobile-first-login-title">ログインしなくても<br>利用可能</h2>
+      <p>いつもお使いのメッセージアプリで<br>URLを共有するだけ</p>
+      <p class="mobile-first-organizer-note">※幹事はメール登録が必須です</p>
+    </header>
+
+    <figure class="mobile-first-login-visual">
+      <img class="mobile-first-share-scene mobile-first-share-scene-mobile"
+           src="{% static 'tennis/landing/login/share-url-v25-v2.png' %}"
+           alt="幹事がスマートフォンから3人のメンバーへURLを共有する様子"
+           width="1122" height="1402">
+      <img class="mobile-first-share-scene mobile-first-share-scene-desktop"
+           src="{% static 'tennis/landing/login/share-url-v25-desktop-v2.png' %}"
+           alt="左側の幹事がスマートフォンから右側の3人のメンバーへURLを共有する様子"
+           width="1672" height="941">
+    </figure>
+  </section>
+</main>
+{% endblock %}
+
+{% block extra_scripts %}
+<script>
+(function () {
+  const startForm = document.getElementById("club-registration-start");
+  const modal = document.getElementById("club-registration-modal");
+  const clubName = document.getElementById("club-name");
+  const modalClubName = document.getElementById("registration-club-name");
+  const displayName = document.getElementById("registration-display-name");
+  const backButton = document.getElementById("club-registration-back");
+  const registrationForm = document.getElementById("club-registration-form");
+  const submitButton = document.getElementById("club-registration-submit");
+
+  if (!startForm || !modal || !clubName || !modalClubName) return;
+
+  function openModal() {
+    modalClubName.value = clubName.value.trim();
+    modal.hidden = false;
+    document.body.classList.add("club-registration-modal-open");
+    window.setTimeout(() => displayName && displayName.focus(), 0);
+  }
+
+  function closeModal() {
+    modal.hidden = true;
+    document.body.classList.remove("club-registration-modal-open");
+    clubName.focus();
+  }
+
+  startForm.addEventListener("submit", function (event) {
+    event.preventDefault();
+    clubName.value = clubName.value.trim();
+    if (!clubName.checkValidity()) {
+      clubName.reportValidity();
+      return;
+    }
+    openModal();
+  });
+
+  backButton.addEventListener("click", closeModal);
+  document.addEventListener("keydown", function (event) {
+    if (event.key === "Escape" && !modal.hidden) closeModal();
+  });
+
+  registrationForm.addEventListener("submit", function () {
+    modalClubName.value = clubName.value.trim();
+    submitButton.disabled = true;
+    submitButton.textContent = "登録中…";
+  });
+
+  if (!modal.hidden) {
+    document.body.classList.add("club-registration-modal-open");
+  }
+})();
+</script>
+{% endblock %}
