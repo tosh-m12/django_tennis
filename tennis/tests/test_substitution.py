@@ -24,6 +24,7 @@ from .factories import (
     make_ep,
     make_published_schedule,
     make_score,
+    set_member_session,
 )
 
 
@@ -55,6 +56,7 @@ class SubstituteSlotTests(TestCase):
         make_score(self.ms, 1, 1, 6, 3)  # この試合にスコアあり
 
         self.url = reverse("tennis:substitute_slot")
+        set_member_session(self.client, self.club.id)
 
     def _post(self, **extra):
         data = {

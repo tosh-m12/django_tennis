@@ -8,6 +8,7 @@ import uuid
 from collections import defaultdict
 from datetime import time
 
+from django.conf import settings
 from django.db import transaction, models
 from django.db.models import Max
 from django.shortcuts import render, get_object_or_404, redirect
@@ -19,6 +20,7 @@ from django.views.decorators.csrf import ensure_csrf_cookie
 from django.template.loader import render_to_string
 
 from .utils import generate_doubles_schedule, generate_singles_schedule
+from .security import rate_limit_exceeded, verify_turnstile
 from .models import (
     ActorTokenKind,
     AuditLog,
@@ -49,6 +51,10 @@ MAX_FLAGS = 3  # V1仕様：クラブごとのフラグ最大数
 
 MAX_EVENT_FLAGS = 2
 
+MAX_MEMBER_NAME_LENGTH = 100
+MAX_COMMENT_LENGTH = 500
+MAX_CLUB_NAME_LENGTH = 200
+
 log = logging.getLogger(__name__)
 
 
@@ -56,6 +62,21 @@ log = logging.getLogger(__name__)
 # Session Auth (token-based admin access)
 #  - eventページの「幹事モード」は、URL token 一致でセッションにフラグを立てる方式
 # ============================================================
+
+def _club_member_session_key(club_id: int) -> str:
+    return f"tennis_club_member:{club_id}"
+
+
+def _mark_club_member_session(request, club_id: int) -> None:
+    """正しい公開URLを開いたセッションに、そのクラブの操作権を記録する。"""
+    key = _club_member_session_key(club_id)
+    if not request.session.get(key, False):
+        request.session[key] = True
+        request.session.modified = True
+
+
+def _is_club_member_session(request, club_id: int) -> bool:
+    return bool(request.session.get(_club_member_session_key(club_id), False))
 
 def _admin_session_key(event_id: int) -> str:
     return f"tennis_event_admin:{event_id}"
@@ -195,7 +216,7 @@ def _get_or_create_member_for_name(club: Club, name: str) -> Member | None:
     無ければ非固定Memberとして作成（臨時参加）
     """
     name = (name or "").strip()
-    if not name:
+    if not name or len(name) > MAX_MEMBER_NAME_LENGTH:
         return None
 
     m = (
@@ -754,7 +775,24 @@ def index(request):
             "club_name": club_name,
             "display_name": display_name,
             "email": email,
+            "turnstile_enabled": settings.TURNSTILE_ENABLED,
+            "turnstile_site_key": settings.TURNSTILE_SITE_KEY,
         }
+
+        if rate_limit_exceeded(
+            request,
+            scope="club-create",
+            limit=settings.CLUB_CREATE_RATE_LIMIT,
+            window_seconds=settings.CLUB_CREATE_RATE_WINDOW_SECONDS,
+        ):
+            context["registration_error"] = "登録回数が上限に達しました。時間を置いてお試しください。"
+            response = render(request, "tennis/index.html", context, status=429)
+            response["Retry-After"] = str(settings.CLUB_CREATE_RATE_WINDOW_SECONDS)
+            return response
+
+        if not verify_turnstile(request, expected_action="club-create"):
+            context["registration_error"] = "確認に失敗しました。もう一度お試しください。"
+            return render(request, "tennis/index.html", context, status=400)
 
         if not club_name:
             context["registration_error"] = "サークル名を入力してください。"
@@ -802,22 +840,23 @@ def index(request):
         )
         return redirect(url)
 
-    return render(request, "tennis/index.html", {"show_topbar": False})
+    return render(request, "tennis/index.html", {
+        "show_topbar": False,
+        "turnstile_enabled": settings.TURNSTILE_ENABLED,
+        "turnstile_site_key": settings.TURNSTILE_SITE_KEY,
+    })
 
 
-@require_http_methods(["GET"])
+@require_http_methods(["GET", "POST"])
 def demo_entry(request):
     """
     /demo : 訪問者（セッション）ごとに専用のデモクラブを発行してメンバーホームへ誘導する。
     - 同じ人が再訪・更新しても、セッションが生きていれば同じクラブを使う。
-    - アクセス都度、無操作が続いた他のデモクラブを掃除（離脱とみなしてリセット）。
+    - 期限切れデモの掃除はWebリクエスト外の管理コマンドで行う。
     """
-    from .demo_seed import CURRENT_SEED_VERSION, create_seeded_demo_club, sweep_stale_demo_clubs
+    from .demo_seed import CURRENT_SEED_VERSION, create_seeded_demo_club
 
     now = timezone.now()
-    # 掃除は1アクセス1件に制限する。大量の期限切れデモを同期削除すると、
-    # 初回表示が gunicorn timeout に達してデモ自体を開けなくなるため。
-    sweep_stale_demo_clubs(now, batch_size=1)
 
     club = None
     cid = request.session.get("demo_club_id")
@@ -826,10 +865,43 @@ def demo_entry(request):
 
     # ベースライン版が古い専用クラブは作り直す（メンバー数や予定の更新を既存セッションへ反映）。
     if club is not None and club.demo_seed_version != CURRENT_SEED_VERSION:
-        club.delete()
+        # Club削除は関連データが多く、本番DBではWebリクエストのタイムアウト要因になる。
+        # 古いクラブは管理コマンドの掃除対象として残し、新しい専用クラブへ切り替える。
         club = None
 
     if club is None:
+        if settings.TURNSTILE_ENABLED and request.method == "GET":
+            return render(request, "tennis/demo_gate.html", {
+                "show_topbar": False,
+                "turnstile_enabled": True,
+                "turnstile_site_key": settings.TURNSTILE_SITE_KEY,
+            })
+
+        if rate_limit_exceeded(
+            request,
+            scope="demo-create",
+            limit=settings.DEMO_CREATE_RATE_LIMIT,
+            window_seconds=settings.DEMO_CREATE_RATE_WINDOW_SECONDS,
+        ):
+            response = render(request, "tennis/demo_gate.html", {
+                "show_topbar": False,
+                "error": "デモの作成回数が上限に達しました。時間を置いてお試しください。",
+                "turnstile_enabled": settings.TURNSTILE_ENABLED,
+                "turnstile_site_key": settings.TURNSTILE_SITE_KEY,
+            }, status=429)
+            response["Retry-After"] = str(settings.DEMO_CREATE_RATE_WINDOW_SECONDS)
+            return response
+
+        if settings.TURNSTILE_ENABLED and not verify_turnstile(
+            request, expected_action="demo-create"
+        ):
+            return render(request, "tennis/demo_gate.html", {
+                "show_topbar": False,
+                "error": "確認に失敗しました。もう一度お試しください。",
+                "turnstile_enabled": True,
+                "turnstile_site_key": settings.TURNSTILE_SITE_KEY,
+            }, status=400)
+
         club = create_seeded_demo_club(now=now)
         request.session["demo_club_id"] = club.id
     else:
@@ -1848,6 +1920,7 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
     _touch_demo_club(club)
 
     member = get_object_or_404(Member, id=int(member_id), club=club)
+    _mark_club_member_session(request, club.id)
 
     # 戦績集計はクラブ統一設定の期間（過去 period_days 日・既定90）に揃える。
     # 試合履歴は期間で絞らず全件表示する（個別の期間選択は廃止）。
@@ -2458,6 +2531,7 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
     # ============================================================
     club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
     event = get_object_or_404(Event, id=int(event_id), club=club)
+    _mark_club_member_session(request, club.id)
 
     _touch_demo_club(club)
 
@@ -2919,6 +2993,23 @@ def _json_forbidden(message: str, code: str = "forbidden", status: int = 403):
     return JsonResponse({"ok": False, "error": code, "message": message}, status=status)
 
 
+def _guard_club_member_access(request, club) -> JsonResponse | None:
+    """公開URLで認証済みの同一クラブセッションだけを許可する。"""
+    if not _is_club_member_session(request, club.id):
+        return _json_forbidden(
+            "クラブの公開ページから操作してください。",
+            code="club_access_required",
+        )
+    return None
+
+
+def _guard_event_member_access(request, event) -> JsonResponse | None:
+    """イベントの所属クラブに対する公開セッション、または幹事セッションを要求する。"""
+    if _is_event_admin_session(request, event.id):
+        return None
+    return _guard_club_member_access(request, event.club)
+
+
 def _guard_participant_change(request, event, *, require_admin_when_published: bool = True) -> JsonResponse | None:
     """
     出欠/試合参加/出席者追加 など「参加者変更系」APIの共通ガード
@@ -2958,6 +3049,10 @@ def update_attendance(request):
         return JsonResponse({"error": "missing_event_id"}, status=400)
 
     event = get_object_or_404(Event, id=int(event_id))
+
+    blocked = _guard_event_member_access(request, event)
+    if blocked:
+        return blocked
 
     blocked = _guard_participant_change(request, event, require_admin_when_published=True)
     if blocked:
@@ -3002,7 +3097,13 @@ def update_comment(request):
         return JsonResponse({"error": "missing_event_id"}, status=400)
     event = get_object_or_404(Event, id=int(event_id))
 
+    blocked = _guard_event_member_access(request, event)
+    if blocked:
+        return blocked
+
     comment = (request.POST.get("comment") or "").strip()
+    if len(comment) > MAX_COMMENT_LENGTH:
+        return JsonResponse({"ok": False, "error": "comment_too_long"}, status=400)
     ep_id = (request.POST.get("ep_id") or "").strip()
     member_id = (request.POST.get("member_id") or "").strip()
 
@@ -3037,6 +3138,10 @@ def update_participant_display_name(request):
         return JsonResponse({"ok": False, "error": "missing_event_id"}, status=400)
 
     event = get_object_or_404(Event, id=int(event_id))
+
+    blocked = _guard_event_member_access(request, event)
+    if blocked:
+        return blocked
 
     new_name = (request.POST.get("display_name") or "").strip()
     if not new_name:
@@ -3098,6 +3203,9 @@ def update_member_display_name(request):
         return JsonResponse({"ok": False, "error": "name_too_long"}, status=400)
 
     club = get_object_or_404(Club, id=int(club_id), is_active=True)
+    blocked = _guard_club_member_access(request, club)
+    if blocked:
+        return blocked
     member = get_object_or_404(Member, id=int(member_id), club=club)
 
     member.display_name = new_name
@@ -3128,6 +3236,10 @@ def set_participates_match(request):
     will_on = checked in ("true", "1", "yes", "on")
 
     event = get_object_or_404(Event, id=int(event_id))
+
+    blocked = _guard_event_member_access(request, event)
+    if blocked:
+        return blocked
 
     blocked = _guard_participant_change(request, event, require_admin_when_published=True)
     if blocked:
@@ -3178,6 +3290,10 @@ def toggle_participant_flag(request):
     is_on = checked in ("true", "1", "yes", "on")
 
     event = get_object_or_404(Event, id=int(event_id))
+
+    blocked = _guard_event_member_access(request, event)
+    if blocked:
+        return blocked
 
     # ============================================================
     # ① フラグ定義を scope で取得（club/event）
@@ -3292,6 +3408,10 @@ def set_participant_flag_value(request):
 
     event = get_object_or_404(Event, id=int(event_id))
 
+    blocked = _guard_event_member_access(request, event)
+    if blocked:
+        return blocked
+
     # フラグ定義を scope で取得（club=ClubFlagDefinition / event=EventFlagDefinition）
     if flag_scope == "event":
         flagdef = get_object_or_404(
@@ -3366,8 +3486,14 @@ def add_guest_participant(request):
 
     if not event_id or not name:
         return JsonResponse({"ok": False, "error": "required"}, status=400)
+    if len(name) > MAX_MEMBER_NAME_LENGTH:
+        return JsonResponse({"ok": False, "error": "name_too_long"}, status=400)
 
     event = get_object_or_404(Event, id=int(event_id))
+
+    blocked = _guard_event_member_access(request, event)
+    if blocked:
+        return blocked
 
     blocked = _guard_participant_change(request, event, require_admin_when_published=True)
     if blocked:
@@ -3388,6 +3514,10 @@ def save_event_display_setting(request):
         return JsonResponse({"ok": False, "error": "missing_event_id"}, status=400)
 
     event = get_object_or_404(Event, id=int(event_id))
+
+    blocked = _guard_admin_only(request, event)
+    if blocked:
+        return blocked
 
     raw = (request.POST.get("settings_json") or "").strip()
     if not raw:
@@ -3865,6 +3995,10 @@ def save_match_score(request):
 
     event = get_object_or_404(Event, pk=int(event_id))
 
+    blocked = _guard_event_member_access(request, event)
+    if blocked:
+        return blocked
+
     match_schedule = MatchSchedule.objects.filter(event=event, published=True).first()
     if not match_schedule:
         return JsonResponse({"ok": False, "error": "no_published_schedule"}, status=409)
@@ -3914,6 +4048,8 @@ def club_add_member(request):
 
     if not name:
         return JsonResponse({"error": "empty_name"}, status=400)
+    if len(name) > MAX_MEMBER_NAME_LENGTH:
+        return JsonResponse({"error": "name_too_long"}, status=400)
 
     m = Member.objects.create(
         club=club,
@@ -3939,14 +4075,15 @@ def club_rename_member(request):
 
     if not club_id or not admin_token or not member_id:
         return JsonResponse({"error": "missing"}, status=400)
+    if not name:
+        return JsonResponse({"error": "empty_name"}, status=400)
+    if len(name) > MAX_MEMBER_NAME_LENGTH:
+        return JsonResponse({"error": "name_too_long"}, status=400)
 
     club = get_object_or_404(Club, id=int(club_id), is_active=True)
     blocked = _require_club_admin_token(request, club)
     if blocked:
         return blocked
-
-    if not name:
-        return JsonResponse({"error": "empty_name"}, status=400)
 
     m = get_object_or_404(Member, id=int(member_id), club=club)
     m.display_name = name
@@ -4101,6 +4238,10 @@ def substitute_slot(request):
         return JsonResponse({"ok": False, "error": "bad_team"}, status=400)
 
     event = get_object_or_404(Event, id=event_id_i)
+
+    blocked = _guard_event_member_access(request, event)
+    if blocked:
+        return blocked
 
     # ✅ 重要：draft が存在するなら代打は禁止（事故防止）
     if MatchSchedule.objects.filter(event=event, published=False).exists():

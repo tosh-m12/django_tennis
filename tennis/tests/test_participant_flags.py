@@ -24,6 +24,7 @@ from .factories import (
     make_ep,
     make_club_flag,
     make_event_flag,
+    set_member_session,
 )
 
 
@@ -35,6 +36,7 @@ class SetFlagValueTests(TestCase):
         self.member = make_member(self.club, "Aさん", member_no=1)
         self.ep = make_ep(self.event, member=self.member, attendance="yes")
         self.url = reverse("tennis:set_participant_flag_value")
+        set_member_session(self.client, self.club.id)
 
     def _post(self, **extra):
         data = {"event_id": self.event.id, "ep_id": self.ep.id}

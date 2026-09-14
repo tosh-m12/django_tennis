@@ -12,6 +12,7 @@ import json
 
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from tennis.models import ClubRankingSetting, Event
 from tennis.views import (
@@ -213,7 +214,9 @@ class RankingNameLinkTests(TestCase):
         self.club = make_club()
         # メンバーは min 1 で ranked に出るよう設定
         ClubRankingSetting.objects.create(club=self.club, preset="winrate", min_matches=1)
-        ev = make_event(self.club, date=datetime.date(2026, 5, 10))
+        ev = make_event(
+            self.club, date=timezone.localdate() - datetime.timedelta(days=20)
+        )
         self.member = make_member(self.club, "メンバーA", member_no=1)
         ep_m = make_ep(ev, member=self.member, attendance="yes")
         ep_g = make_ep(ev, display_name="ゲストB", attendance="yes")

@@ -7,6 +7,9 @@
 {% block extra_head %}
   <meta name="description" content="テニスサークルの練習会スケジュール、出欠、対戦表、個人・クラブ戦績をURLひとつで管理できます。">
   <link rel="stylesheet" href="{% static 'tennis/index.css' %}">
+  {% if turnstile_enabled %}
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  {% endif %}
 {% endblock %}
 
 {% block header %}{% endblock %}
@@ -97,6 +100,13 @@
 
         {% if registration_error %}
           <p class="club-registration-error" role="alert">{{ registration_error }}</p>
+        {% endif %}
+
+        {% if turnstile_enabled %}
+          <div class="cf-turnstile"
+               data-sitekey="{{ turnstile_site_key }}"
+               data-action="club-create"
+               style="display:flex;justify-content:center;margin:18px 0;"></div>
         {% endif %}
 
         <div class="club-registration-modal-actions">

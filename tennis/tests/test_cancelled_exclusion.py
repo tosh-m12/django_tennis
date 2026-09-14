@@ -7,6 +7,7 @@ import datetime
 
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from tennis.models import ClubRankingSetting
 
@@ -50,15 +51,21 @@ class CancelledEventExclusionTests(TestCase):
         self.a = make_member(self.club, "A", member_no=1)
         self.b = make_member(self.club, "B", member_no=2)
 
-        # 4月：通常イベント3試合（A 全勝）
-        for d in (1, 2, 3):
+        # ローリング90日窓内：通常イベント3試合（A 全勝）
+        base_date = timezone.localdate() - datetime.timedelta(days=20)
+        self.regular_dates = [base_date + datetime.timedelta(days=i) for i in range(3)]
+        for event_date in self.regular_dates:
             _make_singles_event_with_score(
-                self.club, datetime.date(2026, 4, d), self.a, self.b
+                self.club, event_date, self.a, self.b
             )
 
-        # 4/10：中止イベント（A 勝ちの試合があるが、中止フラグあり）
+        # 同じ集計窓内の中止イベント（A 勝ちの試合があるが、中止フラグあり）
         _make_singles_event_with_score(
-            self.club, datetime.date(2026, 4, 10), self.a, self.b, cancelled=True
+            self.club,
+            base_date + datetime.timedelta(days=9),
+            self.a,
+            self.b,
+            cancelled=True,
         )
 
     def test_member_detail_excludes_cancelled_event_matches(self):
@@ -94,8 +101,8 @@ class CancelledEventExclusionTests(TestCase):
 
     def test_cancelling_event_after_score_input_removes_from_ranking(self):
         """既存の試合があるイベントを後から中止にしたら、再描画で集計から外れる。"""
-        # 4/1 を中止にする
-        ev = self.club.events.get(date=datetime.date(2026, 4, 1))
+        # 通常イベントの先頭を中止にする
+        ev = self.club.events.get(date=self.regular_dates[0])
         ev.cancelled = True
         ev.save(update_fields=["cancelled", "updated_at"])
 

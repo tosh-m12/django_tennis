@@ -24,6 +24,7 @@ from .factories import (
     make_ep,
     make_published_schedule,
     set_admin_session,
+    set_member_session,
 )
 
 
@@ -36,6 +37,7 @@ class UpdateAttendanceTests(TestCase):
         self.member = make_member(self.club, "テスト太郎")
         self.ep = make_ep(self.event, member=self.member, attendance=None)
         self.url = reverse("tennis:update_attendance")
+        set_member_session(self.client, self.club.id)
 
     def _post(self, **extra):
         data = {"event_id": self.event.id, "ep_id": self.ep.id}

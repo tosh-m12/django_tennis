@@ -1,0 +1,38 @@
+{% extends "tennis/base.html" %}
+{% load static %}
+
+{% block title %}デモ - DeuceNet{% endblock %}
+
+{% block extra_head %}
+  {% if turnstile_enabled %}
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+  {% endif %}
+{% endblock %}
+
+{% block header %}{% endblock %}
+
+{% block content %}
+<div style="max-width:520px;margin:0 auto;text-align:center;padding:80px 16px;">
+  <picture>
+    <source srcset="{% static 'tennis/logo/wordmark.webp' %}" type="image/webp">
+    <img class="brand-logo" src="{% static 'tennis/logo/wordmark.png' %}" alt="Deuce Net">
+  </picture>
+
+  {% if error %}
+    <div class="alert alert-danger" style="margin:20px auto;max-width:420px;">
+      {{ error }}
+    </div>
+  {% endif %}
+
+  <form method="post">
+    {% csrf_token %}
+    {% if turnstile_enabled %}
+      <div class="cf-turnstile"
+           data-sitekey="{{ turnstile_site_key }}"
+           data-action="demo-create"
+           style="display:flex;justify-content:center;margin:24px 0;"></div>
+    {% endif %}
+    <button type="submit" class="btn btn-pill btn-primary">デモを開始</button>
+  </form>
+</div>
+{% endblock %}

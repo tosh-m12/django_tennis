@@ -1,0 +1,84 @@
+from __future__ import annotations
+
+import datetime as dt
+
+from django.db import connection
+from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
+from django.urls import reverse
+from django.utils import timezone
+
+from tennis.demo_seed import create_seeded_demo_club, sweep_stale_demo_clubs
+from tennis.models import Club, EventParticipant, MatchSchedule, MatchScore
+
+from .factories import make_club, make_ep, make_event, make_member
+
+
+class DemoCleanupTests(TestCase):
+    def _make_stale_demo(self, name: str) -> Club:
+        return Club.objects.create(
+            name=name,
+            is_demo=True,
+            demo_last_seen=timezone.now() - dt.timedelta(hours=2),
+        )
+
+    def test_sweep_can_limit_cleanup_batch(self):
+        stale = [self._make_stale_demo(f"デモ{i}") for i in range(3)]
+
+        deleted = sweep_stale_demo_clubs(batch_size=1)
+
+        self.assertEqual(deleted, 1)
+        self.assertEqual(Club.objects.filter(id__in=[c.id for c in stale]).count(), 2)
+
+    def test_demo_entry_does_not_sweep_stale_clubs(self):
+        stale = [self._make_stale_demo(f"デモ{i}") for i in range(3)]
+
+        response = self.client.get(reverse("tennis:demo"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Club.objects.filter(id__in=[c.id for c in stale]).count(), 3)
+        self.assertTrue(Club.objects.filter(is_demo=True, id=self.client.session["demo_club_id"]).exists())
+
+    def test_demo_entry_replaces_outdated_session_without_deleting_old_club(self):
+        old_club = Club.objects.create(
+            name="旧デモ",
+            is_demo=True,
+            demo_last_seen=timezone.now(),
+            demo_seed_version=0,
+        )
+        session = self.client.session
+        session["demo_club_id"] = old_club.id
+        session.save()
+
+        response = self.client.get(reverse("tennis:demo"))
+
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Club.objects.filter(id=old_club.id).exists())
+        self.assertNotEqual(self.client.session["demo_club_id"], old_club.id)
+
+    def test_club_cascade_skips_redundant_member_history_updates(self):
+        club = make_club()
+        event = make_event(club, date=timezone.localdate())
+        member = make_member(club, "削除対象", member_no=1)
+        make_ep(event, member=member, attendance="yes")
+
+        with CaptureQueriesContext(connection) as queries:
+            club.delete()
+
+        redundant_updates = [
+            q["sql"]
+            for q in queries.captured_queries
+            if q["sql"].startswith('UPDATE "tennis_eventparticipant" SET "member_deleted"')
+        ]
+        self.assertEqual(redundant_updates, [])
+        self.assertFalse(EventParticipant.objects.exists())
+
+    def test_demo_seed_uses_bounded_database_round_trips(self):
+        with CaptureQueriesContext(connection) as queries:
+            club = create_seeded_demo_club()
+
+        self.assertLessEqual(len(queries), 30)
+        self.assertEqual(club.members.count(), 20)
+        self.assertEqual(club.events.count(), 32)
+        self.assertEqual(MatchSchedule.objects.filter(event__club=club).count(), 21)
+        self.assertTrue(MatchScore.objects.filter(match_schedule__event__club=club).exists())

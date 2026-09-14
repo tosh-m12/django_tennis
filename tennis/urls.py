@@ -18,26 +18,6 @@ urlpatterns = [
     #  - Create club
     # ============================================================
     path("", views.index, name="index"),
-    path(
-        "preview/blue/",
-        TemplateView.as_view(template_name="tennis/index_blue_preview.html"),
-        name="index_blue_preview",
-    ),
-    path(
-        "preview/concept-3/",
-        TemplateView.as_view(template_name="tennis/index_concept3_preview.html"),
-        name="index_concept3_preview",
-    ),
-    path(
-        "preview/concept-4/",
-        TemplateView.as_view(template_name="tennis/index_concept4_preview.html"),
-        name="index_concept4_preview",
-    ),
-    path(
-        "preview/mobile-first/",
-        TemplateView.as_view(template_name="tennis/index_mobile_first_preview.html"),
-        name="index_mobile_first_preview",
-    ),
 
     # サービス案内・法務ページ（クラブトークン不要）
     path(
