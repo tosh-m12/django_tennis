@@ -63,24 +63,14 @@
     });
   }
 
-  // ---- 復旧メール登録/変更（幹事モードのみ） ----
+  // ---- 登録メールアドレスの登録/変更（幹事モードのみ） ----
   const emailSection = document.getElementById("organizer-email-section");
   if (emailSection) {
     const setEmailUrl = (emailSection.dataset.setEmailUrl || "").trim();
-    const current = document.getElementById("organizer-email-current");
     const emailInput = document.getElementById("organizer-email-input");
+    const status = document.getElementById("organizer-email-status");
     const saveBtn = document.getElementById("organizer-email-save-btn");
-    const changeBtn = document.getElementById("organizer-email-change-btn");
     const msg = document.getElementById("organizer-email-msg");
-
-    if (changeBtn && emailInput && saveBtn) {
-      changeBtn.addEventListener("click", () => {
-        emailInput.hidden = false;
-        saveBtn.style.display = "";
-        changeBtn.style.display = "none";
-        emailInput.focus();
-      });
-    }
 
     if (saveBtn && emailInput) {
       saveBtn.addEventListener("click", async () => {
@@ -107,16 +97,17 @@
             saveBtn.disabled = false;
             return;
           }
-          if (current) {
-            current.hidden = false;
-            current.textContent = (data.email_masked || "") + "（未確認）";
-            current.style.color = "#b45309";
+          emailInput.value = data.pending_email || data.email || email;
+          if (status) {
+            status.replaceChildren();
+            if (data.pending_email || !data.email_confirmed) {
+              const badge = document.createElement("span");
+              badge.className = "member-email-badge is-pending";
+              badge.textContent = "未確認";
+              status.appendChild(badge);
+            }
           }
-          emailInput.hidden = true;
-          emailInput.value = "";
-          saveBtn.style.display = "none";
           saveBtn.disabled = false;
-          if (changeBtn) changeBtn.style.display = "";
           if (msg) { msg.textContent = data.message || "確認メールを送りました。"; msg.style.color = "#059669"; }
         } catch (err) {
           console.error(err);

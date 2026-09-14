@@ -144,69 +144,6 @@
 
 {# ※ 戦績表は専用ページ（tennis:ranking）に移動。トップバーからアクセス。 #}
 
-{% if show_welcome_email_modal %}
-<meta name="csrf-token" content="{{ csrf_token }}">
-<div id="welcome-email-modal" class="wem-overlay">
-  <div class="wem-box">
-    <h2 class="wem-title">クラブを作成しました</h2>
-    <p class="wem-desc">メールを登録すると、URLを無くしても復旧できます。<br>後からでも登録できます。</p>
-    <div class="wem-field">
-      <label for="wem-name">お名前</label>
-      <input type="text" id="wem-name" maxlength="100" placeholder="山田 太郎" autocomplete="off">
-    </div>
-    <div class="wem-field">
-      <label for="wem-email">メールアドレス</label>
-      <input type="email" id="wem-email" maxlength="254" placeholder="you@example.com" autocomplete="off">
-    </div>
-    <p id="wem-msg" class="wem-msg"></p>
-    <div class="wem-actions">
-      <button type="button" class="btn btn-pill" id="wem-later">あとで</button>
-      <button type="button" class="btn btn-pill btn-primary" id="wem-register">登録する</button>
-    </div>
-  </div>
-</div>
-<style>
-  .wem-overlay{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1000;}
-  .wem-box{background:#fff;border-radius:14px;padding:22px 20px;max-width:380px;width:calc(100% - 32px);box-shadow:0 10px 30px rgba(0,0,0,.2);}
-  .wem-title{font-size:18px;margin:0 0 6px;}
-  .wem-desc{font-size:13px;color:#555;line-height:1.7;margin:0 0 14px;}
-  .wem-field{margin:0 0 10px;}
-  .wem-field label{display:block;font-size:12px;color:#555;margin:0 0 4px;}
-  .wem-field input{width:100%;height:38px;padding:0 12px;box-sizing:border-box;border:1px solid #cbd5e1;border-radius:8px;font-size:15px;}
-  .wem-msg{font-size:12px;margin:0 0 8px;min-height:16px;}
-  .wem-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:6px;}
-</style>
-<script>
-(function(){
-  const modal=document.getElementById("welcome-email-modal");
-  if(!modal) return;
-  const csrf=((document.querySelector('meta[name="csrf-token"]')||{}).content)||((document.cookie.match(/csrftoken=([^;]+)/)||[])[1])||"";
-  const clubId="{{ club.id }}", adminToken="{{ club.admin_token }}";
-  const url="{% url 'tennis:organizer_self_register' %}";
-  const close=()=>modal.remove();
-  document.getElementById("wem-later").addEventListener("click", close);
-  document.getElementById("wem-register").addEventListener("click", async ()=>{
-    const name=(document.getElementById("wem-name").value||"").trim();
-    const email=(document.getElementById("wem-email").value||"").trim();
-    const msg=document.getElementById("wem-msg");
-    if(!name){msg.textContent="お名前を入力してください。";msg.style.color="#b91c1c";return;}
-    if(!email){msg.textContent="メールアドレスを入力してください。";msg.style.color="#b91c1c";return;}
-    const fd=new FormData();
-    fd.append("club_id",clubId);fd.append("admin_token",adminToken);
-    fd.append("display_name",name);fd.append("email",email);
-    const btn=document.getElementById("wem-register");btn.disabled=true;
-    try{
-      const r=await fetch(url,{method:"POST",credentials:"include",headers:{"X-CSRFToken":csrf},body:fd});
-      const d=await r.json().catch(()=>({}));
-      if(!r.ok||!d.ok){msg.textContent=(d.message||"登録に失敗しました。");msg.style.color="#b91c1c";btn.disabled=false;return;}
-      modal.querySelector(".wem-box").innerHTML='<h2 class="wem-title">確認メールを送りました</h2><p class="wem-desc">メール内のリンクを開くと登録完了です。</p><div class="wem-actions"><button type="button" class="btn btn-pill btn-primary" id="wem-done">閉じる</button></div>';
-      document.getElementById("wem-done").addEventListener("click", close);
-    }catch(e){msg.textContent="登録に失敗しました（ネットワーク）。";msg.style.color="#b91c1c";btn.disabled=false;}
-  });
-})();
-</script>
-{% endif %}
-
 {% endblock %}
 
 {% block extra_scripts %}

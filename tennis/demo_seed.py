@@ -92,8 +92,18 @@ def create_seeded_demo_club(now=None) -> Club:
     return club
 
 
-def sweep_stale_demo_clubs(now=None, ttl_minutes: int = DEMO_TTL_MINUTES) -> int:
-    """無操作が続いたデモクラブを削除（離脱とみなしてリセット）。削除件数を返す。"""
+def sweep_stale_demo_clubs(
+    now=None,
+    ttl_minutes: int = DEMO_TTL_MINUTES,
+    batch_size: int | None = None,
+) -> int:
+    """
+    無操作が続いたデモクラブを削除（離脱とみなしてリセット）。削除件数を返す。
+
+    Web リクエスト内では batch_size を小さく指定し、期限切れデモが大量に
+    溜まっていても掃除だけで応答がタイムアウトしないようにする。
+    管理コマンドからは従来どおり batch_size=None で全件削除できる。
+    """
     from django.db.models import Q
 
     if now is None:
@@ -102,8 +112,16 @@ def sweep_stale_demo_clubs(now=None, ttl_minutes: int = DEMO_TTL_MINUTES) -> int
     # demo_last_seen が cutoff より前、または未設定（古い取り残し）を対象。
     stale = Club.objects.filter(is_demo=True).filter(
         Q(demo_last_seen__lt=cutoff) | Q(demo_last_seen__isnull=True)
-    )
-    count = stale.count()
+    ).order_by("demo_last_seen", "id")
+
+    if batch_size is not None:
+        batch_size = max(0, int(batch_size))
+        stale_ids = list(stale.values_list("id", flat=True)[:batch_size])
+        stale = Club.objects.filter(id__in=stale_ids)
+        count = len(stale_ids)
+    else:
+        count = stale.count()
+
     if count:
         stale.delete()  # Event/Member 等はカスケード削除
     return count

@@ -57,9 +57,10 @@ def _abs(request, name, args):
 # メール送信
 # ------------------------------------------------------------
 
-def send_confirmation_email(request, organizer) -> None:
-    """幹事メール登録の確認メール。organizer.email 宛に確認リンクを送る。"""
-    token = make_confirm_token(organizer.id, organizer.email)
+def send_confirmation_email(request, organizer, target_email: str | None = None) -> None:
+    """幹事メール登録の確認メール。指定先（省略時は organizer.email）へ送る。"""
+    target_email = normalize_email(target_email or organizer.email)
+    token = make_confirm_token(organizer.id, target_email)
     url = _abs(request, "tennis:verify_email", [token])
     club_name = organizer.club.name
     subject = f"[Deucenet] メールアドレスの確認（{club_name}）"
@@ -68,7 +69,7 @@ def send_confirmation_email(request, organizer) -> None:
         f"下のリンクを開くと登録が完了します（48時間以内）:\n{url}\n\n"
         f"心当たりがない場合は、このメールを破棄してください。\n"
     )
-    send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [organizer.email], fail_silently=False)
+    send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [target_email], fail_silently=False)
 
 
 def send_recovery_email(request, email: str, organizers) -> None:
@@ -89,6 +90,25 @@ def send_recovery_email(request, email: str, organizers) -> None:
         + "\n心当たりがない場合は、このメールを破棄してください。\n"
     )
     subject = "[Deucenet] クラブURLの再送"
+    send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [email], fail_silently=False)
+
+
+def send_url_reset_email(request, email: str, club, reset_kind: str) -> None:
+    """URL再発行後、確認済み幹事へ新しいURLを通知する。"""
+    if reset_kind == "admin":
+        label = "幹事用URL"
+        url = _abs(request, "tennis:club_home_admin", [club.public_token, club.admin_token])
+    else:
+        label = "メンバー用URL"
+        url = _abs(request, "tennis:club_home", [club.public_token])
+
+    subject = f"[Deucenet] {label}を再発行しました（{club.name}）"
+    body = (
+        f"{club.name} の{label}が再発行されました。\n\n"
+        f"新しい{label}:\n{url}\n\n"
+        "以前のURLは使用できません。\n"
+        "心当たりがない場合は、ほかの幹事へご確認ください。\n"
+    )
     send_mail(subject, body, settings.DEFAULT_FROM_EMAIL, [email], fail_silently=False)
 
 

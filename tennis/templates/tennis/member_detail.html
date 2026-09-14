@@ -29,6 +29,7 @@
     <form id="member-name-form" class="member-form name-edit-row">
       <input type="text"
              id="member-name-input"
+             class="member-field-input"
              name="display_name"
              value="{{ member.display_name }}"
              maxlength="100"
@@ -40,25 +41,26 @@
     </form>
   </section>
 
-  {# 復旧メール（幹事モード・当人が幹事のときだけ表示。メンバーURLでは一切出さない） #}
+  {# 登録メール（幹事モード・当人が幹事のときだけ表示。メンバーURLでは一切出さない） #}
   {% if is_admin and is_organizer %}
   <section class="member-edit" id="organizer-email-section"
            data-set-email-url="{% url 'tennis:organizer_set_email' %}">
-    <h2 class="member-section-title">復旧メール（幹事）</h2>
+    <h2 class="member-section-title">登録メールアドレス</h2>
     <div class="name-edit-row">
-      <span id="organizer-email-current"
-            style="font-family:monospace;{% if organizer_confirmed %}color:#555;{% else %}color:#b45309;{% endif %}"
-            {% if not organizer_email_masked %}hidden{% endif %}>{{ organizer_email_masked }}{% if organizer_email_masked and not organizer_confirmed %}（未確認）{% endif %}</span>
-      <input type="email" id="organizer-email-input" placeholder="you@example.com"
-             maxlength="254" autocomplete="off"
-             {% if organizer_confirmed %}hidden{% endif %}>
-      <button type="button" class="btn btn-pill btn-primary" id="organizer-email-save-btn"
-              {% if organizer_confirmed %}style="display:none"{% endif %}>登録</button>
-      <button type="button" class="btn btn-pill" id="organizer-email-change-btn"
-              {% if not organizer_confirmed %}style="display:none"{% endif %}>変更</button>
+      <input type="email"
+             id="organizer-email-input"
+             class="member-field-input"
+             value="{{ organizer_pending_email|default:organizer_email }}"
+             placeholder="you@example.com"
+             maxlength="254"
+             autocomplete="email">
+      <button type="button" class="btn btn-pill btn-primary" id="organizer-email-save-btn">保存</button>
+      <span id="organizer-email-status">
+        {% if organizer_pending_email or organizer_email and not organizer_confirmed %}<span class="member-email-badge is-pending">未確認</span>{% endif %}
+      </span>
     </div>
     <p id="organizer-email-msg" style="font-size:12px;color:#94a3b8;margin:6px 0 0;">
-      URLを忘れても、ここから取り戻せます。確認メールのリンクを開くと完了です。
+      {% if organizer_pending_email or organizer_email and not organizer_confirmed %}確認メールをおくりました。メール内のリンクを開くと登録完了です{% else %}メールアドレスを保存すると確認メールが送られます{% endif %}
     </p>
   </section>
   {% endif %}

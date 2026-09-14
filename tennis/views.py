@@ -4,6 +4,7 @@ import hashlib
 import json
 import datetime as dt
 import logging
+import uuid
 from collections import defaultdict
 from datetime import time
 
@@ -738,19 +739,67 @@ def build_month_ranking(events_qs, game_type: str, min_matches: int = 3, config=
 @require_http_methods(["GET", "POST"])
 def index(request):
     """
-    トップ = クラブ作成
-    作成後は「幹事ホーム（club_home_admin）」へ遷移
+    トップ = クラブ登録。
+    クラブ名・作成者名・幹事メールがすべて揃った最終送信時だけ、
+    Club / Member / ClubOrganizer をまとめて作成する。
     """
     if request.method == "POST":
-        name = (request.POST.get("club_name") or "").strip()
-        if not name:
-            return HttpResponseBadRequest("クラブ名は必須です。")
+        club_name = (request.POST.get("club_name") or "").strip()
+        display_name = (request.POST.get("display_name") or "").strip()
+        email = organizer_email.normalize_email(request.POST.get("email"))
 
-        club = Club.objects.create(name=name)
+        context = {
+            "show_topbar": False,
+            "show_registration_modal": True,
+            "club_name": club_name,
+            "display_name": display_name,
+            "email": email,
+        }
+
+        if not club_name:
+            context["registration_error"] = "サークル名を入力してください。"
+            return render(request, "tennis/index.html", context)
+        if len(club_name) > Club._meta.get_field("name").max_length:
+            context["registration_error"] = "サークル名が長すぎます。"
+            return render(request, "tennis/index.html", context)
+        if not display_name:
+            context["registration_error"] = "お名前を入力してください。"
+            return render(request, "tennis/index.html", context)
+        if len(display_name) > Member._meta.get_field("display_name").max_length:
+            context["registration_error"] = "お名前が長すぎます。"
+            return render(request, "tennis/index.html", context)
+        if not _looks_like_email(email):
+            context["registration_error"] = "メールアドレスを確認してください。"
+            return render(request, "tennis/index.html", context)
+
+        try:
+            with transaction.atomic():
+                if not organizer_email.throttle_ok("confirm", email, limit=5, window_seconds=3600):
+                    context["registration_error"] = "送信が多すぎます。少し待ってからお試しください。"
+                    return render(request, "tennis/index.html", context, status=429)
+
+                club = Club.objects.create(name=club_name)
+                member = Member.objects.create(
+                    club=club,
+                    member_no=1,
+                    display_name=display_name,
+                    is_fixed=True,
+                )
+                organizer = ClubOrganizer.objects.create(
+                    club=club,
+                    member=member,
+                    email=email,
+                )
+                organizer_email.send_confirmation_email(request, organizer)
+        except Exception:
+            log.exception("Failed to create club registration")
+            context["registration_error"] = "登録できませんでした。時間をおいてからもう一度お試しください。"
+            return render(request, "tennis/index.html", context, status=503)
+
         url = reverse(
             "tennis:club_home_admin",
             args=[club.public_token, club.admin_token],
-        ) + "?welcome=1"
+        )
         return redirect(url)
 
     return render(request, "tennis/index.html", {"show_topbar": False})
@@ -766,7 +815,9 @@ def demo_entry(request):
     from .demo_seed import CURRENT_SEED_VERSION, create_seeded_demo_club, sweep_stale_demo_clubs
 
     now = timezone.now()
-    sweep_stale_demo_clubs(now)
+    # 掃除は1アクセス1件に制限する。大量の期限切れデモを同期削除すると、
+    # 初回表示が gunicorn timeout に達してデモ自体を開けなくなるため。
+    sweep_stale_demo_clubs(now, batch_size=1)
 
     club = None
     cid = request.session.get("demo_club_id")
@@ -831,7 +882,7 @@ def club_settings(request, club_public_token, club_admin_token):
         .order_by("member_no", "id")
     )
 
-    # 各メンバーの幹事メール状態（区分ドロップダウン・済/未バッジ用）
+    # 各メンバーの幹事・メール状態
     org_by_member = {
         o.member_id: o
         for o in ClubOrganizer.objects.filter(club=club, member__isnull=False)
@@ -839,7 +890,10 @@ def club_settings(request, club_public_token, club_admin_token):
     for m in members:
         o = org_by_member.get(m.id)
         m.is_organizer = o is not None
-        m.email_confirmed = bool(o and o.is_confirmed)
+        m.organizer_email = (o.pending_email or o.email) if o else ""
+        m.email_unconfirmed = bool(
+            o and (o.pending_email or (o.email and not o.is_confirmed))
+        )
 
     classes = list(
         ClubMemberClass.objects.filter(club=club, is_active=True)
@@ -1972,7 +2026,8 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
         "is_admin": is_admin,
         "organizer": organizer,
         "is_organizer": organizer is not None,
-        "organizer_email_masked": organizer.masked_email if organizer else "",
+        "organizer_email": organizer.email if organizer else "",
+        "organizer_pending_email": organizer.pending_email if organizer else "",
         "organizer_confirmed": bool(organizer and organizer.is_confirmed),
         "stats_blocks": stats_blocks,
         "history_blocks": history_blocks,
@@ -2052,8 +2107,6 @@ def club_home(request, club_public_token, club_admin_token=None):
             "admin_url": admin_url,
             "show_topbar": True,
             "cleanup_warnings": _run_member_auto_cleanup(club) if is_admin else [],
-            # 作成直後だけメール登録モーダルを出す（?welcome=1）
-            "show_welcome_email_modal": is_admin and request.GET.get("welcome") == "1",
         },
     )
 
@@ -4522,6 +4575,97 @@ def _looks_like_email(email: str) -> bool:
 
 
 @require_POST
+def club_reset_url(request):
+    """クラブのメンバー用または幹事用URLを再発行し、確認済み幹事へ通知する。"""
+    club_id = request.POST.get("club_id")
+    reset_kind = (request.POST.get("reset_kind") or "").strip()
+    if not club_id or reset_kind not in ("public", "admin"):
+        return JsonResponse({"ok": False, "error": "bad_request"}, status=400)
+
+    with transaction.atomic():
+        club = get_object_or_404(
+            Club.objects.select_for_update(),
+            id=int(club_id),
+            is_active=True,
+        )
+        blocked = _require_club_admin_token(request, club)
+        if blocked:
+            return blocked
+
+        throttle_key = f"{club.id}:{reset_kind}"
+        if not organizer_email.throttle_ok("url_reset", throttle_key, limit=5, window_seconds=3600):
+            return JsonResponse(
+                {"ok": False, "error": "throttled", "message": "再発行回数が多すぎます。時間をおいて再度お試しください。"},
+                status=429,
+            )
+
+        field = "public_token" if reset_kind == "public" else "admin_token"
+        setattr(club, field, uuid.uuid4().hex)
+        club.save(update_fields=[field, "updated_at"])
+
+        confirmed_emails = list(
+            ClubOrganizer.objects.filter(
+                club=club,
+                confirmed_at__isnull=False,
+            )
+            .exclude(email="")
+            .values_list("email", flat=True)
+        )
+        recipients = sorted({
+            organizer_email.normalize_email(e) for e in confirmed_emails if e
+        })
+        AuditLog.objects.create(
+            club=club,
+            actor_token_kind=ActorTokenKind.ADMIN,
+            action=f"reset_{reset_kind}_url",
+            payload_json={"confirmed_email_count": len(recipients)},
+        )
+
+    # 同じ宛先が複数幹事に登録されていても、通知は1通だけにする。
+    sent_count = 0
+    failed_count = 0
+    for email in recipients:
+        try:
+            organizer_email.send_url_reset_email(request, email, club, reset_kind)
+            sent_count += 1
+        except Exception:
+            failed_count += 1
+            log.exception("Failed to send URL reset email: club=%s kind=%s", club.id, reset_kind)
+
+    if reset_kind == "admin":
+        new_url = request.build_absolute_uri(
+            reverse("tennis:club_home_admin", args=[club.public_token, club.admin_token])
+        )
+        settings_url = request.build_absolute_uri(
+            reverse("tennis:club_settings", args=[club.public_token, club.admin_token])
+        )
+    else:
+        new_url = request.build_absolute_uri(
+            reverse("tennis:club_home", args=[club.public_token])
+        )
+        settings_url = request.build_absolute_uri(
+            reverse("tennis:club_settings", args=[club.public_token, club.admin_token])
+        )
+
+    if sent_count:
+        message = f"URLを再発行し、確認済み幹事へ{sent_count}通送信しました。"
+    else:
+        message = "URLを再発行しました。送信できる確認済みメールアドレスはありません。"
+    if failed_count:
+        message += f" {failed_count}通は送信できませんでした。"
+
+    return JsonResponse({
+        "ok": True,
+        "reset_kind": reset_kind,
+        "new_url": new_url,
+        "settings_url": settings_url,
+        "sent_count": sent_count,
+        "failed_count": failed_count,
+        "message": message,
+    })
+
+
+@require_POST
 def club_set_member_organizer(request):
     """
     メンバーの区分（幹事/メンバー）を切り替える（設定・幹事のみ）。
@@ -4563,6 +4707,10 @@ def club_set_member_organizer(request):
         "member_id": member.id,
         "is_organizer": org is not None,
         "email_confirmed": bool(org and org.is_confirmed),
+        "email": (org.pending_email or org.email) if org else "",
+        "email_unconfirmed": bool(
+            org and (org.pending_email or (org.email and not org.is_confirmed))
+        ),
         "email_masked": org.masked_email if org else "",
     })
 
@@ -4572,7 +4720,8 @@ def organizer_set_email(request):
     """
     幹事の復旧メールを登録/変更（個人ページ・幹事モード）。
     - メンバーを幹事に自動昇格（get_or_create ＋ is_fixed）。
-    - email を保存し confirmed_at をクリア → 確認メール送信。
+    - 初回登録は email に保存して確認待ちにする。
+    - 確認済みメールの変更は pending_email に保存し、旧メールを確認済みのまま保持する。
     """
     club_id = request.POST.get("club_id")
     admin_token = (request.POST.get("admin_token") or "").strip()
@@ -4595,22 +4744,50 @@ def organizer_set_email(request):
 
     member = get_object_or_404(Member, id=int(member_id), club=club)
 
-    org, _created = ClubOrganizer.objects.get_or_create(club=club, member=member)
-    if not member.is_fixed:
-        member.is_fixed = True
-        member.save(update_fields=["is_fixed", "updated_at"])
+    try:
+        with transaction.atomic():
+            org, _created = ClubOrganizer.objects.get_or_create(club=club, member=member)
+            if not member.is_fixed:
+                member.is_fixed = True
+                member.save(update_fields=["is_fixed", "updated_at"])
 
-    org.email = email
-    org.confirmed_at = None
-    org.save(update_fields=["email", "confirmed_at", "updated_at"])
+            if org.is_confirmed:
+                if email == organizer_email.normalize_email(org.email):
+                    org.pending_email = ""
+                    org.save(update_fields=["pending_email", "updated_at"])
+                    return JsonResponse({
+                        "ok": True,
+                        "email": org.email,
+                        "pending_email": "",
+                        "email_confirmed": True,
+                        "message": "このメールアドレスは確認済みです。",
+                    })
+                org.pending_email = email
+                org.save(update_fields=["pending_email", "updated_at"])
+                target_email = org.pending_email
+            else:
+                org.email = email
+                org.pending_email = ""
+                org.confirmed_at = None
+                org.save(update_fields=["email", "pending_email", "confirmed_at", "updated_at"])
+                target_email = org.email
 
-    organizer_email.send_confirmation_email(request, org)
+            # 送信に失敗した場合は、画面だけ確認待ちになる不整合を避けるため保存も戻す。
+            organizer_email.send_confirmation_email(request, org, target_email=target_email)
+    except Exception:
+        log.exception("Failed to send organizer email confirmation")
+        return JsonResponse(
+            {"ok": False, "error": "email_failed", "message": "確認メールを送信できませんでした。時間をおいて再度お試しください。"},
+            status=503,
+        )
 
     return JsonResponse({
         "ok": True,
+        "email": org.email,
+        "pending_email": org.pending_email,
         "email_masked": org.masked_email,
-        "email_confirmed": False,
-        "message": "確認メールを送りました。メール内のリンクを開くと登録完了です。",
+        "email_confirmed": org.is_confirmed,
+        "message": "確認メールをおくりました。メール内のリンクを開くと登録完了です",
     })
 
 
@@ -4626,15 +4803,26 @@ def verify_email(request, token):
 
     org = ClubOrganizer.objects.filter(id=data.get("oid")).select_related("club").first()
     token_email = organizer_email.normalize_email(data.get("email"))
-    if not org or organizer_email.normalize_email(org.email) != token_email:
-        # メールが変更された等でトークンが古い
+    if not org:
         ctx["ok"] = False
         ctx["reason"] = "invalid"
         return render(request, "tennis/verify_email.html", ctx)
 
-    if not org.confirmed_at:
+    current_email = organizer_email.normalize_email(org.email)
+    pending_email = organizer_email.normalize_email(org.pending_email)
+    if token_email == pending_email and pending_email:
+        org.email = pending_email
+        org.pending_email = ""
+        org.confirmed_at = timezone.now()
+        org.save(update_fields=["email", "pending_email", "confirmed_at", "updated_at"])
+    elif token_email == current_email and current_email and not org.confirmed_at:
         org.confirmed_at = timezone.now()
         org.save(update_fields=["confirmed_at", "updated_at"])
+    elif token_email != current_email:
+        # メールが変更された等でトークンが古い
+        ctx["ok"] = False
+        ctx["reason"] = "invalid"
+        return render(request, "tennis/verify_email.html", ctx)
 
     ctx["ok"] = True
     ctx["club_name"] = org.club.name

@@ -1,6 +1,7 @@
 # tennis/urls.py
 from django.contrib import admin
 from django.urls import path
+from django.views.generic import TemplateView
 
 from . import views
 
@@ -17,6 +18,38 @@ urlpatterns = [
     #  - Create club
     # ============================================================
     path("", views.index, name="index"),
+    path(
+        "preview/blue/",
+        TemplateView.as_view(template_name="tennis/index_blue_preview.html"),
+        name="index_blue_preview",
+    ),
+    path(
+        "preview/concept-3/",
+        TemplateView.as_view(template_name="tennis/index_concept3_preview.html"),
+        name="index_concept3_preview",
+    ),
+    path(
+        "preview/concept-4/",
+        TemplateView.as_view(template_name="tennis/index_concept4_preview.html"),
+        name="index_concept4_preview",
+    ),
+    path(
+        "preview/mobile-first/",
+        TemplateView.as_view(template_name="tennis/index_mobile_first_preview.html"),
+        name="index_mobile_first_preview",
+    ),
+
+    # サービス案内・法務ページ（クラブトークン不要）
+    path(
+        "privacy/",
+        TemplateView.as_view(template_name="tennis/privacy.html"),
+        name="privacy",
+    ),
+    path(
+        "terms/",
+        TemplateView.as_view(template_name="tennis/terms.html"),
+        name="terms",
+    ),
 
     # デモサイト入口（deucenet.app/demo）
     path("demo", views.demo_entry, name="demo"),
@@ -178,6 +211,7 @@ urlpatterns = [
 
     # -- club name
     path("api/club/rename_club/", views.club_rename_club, name="club_rename_club"),
+    path("api/club/reset_url/", views.club_reset_url, name="club_reset_url"),
 
     # -- events (settings calendar)
     path("api/club/create_event/", views.club_create_event, name="club_create_event"),

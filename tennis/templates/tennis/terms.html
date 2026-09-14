@@ -1,0 +1,69 @@
+{% extends "tennis/base.html" %}
+{% load static %}
+
+{% block title %}利用規約 | Deuce Net{% endblock %}
+{% block extra_head %}
+  <meta name="description" content="Deuce Netの利用規約です。サービスをご利用になる前にご確認ください。">
+{% endblock %}
+{% block header %}{% endblock %}
+
+{% block content %}
+<main class="public-document">
+  <a class="document-brand" href="{% url 'tennis:index' %}">
+    <picture>
+      <source srcset="{% static 'tennis/logo/wordmark.webp' %}" type="image/webp">
+      <img src="{% static 'tennis/logo/wordmark.png' %}" alt="Deuce Net">
+    </picture>
+  </a>
+  <header class="document-header">
+    <p class="landing-kicker">TERMS</p>
+    <h1>利用規約</h1>
+    <p>Deuce Netを安全に使うための基本ルールです。</p>
+  </header>
+
+  <div class="document-body">
+    <section>
+      <h2>1. 本サービスについて</h2>
+      <p>Deuce Netは、テニスサークルの出欠確認、対戦表作成、試合結果と戦績の集計を支援するサービスです。本規約に同意のうえでご利用ください。</p>
+    </section>
+
+    <section>
+      <h2>2. URLの管理</h2>
+      <p>本サービスでは、発行されたURLを使ってクラブページへアクセスします。特に幹事用URLは、クラブの設定やデータを変更できる重要な情報です。第三者へ不用意に共有せず、利用者の責任で管理してください。</p>
+    </section>
+
+    <section>
+      <h2>3. 入力する情報</h2>
+      <p>利用者は、入力する情報が正確であり、第三者の権利を侵害しないようご配慮ください。個人を特定する必要のない場面では、表示名の利用を推奨します。</p>
+    </section>
+
+    <section>
+      <h2>4. 禁止事項</h2>
+      <ul>
+        <li>法令または公序良俗に反する行為</li>
+        <li>他の利用者になりすます行為</li>
+        <li>サービスの運営を妨げる行為</li>
+        <li>不正アクセスや、過度な負荷をかける行為</li>
+        <li>第三者の権利やプライバシーを侵害する行為</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>5. サービスの変更・停止</h2>
+      <p>保守、障害、災害その他の事情により、事前の通知なくサービスの全部または一部を変更、停止する場合があります。</p>
+    </section>
+
+    <section>
+      <h2>6. 免責</h2>
+      <p>本サービスは、提供する機能や保存データが常に完全であることを保証するものではありません。利用者は必要に応じてデータをダウンロードし、手元にも保管してください。サービスの利用により生じた損害について、法令上認められる範囲で責任を負わないものとします。</p>
+    </section>
+
+    <section>
+      <h2>7. 規約の変更</h2>
+      <p>必要に応じて本規約を改定することがあります。重要な変更は、本サービス上でお知らせします。</p>
+    </section>
+
+    <p class="document-date">制定日：2026年9月9日</p>
+  </div>
+</main>
+{% endblock %}

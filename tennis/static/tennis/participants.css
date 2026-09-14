@@ -440,12 +440,18 @@
 
 /* settings: メンバー管理は左詰め（テーブル自体を縮める） */
 .members-admin-area{
+  width: 100%;
+  max-width: 100%;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
   text-align: left; /* inline-table を左に寄せる */
+  padding-bottom: 6px;
 }
 
 #members-table.participants-table{
-  width: fit-content !important;   /* ← これが効く */
-  max-width: 100%;
+  width: 810px !important;
+  min-width: 810px;
+  max-width: none;
   display: inline-table;          /* ← text-align に従って左に寄る */
   margin-left: 0 !important;
   margin-right: auto !important;
@@ -459,7 +465,8 @@
 }
 
 /* settings：メンバー管理 名前カラムだけ左寄せ（ヘッダー除外） */
-#members-table tbody td:nth-child(2) {
+#members-table tbody td:nth-child(2),
+#members-table tbody td:nth-child(6) {
   text-align: left;
 }
 
