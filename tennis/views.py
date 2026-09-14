@@ -4801,25 +4801,43 @@ def club_reset_url(request):
 
         field = "public_token" if reset_kind == "public" else "admin_token"
         setattr(club, field, uuid.uuid4().hex)
+
+        # 新URLをDBへ確定する前に通知する。全送信が失敗した場合は保存せず、
+        # 現在のURLをそのまま使える状態に保つ。
+        sent_count = 0
+        failed_count = 0
+        for email in recipients:
+            try:
+                organizer_email.send_url_reset_email(request, email, club, reset_kind)
+                sent_count += 1
+            except Exception:
+                failed_count += 1
+                log.exception("Failed to send URL reset email: club=%s kind=%s", club.id, reset_kind)
+
+        if not sent_count:
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "error": "email_failed",
+                    "sent_count": 0,
+                    "failed_count": failed_count,
+                    "message": "メールを送信できなかったため、URLは変更していません。時間をおいて再度お試しください。",
+                },
+                status=503,
+            )
+
         club.save(update_fields=[field, "updated_at"])
 
         AuditLog.objects.create(
             club=club,
             actor_token_kind=ActorTokenKind.ADMIN,
             action=f"reset_{reset_kind}_url",
-            payload_json={"confirmed_email_count": len(recipients)},
+            payload_json={
+                "confirmed_email_count": len(recipients),
+                "sent_count": sent_count,
+                "failed_count": failed_count,
+            },
         )
-
-    # 同じ宛先が複数幹事に登録されていても、通知は1通だけにする。
-    sent_count = 0
-    failed_count = 0
-    for email in recipients:
-        try:
-            organizer_email.send_url_reset_email(request, email, club, reset_kind)
-            sent_count += 1
-        except Exception:
-            failed_count += 1
-            log.exception("Failed to send URL reset email: club=%s kind=%s", club.id, reset_kind)
 
     if reset_kind == "admin":
         new_url = request.build_absolute_uri(
@@ -4836,10 +4854,7 @@ def club_reset_url(request):
             reverse("tennis:club_settings", args=[club.admin_path_token, club.admin_token])
         )
 
-    if sent_count:
-        message = f"URLを再発行し、確認済み幹事へ{sent_count}通送信しました。"
-    else:
-        message = "URLを再発行しましたが、メールを送信できませんでした。"
+    message = f"URLを再発行し、確認済み幹事へ{sent_count}通送信しました。"
     if failed_count:
         message += f" {failed_count}通は送信できませんでした。"
 

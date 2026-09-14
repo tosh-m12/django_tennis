@@ -316,6 +316,28 @@ class OrganizerEmailTests(TestCase):
         self.assertEqual(self.club.admin_token, old_admin_token)
         send_email.assert_not_called()
 
+    @mock.patch(
+        "tennis.views.organizer_email.send_url_reset_email",
+        side_effect=RuntimeError("mail unavailable"),
+    )
+    def test_url_reset_keeps_current_tokens_when_all_email_sends_fail(self, send_email):
+        old_public_token = self.club.public_token
+        old_admin_token = self.club.admin_token
+
+        for reset_kind in ("public", "admin"):
+            with self.subTest(reset_kind=reset_kind):
+                response = self.admin_post(
+                    "tennis:club_reset_url",
+                    {"reset_kind": reset_kind},
+                )
+                self.assertEqual(response.status_code, 503)
+                self.assertEqual(response.json()["error"], "email_failed")
+
+        self.club.refresh_from_db()
+        self.assertEqual(self.club.public_token, old_public_token)
+        self.assertEqual(self.club.admin_token, old_admin_token)
+        self.assertEqual(send_email.call_count, 2)
+
     def test_public_url_reset_email_contains_correct_recipient_subject_and_new_url(self):
         old_public_token = self.club.public_token
 
