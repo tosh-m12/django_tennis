@@ -463,6 +463,16 @@ def _require_club_admin_token(request, club):
     return None
 
 
+def _get_club_for_page(club_path_token, club_admin_token=None):
+    """公開URLは public_token、幹事URLは専用の admin_path_token でクラブを解決する。"""
+    lookup = {"is_active": True}
+    if club_admin_token is None:
+        lookup["public_token"] = club_path_token
+    else:
+        lookup["admin_path_token"] = club_path_token
+    return get_object_or_404(Club, **lookup)
+
+
 # ============================================================
 # 自動メンバー整理（未使用の非固定メンバーを期限到来で削除）
 # ============================================================
@@ -836,7 +846,7 @@ def index(request):
 
         url = reverse(
             "tennis:club_home_admin",
-            args=[club.public_token, club.admin_token],
+            args=[club.admin_path_token, club.admin_token],
         )
         return redirect(url)
 
@@ -919,14 +929,14 @@ def _touch_demo_club(club):
 def club_settings(request, club_public_token, club_admin_token):
     club = get_object_or_404(
         Club,
-        public_token=club_public_token,
+        admin_path_token=club_public_token,
         admin_token=club_admin_token,
-        is_active=True
+        is_active=True,
     )
 
     member_url = request.build_absolute_uri(reverse("tennis:club_home", args=[club.public_token]))
-    admin_home_url = request.build_absolute_uri(reverse("tennis:club_home_admin", args=[club.public_token, club.admin_token]))
-    admin_settings_url = request.build_absolute_uri(reverse("tennis:club_settings", args=[club.public_token, club.admin_token]))
+    admin_home_url = request.build_absolute_uri(reverse("tennis:club_home_admin", args=[club.admin_path_token, club.admin_token]))
+    admin_settings_url = request.build_absolute_uri(reverse("tennis:club_settings", args=[club.admin_path_token, club.admin_token]))
 
     today = timezone.localdate()
     year = _parse_int(request.GET.get("year"), default=today.year, min_v=2000, max_v=2100) or today.year
@@ -959,6 +969,10 @@ def club_settings(request, club_public_token, club_admin_token):
         o.member_id: o
         for o in ClubOrganizer.objects.filter(club=club, member__isnull=False)
     }
+    has_confirmed_organizer_email = any(
+        o.confirmed_at is not None and bool((o.email or "").strip())
+        for o in org_by_member.values()
+    )
     for m in members:
         o = org_by_member.get(m.id)
         m.is_organizer = o is not None
@@ -999,6 +1013,7 @@ def club_settings(request, club_public_token, club_admin_token):
             "flags": club_flags,
             "max_flags": MAX_FLAGS,
             "members": members,
+            "has_confirmed_organizer_email": has_confirmed_organizer_email,
             "classes": classes,
             "default_display_settings": default_display_settings,
             "default_display_settings_json": json.dumps(default_display_settings, ensure_ascii=False),
@@ -1022,7 +1037,7 @@ def club_admin_help(request, club_public_token, club_admin_token):
     """
     club = get_object_or_404(
         Club,
-        public_token=club_public_token,
+        admin_path_token=club_public_token,
         admin_token=club_admin_token,
         is_active=True,
     )
@@ -1285,7 +1300,7 @@ def club_data(request, club_public_token, club_admin_token):
     幹事専用：出欠・共通フラグ・固有フラグのデータ集計表ページ。
     期間内のイベントを対象に、メンバー×イベントの3種のマトリクスを構築する。
     """
-    club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
+    club = _get_club_for_page(club_public_token, club_admin_token)
     if club.admin_token != club_admin_token:
         return HttpResponseBadRequest("admin token mismatch")
 
@@ -1314,10 +1329,10 @@ def club_data(request, club_public_token, club_admin_token):
         "club_flag_tables": data["club_flag_tables"],
         "event_flag_blocks": data["event_flag_blocks"],
         "download_xlsx_url": reverse(
-            "tennis:club_data_download", args=[club.public_token, club.admin_token]
+            "tennis:club_data_download", args=[club.admin_path_token, club.admin_token]
         ),
         "upload_url": reverse(
-            "tennis:club_data_upload", args=[club.public_token, club.admin_token]
+            "tennis:club_data_upload", args=[club.admin_path_token, club.admin_token]
         ),
         "is_admin": True,
         "show_topbar": True,
@@ -1333,7 +1348,7 @@ def club_data_download(request, club_public_token, club_admin_token):
     """
     from . import data_export
 
-    club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
+    club = _get_club_for_page(club_public_token, club_admin_token)
     if club.admin_token != club_admin_token:
         return HttpResponseBadRequest("admin token mismatch")
 
@@ -1378,7 +1393,7 @@ def club_data_upload(request, club_public_token, club_admin_token):
     """
     from . import data_import
 
-    club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
+    club = _get_club_for_page(club_public_token, club_admin_token)
     if club.admin_token != club_admin_token:
         return HttpResponseBadRequest("admin token mismatch")
 
@@ -1422,7 +1437,7 @@ def club_data_apply(request, club_public_token, club_admin_token):
     """
     from . import data_import
 
-    club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
+    club = _get_club_for_page(club_public_token, club_admin_token)
     if club.admin_token != club_admin_token:
         return HttpResponseBadRequest("admin token mismatch")
 
@@ -1459,8 +1474,8 @@ def _render_upload_preview(request, club, *, result=None, error=None,
         "error": error,
         "can_apply": can_apply,
         "applied": applied,
-        "data_url": reverse("tennis:club_data", args=[club.public_token, club.admin_token]),
-        "apply_url": reverse("tennis:club_data_apply", args=[club.public_token, club.admin_token]),
+        "data_url": reverse("tennis:club_data", args=[club.admin_path_token, club.admin_token]),
+        "apply_url": reverse("tennis:club_data_apply", args=[club.admin_path_token, club.admin_token]),
     })
 
 
@@ -1469,7 +1484,7 @@ def _render_upload_preview(request, club, *, result=None, error=None,
 # ============================================================
 
 def _cleanup_club_or_400(club_public_token, club_admin_token):
-    club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
+    club = _get_club_for_page(club_public_token, club_admin_token)
     if club.admin_token != club_admin_token:
         return None, HttpResponseBadRequest("admin token mismatch")
     return club, None
@@ -1488,9 +1503,9 @@ def club_member_cleanup(request, club_public_token, club_admin_token):
         "is_admin": True,
         "show_topbar": True,
         "rows": data_cleanup.member_summaries(club),
-        "merge_preview_url": reverse("tennis:club_member_merge_preview", args=[club.public_token, club.admin_token]),
-        "delete_preview_url": reverse("tennis:club_member_delete_preview", args=[club.public_token, club.admin_token]),
-        "cleanup_url": reverse("tennis:club_member_cleanup", args=[club.public_token, club.admin_token]),
+        "merge_preview_url": reverse("tennis:club_member_merge_preview", args=[club.admin_path_token, club.admin_token]),
+        "delete_preview_url": reverse("tennis:club_member_delete_preview", args=[club.admin_path_token, club.admin_token]),
+        "cleanup_url": reverse("tennis:club_member_cleanup", args=[club.admin_path_token, club.admin_token]),
         "flash": request.session.pop("cleanup_flash", None),
     })
 
@@ -1517,8 +1532,8 @@ def club_member_merge_preview(request, club_public_token, club_admin_token):
     return render(request, "tennis/member_cleanup_preview.html", {
         "club": club, "is_admin": True, "show_topbar": True,
         "mode": "merge", "result": result,
-        "apply_url": reverse("tennis:club_member_merge_apply", args=[club.public_token, club.admin_token]),
-        "cleanup_url": reverse("tennis:club_member_cleanup", args=[club.public_token, club.admin_token]),
+        "apply_url": reverse("tennis:club_member_merge_apply", args=[club.admin_path_token, club.admin_token]),
+        "cleanup_url": reverse("tennis:club_member_cleanup", args=[club.admin_path_token, club.admin_token]),
     })
 
 
@@ -1533,12 +1548,22 @@ def club_member_merge_apply(request, club_public_token, club_admin_token):
     pending = request.session.get("member_merge_pending")
     if not pending or pending.get("club_id") != club.id:
         request.session["cleanup_flash"] = {"kind": "err", "text": "対象がありません。やり直してください。"}
-        return redirect("tennis:club_member_cleanup", club.public_token, club.admin_token)
+        return redirect("tennis:club_member_cleanup", club.admin_path_token, club.admin_token)
 
-    n = data_cleanup.apply_merge(club, pending["source_keys"], pending["target_key"], actor_kind="admin")
+    try:
+        n = data_cleanup.apply_merge(
+            club,
+            pending["source_keys"],
+            pending["target_key"],
+            actor_kind="admin",
+        )
+    except ValueError as exc:
+        request.session.pop("member_merge_pending", None)
+        request.session["cleanup_flash"] = {"kind": "err", "text": str(exc)}
+        return redirect("tennis:club_member_cleanup", club.admin_path_token, club.admin_token)
     request.session.pop("member_merge_pending", None)
     request.session["cleanup_flash"] = {"kind": "ok", "text": f"統合しました（{n}件の記録を移動）。"}
-    return redirect("tennis:club_member_cleanup", club.public_token, club.admin_token)
+    return redirect("tennis:club_member_cleanup", club.admin_path_token, club.admin_token)
 
 
 @require_POST
@@ -1559,8 +1584,8 @@ def club_member_delete_preview(request, club_public_token, club_admin_token):
     return render(request, "tennis/member_cleanup_preview.html", {
         "club": club, "is_admin": True, "show_topbar": True,
         "mode": "delete", "result": result,
-        "apply_url": reverse("tennis:club_member_delete_apply", args=[club.public_token, club.admin_token]),
-        "cleanup_url": reverse("tennis:club_member_cleanup", args=[club.public_token, club.admin_token]),
+        "apply_url": reverse("tennis:club_member_delete_apply", args=[club.admin_path_token, club.admin_token]),
+        "cleanup_url": reverse("tennis:club_member_cleanup", args=[club.admin_path_token, club.admin_token]),
     })
 
 
@@ -1575,12 +1600,12 @@ def club_member_delete_apply(request, club_public_token, club_admin_token):
     pending = request.session.get("member_delete_pending")
     if not pending or pending.get("club_id") != club.id:
         request.session["cleanup_flash"] = {"kind": "err", "text": "対象がありません。やり直してください。"}
-        return redirect("tennis:club_member_cleanup", club.public_token, club.admin_token)
+        return redirect("tennis:club_member_cleanup", club.admin_path_token, club.admin_token)
 
     n = data_cleanup.apply_delete(club, pending["member_id"], actor_kind="admin")
     request.session.pop("member_delete_pending", None)
     request.session["cleanup_flash"] = {"kind": "ok", "text": f"完全削除しました（出欠{n}件を削除）。"}
-    return redirect("tennis:club_member_cleanup", club.public_token, club.admin_token)
+    return redirect("tennis:club_member_cleanup", club.admin_path_token, club.admin_token)
 
 
 # ============================================================
@@ -1600,10 +1625,10 @@ def club_flag_cleanup(request, club_public_token, club_admin_token):
         "rows": rows,
         "club_flags": [r for r in rows if r["scope"] == "club"],
         "event_flags": [r for r in rows if r["scope"] == "event"],
-        "rename_url": reverse("tennis:club_flag_rename", args=[club.public_token, club.admin_token]),
-        "delete_preview_url": reverse("tennis:club_flag_delete_preview", args=[club.public_token, club.admin_token]),
-        "merge_preview_url": reverse("tennis:club_flag_merge_preview", args=[club.public_token, club.admin_token]),
-        "cleanup_url": reverse("tennis:club_flag_cleanup", args=[club.public_token, club.admin_token]),
+        "rename_url": reverse("tennis:club_flag_rename", args=[club.admin_path_token, club.admin_token]),
+        "delete_preview_url": reverse("tennis:club_flag_delete_preview", args=[club.admin_path_token, club.admin_token]),
+        "merge_preview_url": reverse("tennis:club_flag_merge_preview", args=[club.admin_path_token, club.admin_token]),
+        "cleanup_url": reverse("tennis:club_flag_cleanup", args=[club.admin_path_token, club.admin_token]),
         "flash": request.session.pop("flag_flash", None),
     })
 
@@ -1621,14 +1646,14 @@ def club_flag_rename(request, club_public_token, club_admin_token):
         request.session["flag_flash"] = {"kind": "err", "text": "／".join(res["errors"])}
     else:
         request.session["flag_flash"] = {"kind": "ok", "text": "名前を変更しました。"}
-    return redirect("tennis:club_flag_cleanup", club.public_token, club.admin_token)
+    return redirect("tennis:club_flag_cleanup", club.admin_path_token, club.admin_token)
 
 
 def _render_flag_preview(request, club, *, mode, result, apply_url):
     return render(request, "tennis/flag_cleanup_preview.html", {
         "club": club, "is_admin": True, "show_topbar": True,
         "mode": mode, "result": result, "apply_url": apply_url,
-        "cleanup_url": reverse("tennis:club_flag_cleanup", args=[club.public_token, club.admin_token]),
+        "cleanup_url": reverse("tennis:club_flag_cleanup", args=[club.admin_path_token, club.admin_token]),
     })
 
 
@@ -1647,7 +1672,7 @@ def club_flag_delete_preview(request, club_public_token, club_admin_token):
         request.session.pop("flag_delete_pending", None)
     return _render_flag_preview(
         request, club, mode="delete", result=result,
-        apply_url=reverse("tennis:club_flag_delete_apply", args=[club.public_token, club.admin_token]),
+        apply_url=reverse("tennis:club_flag_delete_apply", args=[club.admin_path_token, club.admin_token]),
     )
 
 
@@ -1661,11 +1686,11 @@ def club_flag_delete_apply(request, club_public_token, club_admin_token):
     pending = request.session.get("flag_delete_pending")
     if not pending or pending.get("club_id") != club.id:
         request.session["flag_flash"] = {"kind": "err", "text": "対象がありません。やり直してください。"}
-        return redirect("tennis:club_flag_cleanup", club.public_token, club.admin_token)
+        return redirect("tennis:club_flag_cleanup", club.admin_path_token, club.admin_token)
     n = data_cleanup.apply_flag_delete(club, pending["flag_key"], actor_kind="admin")
     request.session.pop("flag_delete_pending", None)
     request.session["flag_flash"] = {"kind": "ok", "text": f"フラグを削除しました（{n}件の記録を削除）。"}
-    return redirect("tennis:club_flag_cleanup", club.public_token, club.admin_token)
+    return redirect("tennis:club_flag_cleanup", club.admin_path_token, club.admin_token)
 
 
 @require_POST
@@ -1686,7 +1711,7 @@ def club_flag_merge_preview(request, club_public_token, club_admin_token):
         request.session.pop("flag_merge_pending", None)
     return _render_flag_preview(
         request, club, mode="merge", result=result,
-        apply_url=reverse("tennis:club_flag_merge_apply", args=[club.public_token, club.admin_token]),
+        apply_url=reverse("tennis:club_flag_merge_apply", args=[club.admin_path_token, club.admin_token]),
     )
 
 
@@ -1700,14 +1725,14 @@ def club_flag_merge_apply(request, club_public_token, club_admin_token):
     pending = request.session.get("flag_merge_pending")
     if not pending or pending.get("club_id") != club.id:
         request.session["flag_flash"] = {"kind": "err", "text": "対象がありません。やり直してください。"}
-        return redirect("tennis:club_flag_cleanup", club.public_token, club.admin_token)
+        return redirect("tennis:club_flag_cleanup", club.admin_path_token, club.admin_token)
     res = data_cleanup.apply_flag_merge(club, pending["source_key"], pending["target_key"], actor_kind="admin")
     request.session.pop("flag_merge_pending", None)
     if res.get("errors"):
         request.session["flag_flash"] = {"kind": "err", "text": "／".join(res["errors"])}
     else:
         request.session["flag_flash"] = {"kind": "ok", "text": f"統合しました（移動{res['moved']}・統合{res['conflicts']}）。"}
-    return redirect("tennis:club_flag_cleanup", club.public_token, club.admin_token)
+    return redirect("tennis:club_flag_cleanup", club.admin_path_token, club.admin_token)
 
 
 def _parse_int_or_none(v):
@@ -1910,7 +1935,7 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
     - 戦績集計サマリ（シングルス／ダブルス別、クラブ統一期間＝過去 period_days 日）
     - 試合履歴（公開済み MatchSchedule の schedule_json + MatchScore から構築・全件）
     """
-    club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
+    club = _get_club_for_page(club_public_token, club_admin_token)
     is_admin = False
     if club_admin_token is not None:
         if club.admin_token != club_admin_token:
@@ -2065,7 +2090,7 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
     # 戻り先（来た元のページ） — referer があればそれ、無ければクラブホーム
     back_url = request.META.get("HTTP_REFERER") or reverse(
         "tennis:club_home_admin" if is_admin else "tennis:club_home",
-        args=[club.public_token, club.admin_token] if is_admin else [club.public_token],
+        args=[club.admin_path_token, club.admin_token] if is_admin else [club.public_token],
     )
 
     # 戦績は記録のある種別だけ残す（空ブロックは出さない）
@@ -2122,7 +2147,7 @@ def club_home(request, club_public_token, club_admin_token=None):
     - /c/<public>/                 -> is_admin=False
     - /c/<public>/admin/<admin>/   -> is_admin=True
     """
-    club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
+    club = _get_club_for_page(club_public_token, club_admin_token)
 
     _touch_demo_club(club)
 
@@ -2153,10 +2178,10 @@ def club_home(request, club_public_token, club_admin_token=None):
 
     settings_url = ""
     if is_admin:
-        settings_url = reverse("tennis:club_settings", args=[club.public_token, club.admin_token])
+        settings_url = reverse("tennis:club_settings", args=[club.admin_path_token, club.admin_token])
 
     member_url = request.build_absolute_uri(reverse("tennis:club_home", args=[club.public_token]))
-    admin_url = request.build_absolute_uri(reverse("tennis:club_home_admin", args=[club.public_token, club.admin_token]))
+    admin_url = request.build_absolute_uri(reverse("tennis:club_home_admin", args=[club.admin_path_token, club.admin_token]))
 
     save_display_settings_url = reverse("tennis:save_event_display_setting")
 
@@ -2192,7 +2217,7 @@ def ranking_page(request, club_public_token, club_admin_token=None):
       個別の期間選択は廃止（ランキングの基準を一意に保つため）。基準変更は設定ページで。
     - 対象：当該クラブの公開済み MatchSchedule を期間で絞り、build_month_rankings で集計。
     """
-    club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
+    club = _get_club_for_page(club_public_token, club_admin_token)
     is_admin = False
     if club_admin_token is not None:
         if club.admin_token != club_admin_token:
@@ -2221,7 +2246,7 @@ def ranking_page(request, club_public_token, club_admin_token=None):
 
     back_url = reverse(
         "tennis:club_home_admin" if is_admin else "tennis:club_home",
-        args=[club.public_token, club.admin_token] if is_admin else [club.public_token],
+        args=[club.admin_path_token, club.admin_token] if is_admin else [club.public_token],
     )
 
     return render(request, "tennis/ranking.html", {
@@ -2529,7 +2554,7 @@ def event_view(request, club_public_token, event_id, club_admin_token=None):
     # ============================================================
     # 1) 基本取得 & admin 判定
     # ============================================================
-    club = get_object_or_404(Club, public_token=club_public_token, is_active=True)
+    club = _get_club_for_page(club_public_token, club_admin_token)
     event = get_object_or_404(Event, id=int(event_id), club=club)
     _mark_club_member_session(request, club.id)
 
@@ -2940,7 +2965,7 @@ def club_create_event(request):
             "date": ev.date.strftime("%Y-%m-%d"),
             "title": ev.title,
             "public_url": reverse("tennis:event_public", args=[club.public_token, ev.id]),
-            "admin_url": reverse("tennis:event_admin", args=[club.public_token, club.admin_token, ev.id]),
+            "admin_url": reverse("tennis:event_admin", args=[club.admin_path_token, club.admin_token, ev.id]),
         },
     })
 
@@ -4733,17 +4758,6 @@ def club_reset_url(request):
         if blocked:
             return blocked
 
-        throttle_key = f"{club.id}:{reset_kind}"
-        if not organizer_email.throttle_ok("url_reset", throttle_key, limit=5, window_seconds=3600):
-            return JsonResponse(
-                {"ok": False, "error": "throttled", "message": "再発行回数が多すぎます。時間をおいて再度お試しください。"},
-                status=429,
-            )
-
-        field = "public_token" if reset_kind == "public" else "admin_token"
-        setattr(club, field, uuid.uuid4().hex)
-        club.save(update_fields=[field, "updated_at"])
-
         confirmed_emails = list(
             ClubOrganizer.objects.filter(
                 club=club,
@@ -4755,6 +4769,27 @@ def club_reset_url(request):
         recipients = sorted({
             organizer_email.normalize_email(e) for e in confirmed_emails if e
         })
+        if not recipients:
+            return JsonResponse(
+                {
+                    "ok": False,
+                    "error": "confirmed_email_required",
+                    "message": "確認済みの幹事メールを登録してください。",
+                },
+                status=409,
+            )
+
+        throttle_key = f"{club.id}:{reset_kind}"
+        if not organizer_email.throttle_ok("url_reset", throttle_key, limit=5, window_seconds=3600):
+            return JsonResponse(
+                {"ok": False, "error": "throttled", "message": "再発行回数が多すぎます。時間をおいて再度お試しください。"},
+                status=429,
+            )
+
+        field = "public_token" if reset_kind == "public" else "admin_token"
+        setattr(club, field, uuid.uuid4().hex)
+        club.save(update_fields=[field, "updated_at"])
+
         AuditLog.objects.create(
             club=club,
             actor_token_kind=ActorTokenKind.ADMIN,
@@ -4775,23 +4810,23 @@ def club_reset_url(request):
 
     if reset_kind == "admin":
         new_url = request.build_absolute_uri(
-            reverse("tennis:club_home_admin", args=[club.public_token, club.admin_token])
+            reverse("tennis:club_home_admin", args=[club.admin_path_token, club.admin_token])
         )
         settings_url = request.build_absolute_uri(
-            reverse("tennis:club_settings", args=[club.public_token, club.admin_token])
+            reverse("tennis:club_settings", args=[club.admin_path_token, club.admin_token])
         )
     else:
         new_url = request.build_absolute_uri(
             reverse("tennis:club_home", args=[club.public_token])
         )
         settings_url = request.build_absolute_uri(
-            reverse("tennis:club_settings", args=[club.public_token, club.admin_token])
+            reverse("tennis:club_settings", args=[club.admin_path_token, club.admin_token])
         )
 
     if sent_count:
         message = f"URLを再発行し、確認済み幹事へ{sent_count}通送信しました。"
     else:
-        message = "URLを再発行しました。送信できる確認済みメールアドレスはありません。"
+        message = "URLを再発行しましたが、メールを送信できませんでした。"
     if failed_count:
         message += f" {failed_count}通は送信できませんでした。"
 

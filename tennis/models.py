@@ -18,6 +18,9 @@ class Club(models.Model):
 
     # V1：クラブ単位トークンのみ
     public_token = models.CharField(max_length=64, unique=True, editable=False)
+    # 幹事画面URLの経路専用。既存クラブは導入時点の public_token を引き継ぐ。
+    # public_token を再発行しても幹事URLが変わらないよう、別管理する。
+    admin_path_token = models.CharField(max_length=64, unique=True, editable=False)
     admin_token = models.CharField(max_length=64, unique=True, editable=False)
 
     is_active = models.BooleanField(default=True)
@@ -47,6 +50,8 @@ class Club(models.Model):
     def save(self, *args, **kwargs):
         if not self.public_token:
             self.public_token = uuid.uuid4().hex
+        if not self.admin_path_token:
+            self.admin_path_token = self.public_token
         if not self.admin_token:
             self.admin_token = uuid.uuid4().hex
         super().save(*args, **kwargs)

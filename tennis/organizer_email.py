@@ -77,7 +77,7 @@ def send_recovery_email(request, email: str, organizers) -> None:
     blocks = []
     for org in organizers:
         club = org.club
-        admin_url = _abs(request, "tennis:club_home_admin", [club.public_token, club.admin_token])
+        admin_url = _abs(request, "tennis:club_home_admin", [club.admin_path_token, club.admin_token])
         public_url = _abs(request, "tennis:club_home", [club.public_token])
         blocks.append(
             f"■ {club.name}\n"
@@ -97,7 +97,7 @@ def send_url_reset_email(request, email: str, club, reset_kind: str) -> None:
     """URL再発行後、確認済み幹事へ新しいURLを通知する。"""
     if reset_kind == "admin":
         label = "幹事用URL"
-        url = _abs(request, "tennis:club_home_admin", [club.public_token, club.admin_token])
+        url = _abs(request, "tennis:club_home_admin", [club.admin_path_token, club.admin_token])
     else:
         label = "メンバー用URL"
         url = _abs(request, "tennis:club_home", [club.public_token])

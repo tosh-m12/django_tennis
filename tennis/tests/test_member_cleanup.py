@@ -7,9 +7,10 @@ import datetime
 
 from django.test import TestCase, override_settings
 from django.urls import reverse
+from django.utils import timezone
 
 from tennis import data_cleanup
-from tennis.models import Member, EventParticipant, ParticipantFlag, MatchSchedule
+from tennis.models import ClubOrganizer, Member, EventParticipant, ParticipantFlag, MatchSchedule
 
 from .factories import (
     make_club,
@@ -99,6 +100,41 @@ class MemberMergeTests(TestCase):
         team2 = ms.schedule_json[0]["matches"][0]["team2"]
         a_e1 = EventParticipant.objects.get(member=self.A, event=self.e1)
         self.assertIn(a_e1.id, team2)
+
+    def test_source_organizer_role_and_email_move_to_target(self):
+        organizer = ClubOrganizer.objects.create(
+            club=self.club,
+            member=self.B,
+            email="owner@example.com",
+            confirmed_at=timezone.now(),
+        )
+
+        data_cleanup.apply_merge(self.club, [f"m:{self.B.id}"], f"m:{self.A.id}")
+
+        organizer.refresh_from_db()
+        self.assertEqual(organizer.member, self.A)
+        self.assertEqual(organizer.email, "owner@example.com")
+        self.assertIsNotNone(organizer.confirmed_at)
+
+    def test_merge_stops_when_multiple_organizer_records_would_collide(self):
+        ClubOrganizer.objects.create(club=self.club, member=self.A, email="a@example.com")
+        ClubOrganizer.objects.create(club=self.club, member=self.B, email="b@example.com")
+
+        preview = data_cleanup.preview_merge(
+            self.club,
+            [f"m:{self.B.id}"],
+            f"m:{self.A.id}",
+        )
+
+        self.assertTrue(preview["errors"])
+        with self.assertRaises(ValueError):
+            data_cleanup.apply_merge(
+                self.club,
+                [f"m:{self.B.id}"],
+                f"m:{self.A.id}",
+            )
+        self.assertTrue(Member.objects.filter(pk=self.B.id).exists())
+        self.assertEqual(ClubOrganizer.objects.filter(club=self.club).count(), 2)
 
 
 @_NO_MANIFEST_STORAGES

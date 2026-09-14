@@ -22,6 +22,7 @@ from .models import (
     MatchSchedule,
     MatchScheduleDraft,
     AuditLog,
+    ClubOrganizer,
 )
 
 # 出欠の強さ（統合の競合解決：強い方を採用）
@@ -141,6 +142,23 @@ def _resolve_source_eps(club, source_key):
     return []
 
 
+def _merge_member_ids(source_keys, target):
+    source_member_ids = [
+        int(key[2:]) for key in source_keys if key.startswith("m:")
+    ]
+    return [target.id, *source_member_ids]
+
+
+def _organizer_merge_error(club, source_keys, target):
+    organizer_count = ClubOrganizer.objects.filter(
+        club=club,
+        member_id__in=_merge_member_ids(source_keys, target),
+    ).count()
+    if organizer_count > 1:
+        return "幹事が複数含まれるため統合できません。先に幹事設定を整理してください。"
+    return ""
+
+
 def preview_merge(club, source_keys, target_key):
     """
     統合プレビュー（DB変更なし）。戻り値:
@@ -159,6 +177,10 @@ def preview_merge(club, source_keys, target_key):
     if not sources:
         errors.append("統合元を1人以上選んでください。")
         return {"errors": errors}
+
+    organizer_error = _organizer_merge_error(club, sources, target)
+    if organizer_error:
+        return {"errors": [organizer_error]}
 
     target_eps = {ep.event_id: ep for ep in EventParticipant.objects.filter(
         event__club=club, member=target)}
@@ -202,6 +224,28 @@ def apply_merge(club, source_keys, target_key, actor_kind="admin"):
     snapshot = {"target": target_key, "sources": [], "club_id": club.id}
 
     with transaction.atomic():
+        organizer_roles = list(
+            ClubOrganizer.objects.select_for_update().filter(
+                club=club,
+                member_id__in=_merge_member_ids(sources, target),
+            )
+        )
+        if len(organizer_roles) > 1:
+            raise ValueError(
+                "幹事が複数含まれるため統合できません。先に幹事設定を整理してください。"
+            )
+
+        organizer_transfer = None
+        if organizer_roles and organizer_roles[0].member_id != target.id:
+            organizer = organizer_roles[0]
+            organizer_transfer = {
+                "organizer_id": organizer.id,
+                "from_member_id": organizer.member_id,
+                "to_member_id": target.id,
+            }
+            organizer.member = target
+            organizer.save(update_fields=["member", "updated_at"])
+
         target_eps = {
             ep.event_id: ep
             for ep in EventParticipant.objects.select_for_update().filter(event__club=club, member=target)
@@ -243,6 +287,7 @@ def apply_merge(club, source_keys, target_key, actor_kind="admin"):
             payload_json={
                 "target": target_key, "sources": sources,
                 "moved": moved, "merged_conflicts": merged_conflicts,
+                "organizer_transfer": organizer_transfer,
                 "before": snapshot,
             },
         )

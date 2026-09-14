@@ -67,7 +67,7 @@
          data-admin-token="{{ club.admin_token }}"
          data-update-url="{% url 'tennis:ajax_update_event' %}"
          data-delete-url="{% url 'tennis:club_delete_event' %}"
-         data-club-home-url="{% url 'tennis:club_home_admin' club.public_token club.admin_token %}">
+         data-club-home-url="{% url 'tennis:club_home_admin' club.admin_path_token club.admin_token %}">
     </div>
   {% endif %}
 
@@ -161,7 +161,7 @@
 
           <td class="participant-index"><span class="idx">{{ forloop.counter }}</span></td>
 
-          <td><div class="tb-player-card-sm">{% if is_admin %}<a class="name-text name-link" href="{% url 'tennis:member_detail_admin' club.public_token club.admin_token row.member_id %}">{{ row.display_name }}</a>{% else %}<a class="name-text name-link" href="{% url 'tennis:member_detail' club.public_token row.member_id %}">{{ row.display_name }}</a>{% endif %}{% if row.withdrawn %}<span class="withdrawn-mark" title="退会者">*</span>{% endif %}</div></td>
+          <td><div class="tb-player-card-sm">{% if is_admin %}<a class="name-text name-link" href="{% url 'tennis:member_detail_admin' club.admin_path_token club.admin_token row.member_id %}">{{ row.display_name }}</a>{% else %}<a class="name-text name-link" href="{% url 'tennis:member_detail' club.public_token row.member_id %}">{{ row.display_name }}</a>{% endif %}{% if row.withdrawn %}<span class="withdrawn-mark" title="退会者">*</span>{% endif %}</div></td>
 
           <td class="attendance-cell">
             <button type="button"
@@ -305,7 +305,7 @@
 
           <td class="participant-index"><span class="idx">{{ fixed_rows|length|add:forloop.counter }}</span></td>
 
-          <td><div class="tb-player-card-sm">{% if row.member_id %}{% if is_admin %}<a class="name-text name-link" href="{% url 'tennis:member_detail_admin' club.public_token club.admin_token row.member_id %}">{{ row.display_name }}</a>{% else %}<a class="name-text name-link" href="{% url 'tennis:member_detail' club.public_token row.member_id %}">{{ row.display_name }}</a>{% endif %}{% else %}<span class="name-text">{{ row.display_name }}</span>{% endif %}{% if row.withdrawn %}<span class="withdrawn-mark" title="退会者">*</span>{% endif %}</div></td>
+          <td><div class="tb-player-card-sm">{% if row.member_id %}{% if is_admin %}<a class="name-text name-link" href="{% url 'tennis:member_detail_admin' club.admin_path_token club.admin_token row.member_id %}">{{ row.display_name }}</a>{% else %}<a class="name-text name-link" href="{% url 'tennis:member_detail' club.public_token row.member_id %}">{{ row.display_name }}</a>{% endif %}{% else %}<span class="name-text">{{ row.display_name }}</span>{% endif %}{% if row.withdrawn %}<span class="withdrawn-mark" title="退会者">*</span>{% endif %}</div></td>
 
           <td class="attendance-cell">
             <button type="button"

@@ -15,7 +15,7 @@
      data-update-url="{% url 'tennis:update_member_display_name' %}"
      {% if is_admin %}data-delete-url="{% url 'tennis:club_delete_member' %}"
      data-admin-token="{{ club.admin_token }}"
-     data-home-url="{% url 'tennis:club_home_admin' club.public_token club.admin_token %}"
+     data-home-url="{% url 'tennis:club_home_admin' club.admin_path_token club.admin_token %}"
      {% endif %}>
 
   <header class="member-header">

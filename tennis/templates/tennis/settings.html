@@ -93,7 +93,7 @@
   .url-reset-actions{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 12px;}
   .url-reset-btn{padding:8px 16px;border-radius:999px;border:1px solid #cc0000;background:#000;color:#cc0000;font:inherit;font-size:.9rem;font-weight:600;cursor:pointer;}
   .url-reset-btn:hover:not(:disabled){background:#1a0000;color:#ff3b3b;border-color:#ff3b3b;}
-  .url-reset-btn:disabled{opacity:.5;cursor:wait;}
+  .url-reset-btn:disabled{opacity:.5;cursor:not-allowed;}
 </style>
 
 <div class="members-admin-area">
@@ -125,7 +125,7 @@
           <td>{{ m.member_no }}</td>
           <td>
             <a class="member-name"
-               href="{% url 'tennis:member_detail_admin' club.public_token club.admin_token m.id %}"
+               href="{% url 'tennis:member_detail_admin' club.admin_path_token club.admin_token m.id %}"
                style="text-decoration:underline; font-weight:700; color:inherit;"
                title="個人ページを開く">
               {{ m.display_name }}
@@ -163,9 +163,9 @@
             </button>
           </td>
           <td class="member-organizer-email"
-              data-member-url="{% url 'tennis:member_detail_admin' club.public_token club.admin_token m.id %}">
+              data-member-url="{% url 'tennis:member_detail_admin' club.admin_path_token club.admin_token m.id %}">
             {% if m.is_organizer %}
-              <a class="member-email-link" href="{% url 'tennis:member_detail_admin' club.public_token club.admin_token m.id %}">{{ m.organizer_email|default:"登録する" }}</a>
+              <a class="member-email-link" href="{% url 'tennis:member_detail_admin' club.admin_path_token club.admin_token m.id %}">{{ m.organizer_email|default:"登録する" }}</a>
             {% endif %}
           </td>
           <td class="member-organizer-status" style="text-align:center;">
@@ -432,7 +432,7 @@
 {# データ集計表（閲覧・ダウンロード/アップロード） #}
 <div class="data-link-area" style="margin:0 0 16px;">
   <a class="btn btn-pill btn-primary"
-     href="{% url 'tennis:club_data' club.public_token club.admin_token %}">
+     href="{% url 'tennis:club_data' club.admin_path_token club.admin_token %}">
     データ集計表を開く
   </a>
   <small class="flag-note" style="display:block; margin-top:6px;">
@@ -445,8 +445,8 @@
   ※ 以下は取り消せない操作を含みます。実行前に内容を確認できます。
 </small>
 <p style="margin:0 0 12px; display:flex; gap:8px; flex-wrap:wrap;">
-  <a class="cleanup-pill" href="{% url 'tennis:club_member_cleanup' club.public_token club.admin_token %}">メンバー整理（重複の統合・完全削除）</a>
-  <a class="cleanup-pill" href="{% url 'tennis:club_flag_cleanup' club.public_token club.admin_token %}">フラグ整理（名前変更・削除・統合）</a>
+  <a class="cleanup-pill" href="{% url 'tennis:club_member_cleanup' club.admin_path_token club.admin_token %}">メンバー整理（重複の統合・完全削除）</a>
+  <a class="cleanup-pill" href="{% url 'tennis:club_flag_cleanup' club.admin_path_token club.admin_token %}">フラグ整理（名前変更・削除・統合）</a>
 </p>
 
 <hr>
@@ -459,9 +459,12 @@
 </div>
 
 <div class="url-reset-actions">
-  <button type="button" class="url-reset-btn" data-reset-kind="public">メンバー用URLをリセット</button>
-  <button type="button" class="url-reset-btn" data-reset-kind="admin">幹事用URLをリセット</button>
+  <button type="button" class="url-reset-btn" data-reset-kind="public"{% if not has_confirmed_organizer_email %} disabled{% endif %}>メンバー用URLをリセット</button>
+  <button type="button" class="url-reset-btn" data-reset-kind="admin"{% if not has_confirmed_organizer_email %} disabled{% endif %}>幹事用URLをリセット</button>
 </div>
+{% if not has_confirmed_organizer_email %}
+  <small class="flag-note">確認済みの幹事メールを登録すると利用できます。</small>
+{% endif %}
 
 
 {% endblock %}
