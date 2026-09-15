@@ -92,6 +92,7 @@
   .member-email-badge.is-pending{background:#fef3c7;color:#b45309;cursor:pointer;}
   .member-email-badge.is-pending:hover{background:#fde68a;}
   .member-email-badge.is-pending:focus-visible{outline:2px solid #b45309;outline-offset:2px;}
+  .member-email-badge.is-confirmed{background:#dcfce7;color:#166534;}
   .member-email-link{color:inherit;text-decoration:underline;overflow-wrap:anywhere;}
   .url-reset-actions{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 12px;}
   .url-reset-btn{padding:8px 16px;border-radius:999px;border:1px solid #cc0000;background:#000;color:#cc0000;font:inherit;font-size:.9rem;font-weight:600;cursor:pointer;}
@@ -178,6 +179,8 @@
                       data-member-name="{{ m.display_name|escape }}"
                       data-email="{{ m.organizer_email_masked|escape }}"
                       aria-label="{{ m.display_name }}の確認メールを再送">未確認</button>
+            {% elif m.is_organizer and m.email_confirmed %}
+              <span class="member-email-badge is-confirmed">認証済</span>
             {% endif %}
           </td>
         </tr>
