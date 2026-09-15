@@ -168,6 +168,7 @@ MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
     "tennis_project.middleware.WriteRateLimitMiddleware",
     "django.middleware.common.CommonMiddleware",
+    "tennis_project.middleware.ClubAccessMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
