@@ -161,7 +161,29 @@ class PublicPagesTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "プライバシーポリシー")
         self.assertContains(response, "取得する情報")
-        self.assertContains(response, "今後広告を掲載する場合")
+        self.assertContains(response, "Google AdSense")
+        self.assertContains(response, "Googleの広告設定")
+        self.assertContains(response, "パーソナライズ広告を無効")
+
+    def test_public_pages_include_adsense_ownership_meta(self):
+        for route_name in ("tennis:index", "tennis:privacy", "tennis:terms"):
+            with self.subTest(route_name=route_name):
+                response = self.client.get(reverse(route_name))
+                self.assertContains(
+                    response,
+                    '<meta name="google-adsense-account" content="ca-pub-3742846189705890">',
+                    html=True,
+                )
+
+    def test_ads_txt_is_public(self):
+        response = self.client.get(reverse("tennis:ads_txt"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response["Content-Type"].startswith("text/plain"))
+        self.assertEqual(
+            response.content.decode(),
+            "google.com, pub-3742846189705890, DIRECT, f08c47fec0942fa0\n",
+        )
 
     def test_terms_are_public(self):
         response = self.client.get(reverse("tennis:terms"))
