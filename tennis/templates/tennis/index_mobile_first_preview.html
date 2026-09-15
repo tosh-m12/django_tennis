@@ -6,7 +6,7 @@
 {% block extra_head %}
   <meta name="description" content="テニスサークルの練習会スケジュール、出欠、対戦表、個人・クラブ戦績をURLひとつで管理できます。">
   <link rel="stylesheet" href="{% static 'tennis/index.css' %}">
-  <link rel="stylesheet" href="{% static 'tennis/index_mobile_first_preview.css' %}?v=68">
+  <link rel="stylesheet" href="{% static 'tennis/index_mobile_first_preview.css' %}?v=69">
   {% if turnstile_enabled %}
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   {% endif %}
@@ -43,6 +43,9 @@
         >
         <button type="submit" class="mobile-first-action mobile-first-action-primary mobile-first-action-register">サークルを登録</button>
         <a class="mobile-first-action mobile-first-action-secondary mobile-first-action-demo" href="{% url 'tennis:demo' %}">デモを試す</a>
+        <button type="button" class="mobile-first-recover-link" id="club-recovery-open">
+          サークルURLを忘れた場合はこちら
+        </button>
       </form>
     </div>
 
@@ -104,6 +107,40 @@
         <div class="club-registration-modal-actions">
           <button type="button" class="btn btn-pill" id="club-registration-back">戻る</button>
           <button type="submit" class="btn btn-pill btn-primary" id="club-registration-submit">登録する</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div
+    id="club-recovery-modal"
+    class="club-registration-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="club-recovery-modal-title"
+    hidden
+  >
+    <div class="club-registration-modal-box">
+      <h2 id="club-recovery-modal-title">サークルURLの再送</h2>
+      <p>登録済みの幹事メールアドレスにURLを送信します。</p>
+
+      <form method="post" action="{% url 'tennis:recover' %}" id="club-recovery-form">
+        {% csrf_token %}
+        <div class="club-registration-field">
+          <label for="club-recovery-email">メールアドレス</label>
+          <input
+            type="email"
+            id="club-recovery-email"
+            name="email"
+            maxlength="254"
+            autocomplete="email"
+            required
+          >
+        </div>
+
+        <div class="club-registration-modal-actions">
+          <button type="button" class="btn btn-pill" id="club-recovery-back">戻る</button>
+          <button type="submit" class="btn btn-pill btn-primary" id="club-recovery-submit">送信する</button>
         </div>
       </form>
     </div>
@@ -263,6 +300,12 @@
   const backButton = document.getElementById("club-registration-back");
   const registrationForm = document.getElementById("club-registration-form");
   const submitButton = document.getElementById("club-registration-submit");
+  const recoveryOpenButton = document.getElementById("club-recovery-open");
+  const recoveryModal = document.getElementById("club-recovery-modal");
+  const recoveryEmail = document.getElementById("club-recovery-email");
+  const recoveryBackButton = document.getElementById("club-recovery-back");
+  const recoveryForm = document.getElementById("club-recovery-form");
+  const recoverySubmitButton = document.getElementById("club-recovery-submit");
 
   if (!startForm || !modal || !clubName || !modalClubName) return;
 
@@ -279,6 +322,18 @@
     clubName.focus();
   }
 
+  function openRecoveryModal() {
+    recoveryModal.hidden = false;
+    document.body.classList.add("club-registration-modal-open");
+    window.setTimeout(() => recoveryEmail && recoveryEmail.focus(), 0);
+  }
+
+  function closeRecoveryModal() {
+    recoveryModal.hidden = true;
+    document.body.classList.remove("club-registration-modal-open");
+    recoveryOpenButton.focus();
+  }
+
   startForm.addEventListener("submit", function (event) {
     event.preventDefault();
     clubName.value = clubName.value.trim();
@@ -290,14 +345,22 @@
   });
 
   backButton.addEventListener("click", closeModal);
+  recoveryOpenButton.addEventListener("click", openRecoveryModal);
+  recoveryBackButton.addEventListener("click", closeRecoveryModal);
   document.addEventListener("keydown", function (event) {
     if (event.key === "Escape" && !modal.hidden) closeModal();
+    if (event.key === "Escape" && !recoveryModal.hidden) closeRecoveryModal();
   });
 
   registrationForm.addEventListener("submit", function () {
     modalClubName.value = clubName.value.trim();
     submitButton.disabled = true;
     submitButton.textContent = "登録中…";
+  });
+
+  recoveryForm.addEventListener("submit", function () {
+    recoverySubmitButton.disabled = true;
+    recoverySubmitButton.textContent = "送信中…";
   });
 
   if (!modal.hidden) {
