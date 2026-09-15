@@ -83,12 +83,15 @@
      data-rename-url="{% url 'tennis:club_rename_member' %}"
      data-toggle-fixed-url="{% url 'tennis:club_toggle_member_fixed' %}"
      data-delete-url="{% url 'tennis:club_delete_member' %}"
-     data-set-organizer-url="{% url 'tennis:club_set_member_organizer' %}">
+     data-set-organizer-url="{% url 'tennis:club_set_member_organizer' %}"
+     data-resend-confirmation-url="{% url 'tennis:organizer_resend_confirmation' %}">
 </div>
 
 <style>
-  .member-email-badge{display:inline-block;min-width:28px;padding:2px 8px;border-radius:999px;font-size:12px;font-weight:700;line-height:1.4;}
-  .member-email-badge.is-pending{background:#fef3c7;color:#b45309;}
+  .member-email-badge{display:inline-block;min-width:28px;padding:2px 8px;border:0;border-radius:999px;font:inherit;font-size:12px;font-weight:700;line-height:1.4;}
+  .member-email-badge.is-pending{background:#fef3c7;color:#b45309;cursor:pointer;}
+  .member-email-badge.is-pending:hover{background:#fde68a;}
+  .member-email-badge.is-pending:focus-visible{outline:2px solid #b45309;outline-offset:2px;}
   .member-email-link{color:inherit;text-decoration:underline;overflow-wrap:anywhere;}
   .url-reset-actions{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 12px;}
   .url-reset-btn{padding:8px 16px;border-radius:999px;border:1px solid #cc0000;background:#000;color:#cc0000;font:inherit;font-size:.9rem;font-weight:600;cursor:pointer;}
@@ -169,7 +172,13 @@
             {% endif %}
           </td>
           <td class="member-organizer-status" style="text-align:center;">
-            {% if m.is_organizer and m.email_unconfirmed %}<span class="member-email-badge is-pending">未確認</span>{% endif %}
+            {% if m.is_organizer and m.email_unconfirmed %}
+              <button type="button"
+                      class="member-email-badge is-pending member-email-resend"
+                      data-member-name="{{ m.display_name|escape }}"
+                      data-email="{{ m.organizer_email|escape }}"
+                      aria-label="{{ m.display_name }}の確認メールを再送">未確認</button>
+            {% endif %}
           </td>
         </tr>
       {% endfor %}

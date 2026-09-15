@@ -18,6 +18,11 @@ urlpatterns = [
     #  - Create club
     # ============================================================
     path("", views.index, name="index"),
+    path(
+        "registration/continue/",
+        views.club_registration_continue,
+        name="club_registration_continue",
+    ),
 
     # サービス案内・法務ページ（クラブトークン不要）
     path(
@@ -207,6 +212,7 @@ urlpatterns = [
     # -- 幹事メール（ClubOrganizer）
     path("api/club/set_member_organizer/", views.club_set_member_organizer, name="club_set_member_organizer"),
     path("api/organizer/set_email/", views.organizer_set_email, name="organizer_set_email"),
+    path("api/organizer/resend_confirmation/", views.organizer_resend_confirmation, name="organizer_resend_confirmation"),
     path("api/organizer/self_register/", views.organizer_self_register, name="organizer_self_register"),
 
     # NOTE: 既存URL互換のため prefix を変更しない（現状維持）

@@ -54,6 +54,7 @@ MAX_EVENT_FLAGS = 2
 MAX_MEMBER_NAME_LENGTH = 100
 MAX_COMMENT_LENGTH = 500
 MAX_CLUB_NAME_LENGTH = 200
+CLUB_REGISTRATION_SUCCESS_URL_SESSION_KEY = "club_registration_success_url"
 
 log = logging.getLogger(__name__)
 
@@ -851,13 +852,26 @@ def index(request):
             "tennis:club_home_admin",
             args=[club.admin_path_token, club.admin_token],
         )
-        return redirect(url)
+        request.session[CLUB_REGISTRATION_SUCCESS_URL_SESSION_KEY] = url
+        return redirect("tennis:index")
 
     return render(request, "tennis/index_mobile_first_preview.html", {
         "show_topbar": False,
+        "registration_success_url": request.session.get(
+            CLUB_REGISTRATION_SUCCESS_URL_SESSION_KEY, ""
+        ),
         "turnstile_enabled": settings.TURNSTILE_ENABLED,
         "turnstile_site_key": settings.TURNSTILE_SITE_KEY,
     })
+
+
+@require_POST
+def club_registration_continue(request):
+    """登録完了モーダルのOK押下後に、作成したクラブの幹事ページへ進む。"""
+    url = request.session.pop(CLUB_REGISTRATION_SUCCESS_URL_SESSION_KEY, "")
+    if not url or not url.startswith("/c/") or url.startswith("//"):
+        return redirect("tennis:index")
+    return redirect(url)
 
 
 @require_http_methods(["GET", "POST"])
@@ -4998,6 +5012,82 @@ def organizer_set_email(request):
         "email_confirmed": org.is_confirmed,
         "message": "確認メールをおくりました。メール内のリンクを開くと登録完了です",
     })
+
+
+@require_POST
+def organizer_resend_confirmation(request):
+    """設定ページから、現在確認待ちの幹事メールへ確認メールを再送する。"""
+    club_id = request.POST.get("club_id")
+    member_id = request.POST.get("member_id")
+    admin_token = (request.POST.get("admin_token") or "").strip()
+    club_id_i = _parse_int(club_id, min_v=1)
+    member_id_i = _parse_int(member_id, min_v=1)
+
+    if club_id_i is None or member_id_i is None or not admin_token:
+        return JsonResponse({"ok": False, "error": "missing"}, status=400)
+
+    club = get_object_or_404(Club, id=club_id_i, is_active=True)
+    blocked = _require_club_admin_token(request, club)
+    if blocked:
+        return blocked
+
+    organizer = get_object_or_404(
+        ClubOrganizer,
+        club=club,
+        member_id=member_id_i,
+    )
+    target_email = organizer_email.normalize_email(
+        organizer.pending_email
+        or (organizer.email if not organizer.is_confirmed else "")
+    )
+    if not target_email:
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": "not_pending",
+                "message": "このメールアドレスは確認待ちではありません。",
+            },
+            status=400,
+        )
+    if not organizer_email.delivery_enabled():
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": "email_unavailable",
+                "message": "現在メールを送信できません。時間をおいて再度お試しください。",
+            },
+            status=503,
+        )
+    if not organizer_email.throttle_ok(
+        "confirm", target_email, limit=5, window_seconds=3600
+    ):
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": "throttled",
+                "message": "送信が多すぎます。少し待ってください。",
+            },
+            status=429,
+        )
+
+    try:
+        organizer_email.send_confirmation_email(
+            request,
+            organizer,
+            target_email=target_email,
+        )
+    except Exception:
+        log.exception("Failed to resend organizer email confirmation")
+        return JsonResponse(
+            {
+                "ok": False,
+                "error": "email_failed",
+                "message": "確認メールを送信できませんでした。時間をおいて再度お試しください。",
+            },
+            status=503,
+        )
+
+    return JsonResponse({"ok": True, "message": "確認メールを再送しました。"})
 
 
 @require_http_methods(["GET"])

@@ -113,6 +113,27 @@
   </div>
 
   <div
+    id="club-registration-success-modal"
+    class="club-registration-modal"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="club-registration-success-title"
+    {% if not registration_success_url %}hidden{% endif %}
+  >
+    <div class="club-registration-modal-box">
+      <h2 id="club-registration-success-title">確認メールを送信しました</h2>
+      <p>メール内のリンクを開くと、メールアドレスの確認が完了します。</p>
+
+      <form method="post" action="{% url 'tennis:club_registration_continue' %}">
+        {% csrf_token %}
+        <div class="club-registration-modal-actions">
+          <button type="submit" class="btn btn-pill btn-primary">OK</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div
     id="club-recovery-modal"
     class="club-registration-modal"
     role="dialog"
@@ -306,6 +327,7 @@
   const recoveryBackButton = document.getElementById("club-recovery-back");
   const recoveryForm = document.getElementById("club-recovery-form");
   const recoverySubmitButton = document.getElementById("club-recovery-submit");
+  const successModal = document.getElementById("club-registration-success-modal");
 
   if (!startForm || !modal || !clubName || !modalClubName) return;
 
@@ -364,6 +386,9 @@
   });
 
   if (!modal.hidden) {
+    document.body.classList.add("club-registration-modal-open");
+  }
+  if (!successModal.hidden) {
     document.body.classList.add("club-registration-modal-open");
   }
 })();
