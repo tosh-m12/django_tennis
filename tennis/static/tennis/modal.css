@@ -1078,6 +1078,69 @@
   font-size: 0.8rem;
   color: #888;
 }
+#club-ranking-settings-form .rk-period-settings{
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #e5e7eb;
+}
+#club-ranking-settings-form .rk-period-option{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0 0;
+  font-weight: 700;
+  cursor: pointer;
+}
+#club-ranking-settings-form .rk-period-option input{
+  width: 18px;
+  height: 18px;
+  margin: 0;
+  cursor: pointer;
+}
+#club-ranking-settings-form .rk-period-fields{
+  margin: 8px 0 16px 26px;
+}
+#club-ranking-settings-form .rk-period-line{
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  margin-bottom: 8px;
+  font-size: 0.92rem;
+}
+#club-ranking-settings-form .rk-period-line > span:first-child{
+  width: 58px;
+  flex: 0 0 58px;
+}
+#club-ranking-settings-form .rk-period-line select{
+  height: 36px;
+  padding: 5px 28px 5px 8px;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background: #fff;
+  font-size: 0.95rem;
+  box-sizing: border-box;
+}
+#club-ranking-settings-form .rk-custom-months{
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+#club-ranking-settings-form .rk-custom-months.is-hidden{
+  display: none;
+}
+#club-ranking-settings-form .rk-period-current{
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin-top: 8px;
+  font-size: 0.82rem;
+  color: #666;
+}
+#club-ranking-settings-form .rk-period-current strong{
+  color: #222;
+  font-size: 0.9rem;
+}
 /* そのプリセットで使わない項目（グレーアウト＝編集不可） */
 #club-ranking-settings-form .rk-disabled{
   opacity: 0.5;
@@ -1085,7 +1148,8 @@
 #club-ranking-settings-form .rk-disabled .rk-field-label{
   color: #999;
 }
-#club-ranking-settings-form input:disabled{
+#club-ranking-settings-form input:disabled,
+#club-ranking-settings-form select:disabled{
   background: #f0f0f0;
   cursor: not-allowed;
 }

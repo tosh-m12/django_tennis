@@ -18,7 +18,11 @@
     <p class="ranking-rule-head">集計ルール：<strong>{{ ranking_rule.label }}</strong></p>
     <p class="ranking-rule-desc">{{ ranking_rule.description }}</p>
     <p class="ranking-rule-detail">
-      対象期間は過去{{ period_days }}日（{{ start_date|date:'Y/n/j' }} 〜 {{ end_date|date:'Y/n/j' }}）。
+      {% if period_mode == 'cycle' %}
+        対象期間は{{ start_date|date:'Y/n/j' }}〜{{ configured_end_date|date:'Y/n/j' }}{% if end_date != configured_end_date %}（本日までの戦績）{% endif %}。
+      {% else %}
+        対象期間は過去{{ period_days }}日（{{ start_date|date:'Y/n/j' }}〜{{ end_date|date:'Y/n/j' }}）。
+      {% endif %}
       並び順は {{ ranking_rule.sort }}。最低{{ ranking_rule.min_matches }}試合以上が対象です。
       {% if ranking_rule.count_draws %}引き分けは0.5勝として勝率に算入します。{% endif %}
       {% if ranking_is_points %}勝ち点は 勝{{ ranking_rule.points_win }}・分{{ ranking_rule.points_draw }}・負{{ ranking_rule.points_loss }}。{% endif %}

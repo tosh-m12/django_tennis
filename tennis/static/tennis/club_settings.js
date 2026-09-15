@@ -138,11 +138,17 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const numInput = (key) => root.querySelector(`input[type="number"][data-rk="${key}"]`);
+    const selectInput = (key) => root.querySelector(`select[data-rk="${key}"]`);
     const drawToggle = () => root.querySelector('.rk-toggle[data-rk="count_draws"]');
 
     function getSelectedPreset() {
       const checked = root.querySelector('input[name="rk-preset"]:checked');
       return checked ? checked.value : "winrate";
+    }
+
+    function getSelectedPeriodMode() {
+      const checked = root.querySelector('input[name="rk-period-mode"]:checked');
+      return checked ? checked.value : "rolling";
     }
 
     function readToggle(btn) {
@@ -181,6 +187,84 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
+    function periodMonthsValue() {
+      const preset = selectInput("period_month_preset")?.value || "12";
+      if (preset !== "custom") return parseInt(preset, 10);
+      const value = parseInt(numInput("period_months")?.value, 10);
+      return Number.isFinite(value) ? Math.min(12, Math.max(1, value)) : 12;
+    }
+
+    function applyPeriodAvailability() {
+      const mode = getSelectedPeriodMode();
+      root.querySelectorAll("[data-period-fields]").forEach((field) => {
+        const enabled = field.dataset.periodFields === mode;
+        field.classList.toggle("rk-disabled", !enabled);
+        field.querySelectorAll("input, select").forEach((el) => { el.disabled = !enabled; });
+      });
+
+      const custom = selectInput("period_month_preset")?.value === "custom";
+      const customWrap = root.querySelector(".rk-custom-months");
+      customWrap?.classList.toggle("is-hidden", !custom);
+      const customInput = numInput("period_months");
+      if (customInput) customInput.disabled = mode !== "cycle" || !custom;
+    }
+
+    function applyValidStartDays() {
+      const month = parseInt(selectInput("period_start_month")?.value, 10) || 1;
+      // 毎年同じ日を起点にできるよう、2月は28日までとする。
+      const maxDay = new Date(2001, month, 0).getDate();
+      const daySelect = selectInput("period_start_day");
+      if (!daySelect) return;
+      daySelect.querySelectorAll("option").forEach((option) => {
+        const valid = parseInt(option.value, 10) <= maxDay;
+        option.disabled = !valid;
+        option.hidden = !valid;
+      });
+      if (parseInt(daySelect.value, 10) > maxDay) daySelect.value = String(maxDay);
+    }
+
+    function addCalendarMonths(date, months) {
+      const targetMonth = date.getMonth() + months;
+      const targetYear = date.getFullYear() + Math.floor(targetMonth / 12);
+      const normalizedMonth = ((targetMonth % 12) + 12) % 12;
+      const maxDay = new Date(targetYear, normalizedMonth + 1, 0).getDate();
+      return new Date(targetYear, normalizedMonth, Math.min(date.getDate(), maxDay));
+    }
+
+    function formatJapaneseDate(date) {
+      return `${date.getFullYear()}年${date.getMonth() + 1}月${date.getDate()}日`;
+    }
+
+    function updatePeriodPreview() {
+      const preview = root.querySelector("[data-rk-period-preview]");
+      if (!preview) return;
+      const todayParts = (root.dataset.today || "").split("-").map(Number);
+      if (todayParts.length !== 3 || todayParts.some((value) => !Number.isFinite(value))) return;
+
+      const today = new Date(todayParts[0], todayParts[1] - 1, todayParts[2]);
+      const month = parseInt(selectInput("period_start_month")?.value, 10) || 4;
+      const day = parseInt(selectInput("period_start_day")?.value, 10) || 1;
+      const months = periodMonthsValue();
+      let annualStart = new Date(today.getFullYear(), month - 1, day);
+      if (annualStart > today) annualStart = new Date(today.getFullYear() - 1, month - 1, day);
+      const nextAnnualStart = new Date(annualStart.getFullYear() + 1, month - 1, day);
+
+      let periodStart = annualStart;
+      let offset = months;
+      let nextStart;
+      while (true) {
+        nextStart = addCalendarMonths(annualStart, offset);
+        if (nextStart > nextAnnualStart) nextStart = nextAnnualStart;
+        if (today < nextStart) break;
+        periodStart = nextStart;
+        if (periodStart >= nextAnnualStart) break;
+        offset += months;
+      }
+      const periodEnd = new Date(nextStart);
+      periodEnd.setDate(periodEnd.getDate() - 1);
+      preview.textContent = `${formatJapaneseDate(periodStart)}〜${formatJapaneseDate(periodEnd)}`;
+    }
+
     function collectSettings() {
       const num = (key, fallback) => {
         const el = numInput(key);
@@ -196,6 +280,10 @@ document.addEventListener("DOMContentLoaded", () => {
         min_matches: Math.max(0, Math.trunc(num("min_matches", 3))),
         // 集計対象期間（日）。1〜3650 にクランプ。プリセットとは独立（連動しない）。
         period_days: Math.min(3650, Math.max(1, Math.trunc(num("period_days", 90)))),
+        period_mode: getSelectedPeriodMode(),
+        period_months: periodMonthsValue(),
+        period_start_month: parseInt(selectInput("period_start_month")?.value, 10) || 4,
+        period_start_day: parseInt(selectInput("period_start_day")?.value, 10) || 1,
       };
     }
 
@@ -247,6 +335,21 @@ document.addEventListener("DOMContentLoaded", () => {
         applyPresetDefaults(t.value);
         applyFieldAvailability(t.value);
         persist();
+      } else if (t?.name === "rk-period-mode") {
+        applyPeriodAvailability();
+        updatePeriodPreview();
+        persist();
+      } else if (t?.matches?.('[data-rk="period_month_preset"]')) {
+        applyPeriodAvailability();
+        updatePeriodPreview();
+        persist();
+      } else if (t?.matches?.('[data-rk="period_start_month"]')) {
+        applyValidStartDays();
+        updatePeriodPreview();
+        persist();
+      } else if (t?.matches?.('[data-rk="period_start_day"], [data-rk="period_months"]')) {
+        updatePeriodPreview();
+        persist();
       } else if (t?.matches?.('input[type="number"][data-rk]')) {
         // 数値入力は確定（change=blur/Enter）で保存
         persist();
@@ -255,6 +358,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     // 初期表示：現在のプリセットで使わない項目をグレーアウト
     applyFieldAvailability(getSelectedPreset());
+    applyPeriodAvailability();
+    applyValidStartDays();
+    updatePeriodPreview();
 
     // 引き分けトグル：切り替えて即保存
     root.addEventListener("click", (e) => {

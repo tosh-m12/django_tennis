@@ -9,7 +9,7 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from tennis.models import Member
+from tennis.models import ClubRankingSetting, Member
 
 from .factories import (
     make_club,
@@ -181,6 +181,22 @@ class MemberDetailStatsTests(TestCase):
         self.assertEqual(ctx["stats_start_date"], today - datetime.timedelta(days=90))
         # 期間選択フォームは廃止
         self.assertNotContains(self.client.get(url), 'name="start"')
+
+    def test_stats_use_cycle_period_context(self):
+        ClubRankingSetting.objects.create(
+            club=self.club,
+            period_mode="cycle",
+            period_months=12,
+            period_start_month=4,
+            period_start_day=1,
+        )
+        url = reverse("tennis:member_detail", args=[self.club.public_token, self.a.id])
+        ctx = self.client.get(url).context
+        today = timezone.localdate()
+        expected_year = today.year if today >= datetime.date(today.year, 4, 1) else today.year - 1
+        self.assertEqual(ctx["stats_period_mode"], "cycle")
+        self.assertEqual(ctx["stats_start_date"], datetime.date(expected_year, 4, 1))
+        self.assertEqual(ctx["stats_configured_end_date"], datetime.date(expected_year + 1, 3, 31))
 
     def test_singles_only_member_doubles_block_absent(self):
         """シングルスにしか記録が無いメンバーは、ダブルスのカードや履歴を出さない。"""

@@ -258,7 +258,8 @@
      data-club-id="{{ club.id }}"
      data-admin-token="{{ club.admin_token }}"
      data-save-url="{{ save_club_ranking_setting_url }}"
-     data-preset-defaults="{{ ranking_preset_defaults_json }}">
+     data-preset-defaults="{{ ranking_preset_defaults_json }}"
+     data-today="{{ today|date:'Y-m-d' }}">
 
   <div class="rk-presets">
     {% for opt in ranking_preset_options %}
@@ -302,10 +303,66 @@
     <span class="rk-hint">この試合数未満はランキング下部に表示</span>
   </div>
 
-  <div class="rk-field rk-field-inline">
-    <span class="rk-field-label">集計対象期間（日）</span>
-    <input type="number" data-rk="period_days" min="1" max="3650" step="1" value="{{ ranking_setting.period_days }}">
-    <span class="rk-hint">戦績ページの既定期間＝過去この日数。推移グラフの各日の順位もこの日数で算出（既定90日）</span>
+  <div class="rk-period-settings">
+    <span class="rk-field-label">集計対象期間</span>
+
+    <label class="rk-period-option">
+      <input type="radio" name="rk-period-mode" value="rolling"
+             {% if ranking_setting.period_mode != 'cycle' %}checked{% endif %}>
+      <span>過去日数で集計</span>
+    </label>
+    <div class="rk-period-fields{% if ranking_setting.period_mode == 'cycle' %} rk-disabled{% endif %}"
+         data-period-fields="rolling">
+      <label class="rk-period-line">
+        <span>集計日数</span>
+        <input type="number" data-rk="period_days" min="1" max="3650" step="1"
+               value="{{ ranking_setting.period_days }}"
+               {% if ranking_setting.period_mode == 'cycle' %}disabled{% endif %}>
+        <span>日</span>
+      </label>
+    </div>
+
+    <label class="rk-period-option">
+      <input type="radio" name="rk-period-mode" value="cycle"
+             {% if ranking_setting.period_mode == 'cycle' %}checked{% endif %}>
+      <span>期間を区切って集計</span>
+    </label>
+    <div class="rk-period-fields{% if ranking_setting.period_mode != 'cycle' %} rk-disabled{% endif %}"
+         data-period-fields="cycle">
+      <label class="rk-period-line">
+        <span>期間</span>
+        <select data-rk="period_month_preset"{% if ranking_setting.period_mode != 'cycle' %} disabled{% endif %}>
+          <option value="12"{% if ranking_setting.period_months == 12 %} selected{% endif %}>1年</option>
+          <option value="6"{% if ranking_setting.period_months == 6 %} selected{% endif %}>半年</option>
+          <option value="3"{% if ranking_setting.period_months == 3 %} selected{% endif %}>3ヶ月</option>
+          <option value="1"{% if ranking_setting.period_months == 1 %} selected{% endif %}>1ヶ月</option>
+          <option value="custom"{% if ranking_period_is_custom %} selected{% endif %}>その他</option>
+        </select>
+        <span class="rk-custom-months{% if not ranking_period_is_custom %} is-hidden{% endif %}">
+          <input type="number" data-rk="period_months" min="1" max="12" step="1"
+                 value="{{ ranking_setting.period_months }}"
+                 {% if ranking_setting.period_mode != 'cycle' or not ranking_period_is_custom %}disabled{% endif %}>
+          <span>ヶ月</span>
+        </span>
+      </label>
+      <div class="rk-period-line">
+        <span>開始日</span>
+        <select data-rk="period_start_month"{% if ranking_setting.period_mode != 'cycle' %} disabled{% endif %}>
+          {% for value in ranking_period_month_options %}
+            <option value="{{ value }}"{% if ranking_setting.period_start_month == value %} selected{% endif %}>{{ value }}月</option>
+          {% endfor %}
+        </select>
+        <select data-rk="period_start_day"{% if ranking_setting.period_mode != 'cycle' %} disabled{% endif %}>
+          {% for value in ranking_period_day_options %}
+            <option value="{{ value }}"{% if ranking_setting.period_start_day == value %} selected{% endif %}>{{ value }}日</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="rk-period-current">
+        <span>現在の対象期間</span>
+        <strong data-rk-period-preview>{{ ranking_period_start|date:'Y年n月j日' }}〜{{ ranking_period_end|date:'Y年n月j日' }}</strong>
+      </div>
+    </div>
   </div>
 </div>
 

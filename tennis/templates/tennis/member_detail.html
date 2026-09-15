@@ -68,7 +68,13 @@
   {# 戦績集計（記録のある種別だけ表示・クラブ統一期間） #}
   {% if stats_blocks %}
     <section class="member-stats">
-      <h2 class="member-section-title">戦績（過去{{ stats_period_days }}日間合計）</h2>
+      <h2 class="member-section-title">
+        {% if stats_period_mode == 'cycle' %}
+          戦績（{{ stats_start_date|date:'Y/n/j' }}〜{{ stats_end_date|date:'Y/n/j' }}）
+        {% else %}
+          戦績（過去{{ stats_period_days }}日間合計）
+        {% endif %}
+      </h2>
       <div class="member-stats-grid">
         {% for gt_key, gt_label, st in stats_blocks %}
           <div class="stats-card">
