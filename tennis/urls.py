@@ -35,6 +35,14 @@ urlpatterns = [
         TemplateView.as_view(template_name="tennis/terms.html"),
         name="terms",
     ),
+    path(
+        "ads.txt",
+        TemplateView.as_view(
+            template_name="tennis/ads.txt",
+            content_type="text/plain",
+        ),
+        name="ads_txt",
+    ),
 
     # デモサイト入口（deucenet.app/demo）
     path("demo", views.demo_entry, name="demo"),
