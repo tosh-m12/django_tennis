@@ -168,7 +168,7 @@
           <td class="member-organizer-email"
               data-member-url="{% url 'tennis:member_detail_admin' club.admin_path_token club.admin_token m.id %}">
             {% if m.is_organizer %}
-              <a class="member-email-link" href="{% url 'tennis:member_detail_admin' club.admin_path_token club.admin_token m.id %}">{{ m.organizer_email|default:"登録する" }}</a>
+              <a class="member-email-link" href="{% url 'tennis:member_detail_admin' club.admin_path_token club.admin_token m.id %}">{{ m.organizer_email_masked|default:"登録する" }}</a>
             {% endif %}
           </td>
           <td class="member-organizer-status" style="text-align:center;">
@@ -176,7 +176,7 @@
               <button type="button"
                       class="member-email-badge is-pending member-email-resend"
                       data-member-name="{{ m.display_name|escape }}"
-                      data-email="{{ m.organizer_email|escape }}"
+                      data-email="{{ m.organizer_email_masked|escape }}"
                       aria-label="{{ m.display_name }}の確認メールを再送">未確認</button>
             {% endif %}
           </td>

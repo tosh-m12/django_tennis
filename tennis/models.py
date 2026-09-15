@@ -706,13 +706,21 @@ class ClubOrganizer(models.Model):
 
     @property
     def masked_email(self) -> str:
-        """h•••@example.com 形式。公開ページには出さず、幹事モードでの確認用。"""
-        if not self.email:
+        """h***@e***.*** 形式。確認待ちがあればその宛先を優先する。"""
+        address = self.pending_email or self.email
+        if not address:
             return ""
-        local, sep, domain = self.email.partition("@")
+        local, sep, domain = address.partition("@")
         if not sep:
-            return "•••"
-        return f"{local[:1]}•••@{domain}"
+            return "***"
+
+        local_masked = f"{local[:1]}***" if local else "***"
+        domain_parts = domain.split(".")
+        if domain_parts:
+            first = domain_parts[0]
+            domain_parts[0] = f"{first[:1]}***" if first else "***"
+            domain_parts[1:] = ["***" for _part in domain_parts[1:]]
+        return f"{local_masked}@{'.'.join(domain_parts)}"
 
     def __str__(self) -> str:
         return f"{self.club_id}:member={self.member_id}:{self.email or '(no email)'}"

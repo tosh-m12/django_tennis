@@ -97,10 +97,11 @@
             saveBtn.disabled = false;
             return;
           }
-          emailInput.value = data.pending_email || data.email || email;
+          emailInput.value = "";
+          emailInput.placeholder = data.email_masked || "you@example.com";
           if (status) {
             status.replaceChildren();
-            if (data.pending_email || !data.email_confirmed) {
+            if (data.email_unconfirmed) {
               const badge = document.createElement("span");
               badge.className = "member-email-badge is-pending";
               badge.textContent = "未確認";
