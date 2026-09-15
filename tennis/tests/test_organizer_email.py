@@ -29,6 +29,15 @@ class OrganizerEmailTests(TestCase):
             {"club_id": self.club.id, "admin_token": self.club.admin_token, **data},
         )
 
+    def test_masked_email_hides_local_part_and_full_domain(self):
+        self.assertEqual(self.owner_org.masked_email, "o***@e***.***")
+
+        self.owner_org.pending_email = "next@mail.example.jp"
+        self.owner_org.save(update_fields=["pending_email", "updated_at"])
+
+        self.assertEqual(self.owner_org.masked_email, "n***@m***.***.***")
+        self.assertNotIn("example", self.owner_org.masked_email)
+
     def test_settings_shows_organizer_checkbox_and_email_only_for_organizers(self):
         response = self.client.get(
             reverse(
@@ -39,7 +48,8 @@ class OrganizerEmailTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, "<th>幹事</th>", html=True)
-        self.assertContains(response, "owner@example.com")
+        self.assertContains(response, "o***@e***.***")
+        self.assertNotContains(response, "owner@example.com")
         self.assertContains(response, "member-organizer-toggle is-on")
         self.assertNotContains(response, "member-organizer-select")
         self.assertContains(response, "URLリセット")
@@ -60,7 +70,8 @@ class OrganizerEmailTests(TestCase):
         )
 
         self.assertContains(response, "member-email-resend")
-        self.assertContains(response, 'data-email="owner@example.com"')
+        self.assertContains(response, 'data-email="o***@e***.***"')
+        self.assertNotContains(response, "owner@example.com")
         self.assertContains(response, "確認メールを再送")
         self.assertContains(
             response,
@@ -139,7 +150,8 @@ class OrganizerEmailTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["is_organizer"])
-        self.assertEqual(response.json()["email"], "")
+        self.assertEqual(response.json()["email_masked"], "")
+        self.assertNotIn("email", response.json())
         self.assertFalse(response.json()["email_unconfirmed"])
         self.assertTrue(ClubOrganizer.objects.filter(club=self.club, member=self.member).exists())
         self.member.refresh_from_db()
@@ -176,7 +188,8 @@ class OrganizerEmailTests(TestCase):
         self.assertContains(response, 'id="member-name-input"')
         self.assertContains(response, 'id="organizer-email-input"')
         self.assertContains(response, 'class="member-field-input"', count=2)
-        self.assertContains(response, 'value="owner@example.com"')
+        self.assertContains(response, 'placeholder="o***@e***.***"')
+        self.assertNotContains(response, "owner@example.com")
         self.assertNotContains(response, 'id="organizer-email-change-btn"')
         self.assertNotContains(response, "readonly")
 
@@ -200,6 +213,9 @@ class OrganizerEmailTests(TestCase):
         self.assertEqual(self.owner_org.email, "owner@example.com")
         self.assertEqual(self.owner_org.pending_email, "new@example.com")
         self.assertEqual(self.owner_org.confirmed_at, original_confirmed_at)
+        self.assertEqual(response.json()["email_masked"], "n***@e***.***")
+        self.assertNotIn("email", response.json())
+        self.assertNotIn("pending_email", response.json())
         send_mail.assert_called_once_with(
             mock.ANY, self.owner_org, target_email="new@example.com"
         )

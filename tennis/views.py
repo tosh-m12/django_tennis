@@ -992,7 +992,7 @@ def club_settings(request, club_public_token, club_admin_token):
     for m in members:
         o = org_by_member.get(m.id)
         m.is_organizer = o is not None
-        m.organizer_email = (o.pending_email or o.email) if o else ""
+        m.organizer_email_masked = o.masked_email if o else ""
         m.email_unconfirmed = bool(
             o and (o.pending_email or (o.email and not o.is_confirmed))
         )
@@ -2199,9 +2199,11 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
         "is_admin": is_admin,
         "organizer": organizer,
         "is_organizer": organizer is not None,
-        "organizer_email": organizer.email if organizer else "",
-        "organizer_pending_email": organizer.pending_email if organizer else "",
-        "organizer_confirmed": bool(organizer and organizer.is_confirmed),
+        "organizer_email_masked": organizer.masked_email if organizer else "",
+        "organizer_email_unconfirmed": bool(
+            organizer
+            and (organizer.pending_email or (organizer.email and not organizer.is_confirmed))
+        ),
         "stats_blocks": stats_blocks,
         "history_blocks": history_blocks,
         "no_records": no_records,
@@ -5022,7 +5024,6 @@ def club_set_member_organizer(request):
         "member_id": member.id,
         "is_organizer": org is not None,
         "email_confirmed": bool(org and org.is_confirmed),
-        "email": (org.pending_email or org.email) if org else "",
         "email_unconfirmed": bool(
             org and (org.pending_email or (org.email and not org.is_confirmed))
         ),
@@ -5077,9 +5078,9 @@ def organizer_set_email(request):
                     org.save(update_fields=["pending_email", "updated_at"])
                     return JsonResponse({
                         "ok": True,
-                        "email": org.email,
-                        "pending_email": "",
+                        "email_masked": org.masked_email,
                         "email_confirmed": True,
+                        "email_unconfirmed": False,
                         "message": "このメールアドレスは確認済みです。",
                     })
                 org.pending_email = email
@@ -5103,10 +5104,11 @@ def organizer_set_email(request):
 
     return JsonResponse({
         "ok": True,
-        "email": org.email,
-        "pending_email": org.pending_email,
         "email_masked": org.masked_email,
         "email_confirmed": org.is_confirmed,
+        "email_unconfirmed": bool(
+            org.pending_email or (org.email and not org.is_confirmed)
+        ),
         "message": "確認メールをおくりました。メール内のリンクを開くと登録完了です",
     })
 

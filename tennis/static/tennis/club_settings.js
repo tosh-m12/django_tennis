@@ -896,7 +896,7 @@ document.addEventListener("DOMContentLoaded", () => {
               const link = document.createElement("a");
               link.className = "member-email-link";
               link.href = emailCell.dataset.memberUrl || "#";
-              link.textContent = data.email || "登録する";
+              link.textContent = data.email_masked || "登録する";
               emailCell.appendChild(link);
             }
           }
@@ -910,7 +910,7 @@ document.addEventListener("DOMContentLoaded", () => {
               badge.className = "member-email-badge is-pending member-email-resend";
               badge.textContent = "未確認";
               badge.dataset.memberName = tr.querySelector(".member-name")?.textContent?.trim() || "";
-              badge.dataset.email = data.email || "";
+              badge.dataset.email = data.email_masked || "";
               badge.setAttribute("aria-label", `${badge.dataset.memberName}の確認メールを再送`);
               statusCell.appendChild(badge);
             }
