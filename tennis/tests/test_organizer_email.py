@@ -48,6 +48,89 @@ class OrganizerEmailTests(TestCase):
         html = response.content.decode()
         self.assertLess(html.index("データ整理"), html.index("URLリセット"))
 
+    def test_settings_unconfirmed_badge_opens_resend_modal(self):
+        self.owner_org.confirmed_at = None
+        self.owner_org.save(update_fields=["confirmed_at", "updated_at"])
+
+        response = self.client.get(
+            reverse(
+                "tennis:club_settings",
+                args=[self.club.public_token, self.club.admin_token],
+            )
+        )
+
+        self.assertContains(response, "member-email-resend")
+        self.assertContains(response, 'data-email="owner@example.com"')
+        self.assertContains(response, "確認メールを再送")
+        self.assertContains(
+            response,
+            reverse("tennis:organizer_resend_confirmation"),
+        )
+
+    @mock.patch("tennis.views.organizer_email.send_confirmation_email")
+    def test_resend_confirmation_sends_to_unconfirmed_email(self, send_mail):
+        self.owner_org.confirmed_at = None
+        self.owner_org.save(update_fields=["confirmed_at", "updated_at"])
+
+        response = self.admin_post(
+            "tennis:organizer_resend_confirmation",
+            {"member_id": self.owner.id},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["message"], "確認メールを再送しました。")
+        send_mail.assert_called_once_with(
+            mock.ANY,
+            self.owner_org,
+            target_email="owner@example.com",
+        )
+
+    @mock.patch("tennis.views.organizer_email.send_confirmation_email")
+    def test_resend_confirmation_uses_pending_email(self, send_mail):
+        self.owner_org.pending_email = "new@example.com"
+        self.owner_org.save(update_fields=["pending_email", "updated_at"])
+
+        response = self.admin_post(
+            "tennis:organizer_resend_confirmation",
+            {"member_id": self.owner.id},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        send_mail.assert_called_once_with(
+            mock.ANY,
+            self.owner_org,
+            target_email="new@example.com",
+        )
+
+    @mock.patch("tennis.views.organizer_email.send_confirmation_email")
+    def test_resend_confirmation_rejects_confirmed_email(self, send_mail):
+        response = self.admin_post(
+            "tennis:organizer_resend_confirmation",
+            {"member_id": self.owner.id},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.json()["error"], "not_pending")
+        send_mail.assert_not_called()
+
+    @mock.patch("tennis.views.organizer_email.send_confirmation_email")
+    def test_resend_confirmation_cannot_target_another_club(self, send_mail):
+        other_club = make_club("別クラブ")
+        other_member = make_member(other_club, "別幹事", is_fixed=True)
+        ClubOrganizer.objects.create(
+            club=other_club,
+            member=other_member,
+            email="other@example.com",
+        )
+
+        response = self.admin_post(
+            "tennis:organizer_resend_confirmation",
+            {"member_id": other_member.id},
+        )
+
+        self.assertEqual(response.status_code, 404)
+        send_mail.assert_not_called()
+
     def test_assigning_organizer_creates_role_and_fixes_member(self):
         response = self.admin_post(
             "tennis:club_set_member_organizer",

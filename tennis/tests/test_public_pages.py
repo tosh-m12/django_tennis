@@ -54,11 +54,7 @@ class PublicPagesTests(TestCase):
         member = Member.objects.get()
         organizer = ClubOrganizer.objects.get()
 
-        self.assertRedirects(
-            response,
-            reverse("tennis:club_home_admin", args=[club.public_token, club.admin_token]),
-            fetch_redirect_response=False,
-        )
+        self.assertRedirects(response, reverse("tennis:index"))
         self.assertEqual(club.name, "青空テニス")
         self.assertEqual(member.club, club)
         self.assertEqual(member.member_no, 1)
@@ -69,6 +65,40 @@ class PublicPagesTests(TestCase):
         self.assertEqual(organizer.email, "taro@example.com")
         self.assertIsNone(organizer.confirmed_at)
         send_confirmation_email.assert_called_once_with(mock.ANY, organizer)
+
+        completion = self.client.get(reverse("tennis:index"))
+        expected_club_url = reverse(
+            "tennis:club_home_admin",
+            args=[club.admin_path_token, club.admin_token],
+        )
+        self.assertEqual(
+            completion.context["registration_success_url"], expected_club_url
+        )
+        self.assertContains(completion, "確認メールを送信しました")
+        self.assertContains(
+            completion,
+            f'action="{reverse("tennis:club_registration_continue")}"',
+        )
+
+        continue_response = self.client.post(
+            reverse("tennis:club_registration_continue")
+        )
+        self.assertRedirects(
+            continue_response,
+            expected_club_url,
+            fetch_redirect_response=False,
+        )
+        self.assertEqual(
+            self.client.get(reverse("tennis:index")).context[
+                "registration_success_url"
+            ],
+            "",
+        )
+
+    def test_registration_continue_without_completed_registration_returns_to_top(self):
+        response = self.client.post(reverse("tennis:club_registration_continue"))
+
+        self.assertRedirects(response, reverse("tennis:index"))
 
     @mock.patch(
         "tennis.views.organizer_email.send_confirmation_email",

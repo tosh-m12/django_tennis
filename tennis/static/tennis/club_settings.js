@@ -677,6 +677,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const renameUrl = hooks.dataset.renameUrl;
     const toggleFixedUrl = hooks.dataset.toggleFixedUrl;
     const setOrganizerUrl = hooks.dataset.setOrganizerUrl;
+    const resendConfirmationUrl = hooks.dataset.resendConfirmationUrl;
 
     const input = document.getElementById("member-add-input");
     const addBtn = document.getElementById("member-add-btn");
@@ -798,9 +799,13 @@ document.addEventListener("DOMContentLoaded", () => {
           if (statusCell) {
             statusCell.replaceChildren();
             if (data.is_organizer && data.email_unconfirmed) {
-              const badge = document.createElement("span");
-              badge.className = "member-email-badge is-pending";
+              const badge = document.createElement("button");
+              badge.type = "button";
+              badge.className = "member-email-badge is-pending member-email-resend";
               badge.textContent = "未確認";
+              badge.dataset.memberName = tr.querySelector(".member-name")?.textContent?.trim() || "";
+              badge.dataset.email = data.email || "";
+              badge.setAttribute("aria-label", `${badge.dataset.memberName}の確認メールを再送`);
               statusCell.appendChild(badge);
             }
           }
@@ -816,6 +821,75 @@ document.addEventListener("DOMContentLoaded", () => {
           }
         } finally {
           btn.disabled = false;
+        }
+      });
+    }
+
+    // 未確認メールの再送
+    if (resendConfirmationUrl) {
+      const modal = document.getElementById("organizer-confirmation-resend-modal");
+      const closeButton = document.getElementById("organizer-confirmation-resend-close");
+      const submitButton = document.getElementById("organizer-confirmation-resend-submit");
+      const recipient = document.getElementById("organizer-confirmation-resend-recipient");
+      let selectedMemberId = "";
+
+      const closeModal = () => {
+        if (!modal) return;
+        modal.classList.remove("is-open");
+        modal.setAttribute("aria-hidden", "true");
+        selectedMemberId = "";
+      };
+
+      table.addEventListener("click", (e) => {
+        const badge = e.target.closest("button.member-email-resend");
+        if (!badge || !modal) return;
+        const tr = badge.closest("tr[data-member-id]");
+        if (!tr) return;
+
+        selectedMemberId = tr.dataset.memberId || "";
+        const name = badge.dataset.memberName || "";
+        const email = badge.dataset.email || "";
+        if (recipient) recipient.textContent = `${name}（${email}）`;
+        modal.classList.add("is-open");
+        modal.setAttribute("aria-hidden", "false");
+        submitButton?.focus();
+      });
+
+      closeButton?.addEventListener("click", closeModal);
+      modal?.addEventListener("click", (e) => {
+        if (e.target === modal) closeModal();
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && modal?.classList.contains("is-open")) closeModal();
+      });
+
+      submitButton?.addEventListener("click", async () => {
+        if (!selectedMemberId || submitButton.disabled) return;
+
+        const fd = new FormData();
+        fd.append("club_id", clubId);
+        fd.append("admin_token", adminToken);
+        fd.append("member_id", selectedMemberId);
+
+        submitButton.disabled = true;
+        try {
+          const response = await fetch(resendConfirmationUrl, {
+            method: "POST",
+            headers: { "X-CSRFToken": csrftoken || "" },
+            body: fd,
+          });
+          const data = await response.json().catch(() => ({}));
+          if (!response.ok || !data.ok) {
+            UI?.showMessage?.(data.message || "確認メールを再送できませんでした。", 2600);
+            return;
+          }
+          closeModal();
+          UI?.showMessage?.(data.message || "確認メールを再送しました。", 1800);
+        } catch (err) {
+          console.error(err);
+          UI?.showMessage?.("確認メールを再送できませんでした。", 2600);
+        } finally {
+          submitButton.disabled = false;
         }
       });
     }

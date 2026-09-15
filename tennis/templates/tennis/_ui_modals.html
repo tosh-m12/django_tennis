@@ -420,6 +420,35 @@
 {% endif %}
 
 {% comment %}
+[7b] 幹事メール確認の再送モーダル（settings adminのみ）
+- 設定ページの「未確認」バッジから開く
+{% endcomment %}
+{% if club and is_admin %}
+<div id="organizer-confirmation-resend-modal" class="modal-backdrop" aria-hidden="true">
+  <div class="modal-content event-modal modal-has-topbar"
+       role="dialog" aria-modal="true" aria-labelledby="organizer-confirmation-resend-title">
+    <div class="modal-topbar">
+      <div class="modal-topbar-title" id="organizer-confirmation-resend-title">確認メールを再送</div>
+      <button type="button"
+              id="organizer-confirmation-resend-close"
+              class="modal-topbar-btn"
+              aria-label="閉じる">×</button>
+    </div>
+
+    <div class="modal-form">
+      <div id="organizer-confirmation-resend-recipient"
+           style="text-align:center;overflow-wrap:anywhere;"></div>
+      <div class="modal-actions">
+        <button type="button"
+                class="btn btn-pill btn-primary"
+                id="organizer-confirmation-resend-submit">再送する</button>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% comment %}
 [8] フラグ名変更モーダル（settings adminのみ）
 - club_settings.js が open/close/submit
 - 「event の参加登録モーダル」に寄せたデザイン（topbar + field-group + primary pill）
