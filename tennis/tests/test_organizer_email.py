@@ -211,14 +211,16 @@ class OrganizerEmailTests(TestCase):
 
         self.assertEqual(verify_response.status_code, 200)
         self.assertContains(verify_response, self.club.name)
-        self.assertContains(
-            verify_response,
-            reverse(
-                "tennis:club_home_admin",
-                args=[self.club.admin_path_token, self.club.admin_token],
-            ),
+        club_url = reverse(
+            "tennis:club_home_admin",
+            args=[self.club.admin_path_token, self.club.admin_token],
         )
+        self.assertContains(verify_response, club_url)
         self.assertContains(verify_response, f"{self.club.name}を開く")
+        self.assertNotContains(
+            verify_response,
+            f'<a href="{club_url}" class="btn btn-pill btn-primary">',
+        )
         self.owner_org.refresh_from_db()
         self.assertEqual(self.owner_org.email, "new@example.com")
         self.assertEqual(self.owner_org.pending_email, "")
