@@ -832,7 +832,10 @@ def index(request):
                     context["registration_error"] = "送信が多すぎます。少し待ってからお試しください。"
                     return render(request, "tennis/index_mobile_first_preview.html", context, status=429)
 
-                club = Club.objects.create(name=club_name)
+                club = Club.objects.create(
+                    name=club_name,
+                    registered_by_email=email,
+                )
                 member = Member.objects.create(
                     club=club,
                     member_no=1,
@@ -1001,6 +1004,7 @@ def club_settings(request, club_public_token, club_admin_token):
 
     default_display_settings = _resolve_club_display_settings(club)
     ranking_setting = _resolve_club_ranking_config(club)
+    ranking_period_start, _, ranking_period_end = _ranking_period_bounds(today, ranking_setting)
 
     prev_year = year - 1 if month == 1 else year
     prev_month = 12 if month == 1 else month - 1
@@ -1035,6 +1039,11 @@ def club_settings(request, club_public_token, club_admin_token):
             "ranking_setting_json": json.dumps(ranking_setting, ensure_ascii=False),
             "ranking_preset_defaults_json": json.dumps(RANKING_PRESET_DEFAULTS, ensure_ascii=False),
             "ranking_preset_options": _ranking_preset_options(),
+            "ranking_period_is_custom": int(ranking_setting.get("period_months", 12)) not in (1, 3, 6, 12),
+            "ranking_period_month_options": range(1, 13),
+            "ranking_period_day_options": range(1, 32),
+            "ranking_period_start": ranking_period_start,
+            "ranking_period_end": ranking_period_end,
             "save_club_ranking_setting_url": reverse("tennis:save_club_ranking_setting"),
             "is_admin": True,
             "show_topbar": True,
@@ -1764,19 +1773,72 @@ def _ranking_window_start(as_of, period_days):
     return as_of - dt.timedelta(days=max(1, int(period_days)))
 
 
+def _add_calendar_months(value, months):
+    """月末を超える日はその月の末日に収めて、value から months ヶ月進める。"""
+    total = value.year * 12 + (value.month - 1) + int(months)
+    year, month_index = divmod(total, 12)
+    month = month_index + 1
+    day = min(value.day, calendar.monthrange(year, month)[1])
+    return dt.date(year, month, day)
+
+
+def _ranking_cycle_bounds(as_of, config):
+    """
+    「期間を区切る」方式で as_of が属する期間の開始日・終了日を返す。
+
+    period_start_month/day を年度の起点とし、period_months ごとに区切る。
+    12を割り切らない月数の場合も年度開始日で必ず区切り直すため、年度末の
+    最後の区間だけ短くなる。
+    """
+    months = min(12, max(1, int(config.get("period_months", 12))))
+    start_month = min(12, max(1, int(config.get("period_start_month", 4))))
+    max_start_day = calendar.monthrange(2001, start_month)[1]
+    start_day = min(max_start_day, max(1, int(config.get("period_start_day", 1))))
+
+    annual_start = dt.date(as_of.year, start_month, start_day)
+    if annual_start > as_of:
+        annual_start = dt.date(as_of.year - 1, start_month, start_day)
+    next_annual_start = dt.date(annual_start.year + 1, start_month, start_day)
+
+    period_start = annual_start
+    offset = months
+    while True:
+        next_start = min(_add_calendar_months(annual_start, offset), next_annual_start)
+        if as_of < next_start:
+            return period_start, next_start - dt.timedelta(days=1)
+        period_start = next_start
+        if period_start >= next_annual_start:
+            # as_of が次年度開始日なら通常は上の annual_start 算出で処理される。
+            return period_start, period_start
+        offset += months
+
+
+def _ranking_period_bounds(as_of, config):
+    """クラブ設定に応じた集計開始日・集計末日・設定上の期間終了日を返す。"""
+    if config.get("period_mode") == ClubRankingSetting.PERIOD_MODE_CYCLE:
+        start, configured_end = _ranking_cycle_bounds(as_of, config)
+        return start, as_of, configured_end
+    period_days = int(config.get("period_days", DEFAULT_RANKING_PERIOD_DAYS))
+    start = _ranking_window_start(as_of, period_days)
+    return start, as_of, as_of
+
+
+def _ranking_period_start(as_of, config):
+    """ランキング算出窓の開始日。画面と順位推移で共通利用する。"""
+    return _ranking_period_bounds(as_of, config)[0]
+
+
 def _member_rank_trend(club, member_id, config, start_d, end_d):
     """
     [start_d, end_d] の「試合があった日ごと」に、その日のクラブランキングでの本人の順位を返す。
-    各日のランキングはクラブの算出基準（その日を末尾とする過去3ヶ月のローリング窓）で計算する
+    各日のランキングはクラブの算出基準（日数方式または期間方式）で計算する
     ため、最新点は戦績ページの現在ランキングと一致する。試合がある日にだけ順位が変わる前提
     （＝階段グラフ用）。種別ごと。
     戻り値: {"singles": [{date, rank|None, total}, ...], "doubles": [...]}（試合日の昇順）。
-    rank=None はその日の3ヶ月窓で最低試合数に達していない（圏外）。ランキング設定は config に準ずる。
+    rank=None はその日の算出期間で最低試合数に達していない（圏外）。ランキング設定は config に準ずる。
     """
-    # 各日のランキングは period_days 日のローリング窓で算出（クラブ設定・既定90）。
-    period_days = int(config.get("period_days", DEFAULT_RANKING_PERIOD_DAYS))
-    # 表示期間の先頭(start_d)の点も窓で算出するため、period_days 手前まで遡って試合を読む。
-    load_start = _ranking_window_start(start_d, period_days)
+    # 表示期間の先頭(start_d)の点もクラブ設定の算出窓で計算できるところまで遡る。
+    load_start = _ranking_period_start(start_d, config)
     schedules = list(
         MatchSchedule.objects
         .filter(event__club=club, published=True, event__cancelled=False,
@@ -1832,8 +1894,8 @@ def _member_rank_trend(club, member_id, config, start_d, end_d):
         # 点を打つのは表示期間 [start_d, end_d] 内の試合日のみ（load_start〜start_d は算出用の助走）。
         display_dates = [d for d in date_keys if start_d <= d <= end_d]
         for the_date in display_dates:
-            # その日を末尾とする過去 period_days 日のローリング窓で、その日のクラブランキングを算出。
-            w_start = _ranking_window_start(the_date, period_days)
+            # その日が属するクラブ設定の集計窓で、その日のクラブランキングを算出。
+            w_start = _ranking_period_start(the_date, config)
             stats = {}
             for d2 in date_keys:
                 if d2 < w_start or d2 > the_date:
@@ -1945,7 +2007,7 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
     メンバー個人ページ（一般・幹事共通）。
     - 名前編集（一般・幹事とも可。既存の "誰でも編集" 仕様を継承）
     - 削除ボタン（幹事モード・非固定メンバーのみ表示）
-    - 戦績集計サマリ（シングルス／ダブルス別、クラブ統一期間＝過去 period_days 日）
+    - 戦績集計サマリ（シングルス／ダブルス別、クラブ統一期間）
     - 試合履歴（公開済み MatchSchedule の schedule_json + MatchScore から構築・全件）
     """
     club = _get_club_for_page(club_public_token, club_admin_token)
@@ -1960,12 +2022,12 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
     member = get_object_or_404(Member, id=int(member_id), club=club)
     _mark_club_member_session(request, club.id)
 
-    # 戦績集計はクラブ統一設定の期間（過去 period_days 日・既定90）に揃える。
+    # 戦績集計はクラブ統一設定の日数方式／期間方式に揃える。
     # 試合履歴は期間で絞らず全件表示する（個別の期間選択は廃止）。
     ranking_config = _resolve_club_ranking_config(club)
     period_days = int(ranking_config.get("period_days", DEFAULT_RANKING_PERIOD_DAYS))
     today = timezone.localdate()
-    stats_start = _ranking_window_start(today, period_days)  # 戦績集計の対象開始日
+    stats_start, _, stats_configured_end = _ranking_period_bounds(today, ranking_config)
 
     # このメンバーの EP id 集合
     my_ep_ids = set(
@@ -2146,6 +2208,8 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
         "matches_history": matches_history,
         # 戦績集計が対象とするクラブ統一期間（表示用）
         "stats_period_days": period_days,
+        "stats_period_mode": ranking_config.get("period_mode", ClubRankingSetting.PERIOD_MODE_ROLLING),
+        "stats_configured_end_date": stats_configured_end,
         "stats_start_date": stats_start,
         "stats_end_date": today,
         "back_url": back_url,
@@ -2226,7 +2290,7 @@ def club_home(request, club_public_token, club_admin_token=None):
 def ranking_page(request, club_public_token, club_admin_token=None):
     """
     戦績表（ランキング）ページ。一般・幹事どちらでもアクセス可。
-    - 期間：クラブ統一設定（過去 period_days 日・既定90）のローリング窓に固定。
+    - 期間：クラブ統一設定（日数方式または期間方式）に固定。
       個別の期間選択は廃止（ランキングの基準を一意に保つため）。基準変更は設定ページで。
     - 対象：当該クラブの公開済み MatchSchedule を期間で絞り、build_month_rankings で集計。
     """
@@ -2243,10 +2307,8 @@ def ranking_page(request, club_public_token, club_admin_token=None):
     period_days = int(ranking_config.get("period_days", DEFAULT_RANKING_PERIOD_DAYS))
 
     today = timezone.localdate()
-    # 期間は常にクラブ設定の「過去 period_days 日」（例: 6/5・90日なら 3/7 〜 6/5）。
-    # 推移グラフの各日の算出窓と同じ _ranking_window_start を使い、一意のランキングに揃える。
-    start_d = _ranking_window_start(today, period_days)
-    end_d = today
+    # 推移グラフの各日の算出窓と同じ共通処理を使い、一意のランキングに揃える。
+    start_d, end_d, configured_end_d = _ranking_period_bounds(today, ranking_config)
 
     events_qs = (
         Event.objects
@@ -2268,6 +2330,8 @@ def ranking_page(request, club_public_token, club_admin_token=None):
         "start_date": start_d,
         "end_date": end_d,
         "period_days": period_days,
+        "period_mode": ranking_config.get("period_mode", ClubRankingSetting.PERIOD_MODE_ROLLING),
+        "configured_end_date": configured_end_d,
         "ranking_doubles": ranking_doubles,
         "ranking_singles": ranking_singles,
         "ranking_config": ranking_config,
@@ -2327,6 +2391,10 @@ def _ranking_preset_default_config(preset="winrate"):
     cfg = dict(base)
     cfg["preset"] = preset if preset in RANKING_PRESET_DEFAULTS else "winrate"
     cfg["period_days"] = DEFAULT_RANKING_PERIOD_DAYS
+    cfg["period_mode"] = ClubRankingSetting.PERIOD_MODE_ROLLING
+    cfg["period_months"] = 12
+    cfg["period_start_month"] = 4
+    cfg["period_start_day"] = 1
     return cfg
 
 
@@ -2379,6 +2447,10 @@ def _ranking_rule_summary(config):
         "count_draws": bool(config.get("count_draws", False)),
         "min_matches": int(config.get("min_matches", 3)),
         "period_days": int(config.get("period_days", DEFAULT_RANKING_PERIOD_DAYS)),
+        "period_mode": config.get("period_mode", ClubRankingSetting.PERIOD_MODE_ROLLING),
+        "period_months": int(config.get("period_months", 12)),
+        "period_start_month": int(config.get("period_start_month", 4)),
+        "period_start_day": int(config.get("period_start_day", 1)),
         "points_win": config.get("points_win", 3),
         "points_draw": config.get("points_draw", 1),
         "points_loss": config.get("points_loss", 0),
@@ -3631,7 +3703,8 @@ def save_club_ranking_setting(request):
     """
     クラブの戦績ランキング集計ルールを保存。
     認可：admin_token 必須。POST keys: club_id, admin_token, settings_json
-        （preset / count_draws / points_win / points_draw / points_loss / min_matches / period_days）。
+        （preset / count_draws / points_win / points_draw / points_loss / min_matches /
+          period_days / period_mode / period_months / period_start_month / period_start_day）。
     """
     club_id = (request.POST.get("club_id") or "").strip()
     if not club_id:
@@ -3689,6 +3762,29 @@ def save_club_ranking_setting(request):
     if period_days < 1 or period_days > 3650:
         return JsonResponse({"ok": False, "error": "bad_period_days"}, status=400)
 
+    # 旧画面からの保存要求にも対応し、追加項目が無いときは既存値（新規なら従来方式）を維持する。
+    existing = ClubRankingSetting.objects.filter(club=club).first()
+    period_mode = s.get(
+        "period_mode",
+        existing.period_mode if existing else ClubRankingSetting.PERIOD_MODE_ROLLING,
+    )
+    if period_mode not in dict(ClubRankingSetting.PERIOD_MODE_CHOICES):
+        return JsonResponse({"ok": False, "error": "bad_period_mode"}, status=400)
+
+    try:
+        period_months = int(s.get("period_months", existing.period_months if existing else 12))
+        period_start_month = int(s.get("period_start_month", existing.period_start_month if existing else 4))
+        period_start_day = int(s.get("period_start_day", existing.period_start_day if existing else 1))
+    except (TypeError, ValueError):
+        return JsonResponse({"ok": False, "error": "bad_period_cycle"}, status=400)
+
+    if period_months < 1 or period_months > 12 or period_start_month < 1 or period_start_month > 12:
+        return JsonResponse({"ok": False, "error": "bad_period_cycle"}, status=400)
+    # 毎年同じ月日を起点にできない2月29日は使用しない。
+    max_start_day = calendar.monthrange(2001, period_start_month)[1]
+    if period_start_day < 1 or period_start_day > max_start_day:
+        return JsonResponse({"ok": False, "error": "bad_period_cycle"}, status=400)
+
     obj, _ = ClubRankingSetting.objects.get_or_create(club=club)
     obj.preset = preset
     obj.count_draws = bool(s.get("count_draws"))
@@ -3697,9 +3793,14 @@ def save_club_ranking_setting(request):
     obj.points_loss = points_loss
     obj.min_matches = min_matches
     obj.period_days = period_days
+    obj.period_mode = period_mode
+    obj.period_months = period_months
+    obj.period_start_month = period_start_month
+    obj.period_start_day = period_start_day
     obj.save(update_fields=[
         "preset", "count_draws", "points_win", "points_draw", "points_loss",
-        "min_matches", "period_days", "updated_at",
+        "min_matches", "period_days", "period_mode", "period_months",
+        "period_start_month", "period_start_day", "updated_at",
     ])
 
     return JsonResponse({"ok": True, "settings": obj.as_dict()})

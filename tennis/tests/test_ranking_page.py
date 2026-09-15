@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import datetime
+from unittest.mock import patch
 
 from django.test import TestCase, override_settings
 from django.urls import reverse
@@ -109,6 +110,25 @@ class RankingPagePeriodTests(TestCase):
         ctx = self.client.get(url).context
         today = timezone.localdate()
         self.assertEqual(ctx["start_date"], today - datetime.timedelta(days=30))
+
+    @patch("tennis.views.timezone.localdate", return_value=datetime.date(2026, 9, 15))
+    def test_cycle_period_uses_current_annual_window(self, _localdate):
+        ClubRankingSetting.objects.update_or_create(
+            club=self.club,
+            defaults={
+                "preset": "winrate",
+                "period_mode": "cycle",
+                "period_months": 12,
+                "period_start_month": 4,
+                "period_start_day": 1,
+            },
+        )
+        url = reverse("tennis:ranking", args=[self.club.public_token])
+        resp = self.client.get(url)
+        self.assertEqual(resp.context["start_date"], datetime.date(2026, 4, 1))
+        self.assertEqual(resp.context["end_date"], datetime.date(2026, 9, 15))
+        self.assertEqual(resp.context["configured_end_date"], datetime.date(2027, 3, 31))
+        self.assertContains(resp, "2026/4/1〜2027/3/31")
 
     def test_get_period_is_ignored(self):
         # 期間選択は廃止。GET の start/end を渡してもクラブ設定の期間に固定される。

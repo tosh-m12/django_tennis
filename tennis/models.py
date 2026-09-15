@@ -15,6 +15,8 @@ from django.utils import timezone
 
 class Club(models.Model):
     name = models.CharField(max_length=200)
+    # サークル新規登録時に入力された最初のメールアドレス。幹事メール変更後も履歴として保持する。
+    registered_by_email = models.EmailField(blank=True, default="", editable=False)
 
     # V1：クラブ単位トークンのみ
     public_token = models.CharField(max_length=64, unique=True, editable=False)
@@ -288,6 +290,12 @@ class ClubRankingSetting(models.Model):
         (PRESET_POINTS, "勝ち点制"),
         (PRESET_WINS, "勝利数重視型"),
     ]
+    PERIOD_MODE_ROLLING = "rolling"
+    PERIOD_MODE_CYCLE = "cycle"
+    PERIOD_MODE_CHOICES = [
+        (PERIOD_MODE_ROLLING, "過去日数"),
+        (PERIOD_MODE_CYCLE, "期間を区切る"),
+    ]
 
     club = models.OneToOneField("Club", on_delete=models.CASCADE, related_name="ranking_setting")
     preset = models.CharField(max_length=10, choices=PRESET_CHOICES, default=PRESET_WINRATE)
@@ -298,6 +306,16 @@ class ClubRankingSetting(models.Model):
     min_matches = models.PositiveIntegerField(default=6)
     # 集計対象期間（日）。戦績ページの既定期間＝過去この日数。推移グラフの各日の算出窓もこの日数。
     period_days = models.PositiveIntegerField(default=90)
+    # 集計期間の指定方式。既存クラブは従来どおり rolling のまま維持する。
+    period_mode = models.CharField(
+        max_length=10,
+        choices=PERIOD_MODE_CHOICES,
+        default=PERIOD_MODE_ROLLING,
+    )
+    # cycle のとき、年度開始日から何ヶ月ごとにランキングを区切るか。
+    period_months = models.PositiveSmallIntegerField(default=12)
+    period_start_month = models.PositiveSmallIntegerField(default=4)
+    period_start_day = models.PositiveSmallIntegerField(default=1)
 
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -310,6 +328,10 @@ class ClubRankingSetting(models.Model):
             "points_loss": float(self.points_loss),
             "min_matches": int(self.min_matches),
             "period_days": int(self.period_days),
+            "period_mode": self.period_mode,
+            "period_months": int(self.period_months),
+            "period_start_month": int(self.period_start_month),
+            "period_start_day": int(self.period_start_day),
         }
 
 

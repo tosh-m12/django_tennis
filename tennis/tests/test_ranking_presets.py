@@ -17,6 +17,8 @@ from django.utils import timezone
 from tennis.models import ClubRankingSetting, Event
 from tennis.views import (
     build_month_rankings,
+    _ranking_cycle_bounds,
+    _ranking_period_bounds,
     _ranking_preset_default_config,
     _resolve_club_ranking_config,
 )
@@ -59,6 +61,51 @@ def _build_singles_event(club, date, rounds):
     for i, (_e1, _e2, s1, s2) in enumerate(rounds, start=1):
         make_score(ms, i, 1, s1, s2)
     return ev
+
+
+class RankingPeriodBoundsTests(TestCase):
+    def _cycle(self, months, month=4, day=1):
+        return {
+            "period_mode": "cycle",
+            "period_months": months,
+            "period_start_month": month,
+            "period_start_day": day,
+        }
+
+    def test_annual_period_uses_april_to_march(self):
+        start, end = _ranking_cycle_bounds(datetime.date(2026, 9, 15), self._cycle(12))
+        self.assertEqual(start, datetime.date(2026, 4, 1))
+        self.assertEqual(end, datetime.date(2027, 3, 31))
+
+    def test_half_year_switches_on_october_first(self):
+        config = self._cycle(6)
+        self.assertEqual(
+            _ranking_cycle_bounds(datetime.date(2026, 9, 30), config),
+            (datetime.date(2026, 4, 1), datetime.date(2026, 9, 30)),
+        )
+        self.assertEqual(
+            _ranking_cycle_bounds(datetime.date(2026, 10, 1), config),
+            (datetime.date(2026, 10, 1), datetime.date(2027, 3, 31)),
+        )
+
+    def test_three_month_period_switches_at_boundary(self):
+        start, end = _ranking_cycle_bounds(datetime.date(2027, 1, 1), self._cycle(3))
+        self.assertEqual(start, datetime.date(2027, 1, 1))
+        self.assertEqual(end, datetime.date(2027, 3, 31))
+
+    def test_other_month_count_closes_at_annual_boundary(self):
+        start, end = _ranking_cycle_bounds(datetime.date(2027, 2, 15), self._cycle(5))
+        self.assertEqual(start, datetime.date(2027, 2, 1))
+        self.assertEqual(end, datetime.date(2027, 3, 31))
+
+    def test_rolling_period_keeps_existing_calculation(self):
+        as_of = datetime.date(2026, 9, 15)
+        start, end, configured_end = _ranking_period_bounds(
+            as_of, {"period_mode": "rolling", "period_days": 90}
+        )
+        self.assertEqual(start, as_of - datetime.timedelta(days=90))
+        self.assertEqual(end, as_of)
+        self.assertEqual(configured_end, as_of)
 
 
 class PresetOrderingTests(TestCase):
@@ -319,6 +366,42 @@ class SaveRankingSettingTests(TestCase):
         self.assertEqual(obj.min_matches, 4)
         self.assertEqual(obj.period_days, 60)
 
+    def test_save_cycle_period(self):
+        resp = self.client.post(self.url, {
+            "club_id": self.club.id,
+            "admin_token": self.club.admin_token,
+            "settings_json": json.dumps(self._payload(
+                period_mode="cycle",
+                period_months=6,
+                period_start_month=4,
+                period_start_day=1,
+            )),
+        })
+        self.assertEqual(resp.status_code, 200)
+        obj = ClubRankingSetting.objects.get(club=self.club)
+        self.assertEqual(obj.period_mode, "cycle")
+        self.assertEqual(obj.period_months, 6)
+        self.assertEqual(obj.period_start_month, 4)
+        self.assertEqual(obj.period_start_day, 1)
+
+    def test_old_payload_keeps_existing_cycle_period(self):
+        ClubRankingSetting.objects.create(
+            club=self.club,
+            period_mode="cycle",
+            period_months=3,
+            period_start_month=4,
+            period_start_day=1,
+        )
+        resp = self.client.post(self.url, {
+            "club_id": self.club.id,
+            "admin_token": self.club.admin_token,
+            "settings_json": json.dumps(self._payload()),
+        })
+        self.assertEqual(resp.status_code, 200)
+        obj = ClubRankingSetting.objects.get(club=self.club)
+        self.assertEqual(obj.period_mode, "cycle")
+        self.assertEqual(obj.period_months, 3)
+
     def test_wrong_admin_token_forbidden(self):
         resp = self.client.post(self.url, {
             "club_id": self.club.id,
@@ -364,3 +447,43 @@ class SaveRankingSettingTests(TestCase):
             })
             self.assertEqual(resp.status_code, 400)
             self.assertEqual(resp.json()["error"], "bad_period_days")
+
+    def test_bad_period_mode_rejected(self):
+        resp = self.client.post(self.url, {
+            "club_id": self.club.id,
+            "admin_token": self.club.admin_token,
+            "settings_json": json.dumps(self._payload(period_mode="unknown")),
+        })
+        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.json()["error"], "bad_period_mode")
+
+    def test_bad_cycle_values_rejected(self):
+        bad_values = (
+            {"period_months": 0},
+            {"period_months": 13},
+            {"period_start_month": 13},
+            {"period_start_month": 2, "period_start_day": 29},
+            {"period_start_month": 4, "period_start_day": 31},
+        )
+        for values in bad_values:
+            payload = self._payload(period_mode="cycle", **values)
+            resp = self.client.post(self.url, {
+                "club_id": self.club.id,
+                "admin_token": self.club.admin_token,
+                "settings_json": json.dumps(payload),
+            })
+            self.assertEqual(resp.status_code, 400)
+            self.assertEqual(resp.json()["error"], "bad_period_cycle")
+
+
+@_NO_MANIFEST_STORAGES
+class RankingPeriodSettingsRenderTests(TestCase):
+    def test_settings_page_shows_both_period_modes(self):
+        club = make_club()
+        url = reverse("tennis:club_settings", args=[club.admin_path_token, club.admin_token])
+        resp = self.client.get(url)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'name="rk-period-mode"', count=2)
+        self.assertContains(resp, "過去日数で集計")
+        self.assertContains(resp, "期間を区切って集計")
+        self.assertContains(resp, "現在の対象期間")
