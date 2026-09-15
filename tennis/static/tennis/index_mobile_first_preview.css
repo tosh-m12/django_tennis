@@ -192,6 +192,24 @@ body {
   color: var(--mobile-navy);
 }
 
+.mobile-first-recover-link {
+  justify-self: center;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #52627a;
+  font: inherit;
+  font-size: 0.72rem;
+  line-height: 1.5;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+
+.mobile-first-recover-link:hover {
+  color: var(--mobile-blue);
+}
+
 .mobile-first-section {
   position: relative;
   padding: 86px 20px 78px;
@@ -725,6 +743,12 @@ body {
   .mobile-first-action-demo {
     grid-column: 1;
     grid-row: 3;
+  }
+
+  .mobile-first-recover-link {
+    grid-column: 1;
+    grid-row: 4;
+    font-size: 0.86rem;
   }
 
   .mobile-first-section {
