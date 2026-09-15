@@ -3,6 +3,7 @@ from unittest import mock
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
+from tennis import organizer_email
 from tennis.models import Club, ClubOrganizer, EmailThrottle, Member
 
 
@@ -71,29 +72,31 @@ class PublicPagesTests(TestCase):
             "tennis:club_home_admin",
             args=[club.admin_path_token, club.admin_token],
         )
-        self.assertEqual(
-            completion.context["registration_success_url"], expected_club_url
-        )
+        self.assertTrue(completion.context["registration_success"])
         self.assertContains(completion, "確認メールを送信しました")
         self.assertContains(
             completion,
             f'action="{reverse("tennis:club_registration_continue")}"',
         )
+        self.assertNotContains(completion, expected_club_url)
 
         continue_response = self.client.post(
             reverse("tennis:club_registration_continue")
         )
-        self.assertRedirects(
-            continue_response,
-            expected_club_url,
-            fetch_redirect_response=False,
-        )
-        self.assertEqual(
+        self.assertRedirects(continue_response, reverse("tennis:index"))
+        self.assertFalse(
             self.client.get(reverse("tennis:index")).context[
-                "registration_success_url"
-            ],
-            "",
+                "registration_success"
+            ]
         )
+
+        token = organizer_email.make_confirm_token(organizer.id, organizer.email)
+        verification = self.client.get(
+            reverse("tennis:verify_email", args=[token])
+        )
+        self.assertContains(verification, "メールアドレスを確認しました")
+        self.assertContains(verification, expected_club_url)
+        self.assertContains(verification, "青空テニスを開く")
 
     def test_registration_continue_without_completed_registration_returns_to_top(self):
         response = self.client.post(reverse("tennis:club_registration_continue"))

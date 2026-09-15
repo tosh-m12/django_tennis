@@ -7,6 +7,11 @@
     <p style="color:#555;font-size:15px;line-height:1.8;">
       {% if club_name %}「{{ club_name }}」の{% endif %}復旧メールの登録が完了しました。
     </p>
+    {% if club_url %}
+      <p style="margin:24px 0 0;">
+        <a href="{{ club_url }}" class="btn btn-pill btn-primary">{{ club_name }}を開く</a>
+      </p>
+    {% endif %}
   {% else %}
     <h1 style="font-size:20px;margin:0 0 10px;">リンクが無効です</h1>
     <p style="color:#555;font-size:15px;line-height:1.8;">

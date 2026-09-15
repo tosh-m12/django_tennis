@@ -54,7 +54,9 @@ MAX_EVENT_FLAGS = 2
 MAX_MEMBER_NAME_LENGTH = 100
 MAX_COMMENT_LENGTH = 500
 MAX_CLUB_NAME_LENGTH = 200
-CLUB_REGISTRATION_SUCCESS_URL_SESSION_KEY = "club_registration_success_url"
+# 既に発行済みのセッションとの互換性のためキー名は維持する。
+# 値は遷移先URLではなく、登録完了モーダルを表示するための真偽値として扱う。
+CLUB_REGISTRATION_SUCCESS_SESSION_KEY = "club_registration_success_url"
 
 log = logging.getLogger(__name__)
 
@@ -848,17 +850,13 @@ def index(request):
             context["registration_error"] = "登録できませんでした。時間をおいてからもう一度お試しください。"
             return render(request, "tennis/index_mobile_first_preview.html", context, status=503)
 
-        url = reverse(
-            "tennis:club_home_admin",
-            args=[club.admin_path_token, club.admin_token],
-        )
-        request.session[CLUB_REGISTRATION_SUCCESS_URL_SESSION_KEY] = url
+        request.session[CLUB_REGISTRATION_SUCCESS_SESSION_KEY] = True
         return redirect("tennis:index")
 
     return render(request, "tennis/index_mobile_first_preview.html", {
         "show_topbar": False,
-        "registration_success_url": request.session.get(
-            CLUB_REGISTRATION_SUCCESS_URL_SESSION_KEY, ""
+        "registration_success": bool(
+            request.session.get(CLUB_REGISTRATION_SUCCESS_SESSION_KEY)
         ),
         "turnstile_enabled": settings.TURNSTILE_ENABLED,
         "turnstile_site_key": settings.TURNSTILE_SITE_KEY,
@@ -867,11 +865,9 @@ def index(request):
 
 @require_POST
 def club_registration_continue(request):
-    """登録完了モーダルのOK押下後に、作成したクラブの幹事ページへ進む。"""
-    url = request.session.pop(CLUB_REGISTRATION_SUCCESS_URL_SESSION_KEY, "")
-    if not url or not url.startswith("/c/") or url.startswith("//"):
-        return redirect("tennis:index")
-    return redirect(url)
+    """登録完了モーダルを閉じ、トップページに留まる。"""
+    request.session.pop(CLUB_REGISTRATION_SUCCESS_SESSION_KEY, None)
+    return redirect("tennis:index")
 
 
 @require_http_methods(["GET", "POST"])
@@ -5125,6 +5121,10 @@ def verify_email(request, token):
 
     ctx["ok"] = True
     ctx["club_name"] = org.club.name
+    ctx["club_url"] = reverse(
+        "tennis:club_home_admin",
+        args=[org.club.admin_path_token, org.club.admin_token],
+    )
     return render(request, "tennis/verify_email.html", ctx)
 
 
