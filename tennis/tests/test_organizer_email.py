@@ -50,6 +50,7 @@ class OrganizerEmailTests(TestCase):
         self.assertContains(response, "<th>幹事</th>", html=True)
         self.assertContains(response, "o***@e***.***")
         self.assertNotContains(response, "owner@example.com")
+        self.assertContains(response, '<span class="member-email-badge is-confirmed">認証済</span>', html=True)
         self.assertContains(response, "member-organizer-toggle is-on")
         self.assertNotContains(response, "member-organizer-select")
         self.assertContains(response, "URLリセット")
@@ -72,6 +73,7 @@ class OrganizerEmailTests(TestCase):
         self.assertContains(response, "member-email-resend")
         self.assertContains(response, 'data-email="o***@e***.***"')
         self.assertNotContains(response, "owner@example.com")
+        self.assertNotContains(response, "認証済")
         self.assertContains(response, "確認メールを再送")
         self.assertContains(
             response,

@@ -996,6 +996,7 @@ def club_settings(request, club_public_token, club_admin_token):
         m.email_unconfirmed = bool(
             o and (o.pending_email or (o.email and not o.is_confirmed))
         )
+        m.email_confirmed = bool(o and o.email and o.is_confirmed)
 
     classes = list(
         ClubMemberClass.objects.filter(club=club, is_active=True)
