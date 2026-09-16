@@ -1,4 +1,7 @@
+import datetime
+
 from django.contrib import admin
+from django.db.models import Count, Q
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.html import format_html
@@ -12,21 +15,43 @@ from .models import Club, Event, Member, EventParticipant, ClubFlagDefinition, E
 # ============================================================
 
 
+class ClubActivityFilter(admin.SimpleListFilter):
+    title = "利用状況"
+    parameter_name = "activity"
+
+    def lookups(self, request, model_admin):
+        return (
+            ("recent", "30日以内"),
+            ("inactive", "30日超"),
+            ("never", "未アクセス"),
+        )
+
+    def queryset(self, request, queryset):
+        threshold = timezone.now() - datetime.timedelta(days=30)
+        if self.value() == "recent":
+            return queryset.filter(last_accessed_at__gte=threshold)
+        if self.value() == "inactive":
+            return queryset.filter(last_accessed_at__lt=threshold)
+        if self.value() == "never":
+            return queryset.filter(last_accessed_at__isnull=True)
+        return queryset
+
+
 @admin.register(Club)
 class ClubAdmin(admin.ModelAdmin):
     list_display = (
         "id",
         "name",
         "registration_email",
-        "created_date",
+        "usage_summary",
         "last_accessed_datetime",
+        "created_date",
         "club_home_urls",
-        "public_token",
-        "admin_token",
         "is_active",
     )
+    list_display_links = ("id", "name")
     search_fields = ("name", "registered_by_email", "public_token", "admin_token")
-    list_filter = ("is_active",)
+    list_filter = ("is_active", ClubActivityFilter)
     readonly_fields = (
         "public_token",
         "admin_token",
@@ -35,6 +60,31 @@ class ClubAdmin(admin.ModelAdmin):
         "created_at",
         "updated_at",
     )
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).annotate(
+            _member_count=Count("members", distinct=True),
+            _event_count=Count("events", distinct=True),
+            _match_result_count=Count(
+                "events__match_schedule__scores",
+                filter=(
+                    Q(events__match_schedule__scores__side_a_score__isnull=False)
+                    | Q(events__match_schedule__scores__side_b_score__isnull=False)
+                ),
+                distinct=True,
+            ),
+        )
+
+    @admin.display(description="利用実績")
+    def usage_summary(self, obj: Club):
+        return format_html(
+            '<span style="white-space:nowrap">'
+            "メンバー {}<br>イベント {}<br>試合結果 {}"
+            "</span>",
+            obj._member_count,
+            obj._event_count,
+            obj._match_result_count,
+        )
 
     @admin.display(description="作成日", ordering="created_at")
     def created_date(self, obj: Club):
@@ -50,15 +100,15 @@ class ClubAdmin(admin.ModelAdmin):
             return None
         return timezone.localtime(obj.last_accessed_at).strftime("%Y/%m/%d %H:%M")
 
-    @admin.display(description="Home URLs")
+    @admin.display(description="URL")
     def club_home_urls(self, obj: Club):
         public_url = reverse("tennis:club_home", args=[obj.public_token])
         admin_url = reverse("tennis:club_home_admin", args=[obj.public_token, obj.admin_token])
 
         return format_html(
-            '<a href="{}" target="_blank" rel="noopener">一般用ホーム</a>'
+            '<a href="{}" target="_blank" rel="noopener">一般</a>'
             ' ｜ '
-            '<a href="{}" target="_blank" rel="noopener">幹事用ホーム</a>',
+            '<a href="{}" target="_blank" rel="noopener">幹事</a>',
             public_url,
             admin_url,
         )
