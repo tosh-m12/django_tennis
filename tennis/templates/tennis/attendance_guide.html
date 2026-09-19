@@ -1,0 +1,51 @@
+{% extends "tennis/base.html" %}
+{% load static %}
+{% block title %}テニスサークルの出欠管理の使い方｜DeuceNet{% endblock %}
+{% block extra_head %}
+  <meta name="description" content="DeuceNetの出欠管理を画面付きで紹介。幹事から届いたURLを開き、練習日と自分の出欠を選ぶだけ。メンバーのメール登録・ログインは不要です。">
+  <link rel="stylesheet" href="{% static 'tennis/guide.css' %}">
+  <link rel="stylesheet" href="{% static 'tennis/attendance-guide.css' %}">
+{% endblock %}
+{% block header %}{% endblock %}
+{% block content %}
+<main class="public-document guide-page attendance-guide">
+  <a class="document-brand" href="{% url 'tennis:index' %}" aria-label="DeuceNet トップ">
+    <img src="{% static 'tennis/logo/wordmark.webp' %}" alt="DeuceNet">
+  </a>
+  <header class="guide-header">
+    <h1>出欠管理の使い方</h1>
+    <p>メンバーはメール登録・ログイン不要。<br>幹事から届いたURLで、練習会の出欠を回答できます。</p>
+  </header>
+  <p class="organizer-note"><strong>幹事の方へ</strong><br>先に練習会を作成し、メンバー用URLを共有してください。</p>
+  <ol class="attendance-steps">
+    <li>
+      <h2>練習日を選ぶ</h2>
+      <p>共有されたURLを開き、カレンダーの練習会を押します。</p>
+      <figure class="attendance-shot calendar-shot">
+        <img src="{% static 'tennis/how-to/attendance-calendar.png' %}" width="390" height="600" alt="カレンダーで9月23日の練習会を選ぶ画面">
+        <span class="shot-focus" aria-hidden="true"></span>
+      </figure>
+    </li>
+    <li>
+      <h2>自分の出欠欄を押す</h2>
+      <p>「出席者リスト」で自分の名前を探し、右隣の出欠欄を押します。名前がない場合は「参加登録」から追加してください。</p>
+      <figure class="attendance-shot members-shot">
+        <img src="{% static 'tennis/how-to/attendance-members.png' %}" width="390" height="500" loading="lazy" alt="田中さんの名前の右隣にある出欠欄と、参加登録ボタン">
+        <span class="shot-focus" aria-hidden="true"></span>
+      </figure>
+    </li>
+    <li>
+      <h2>出欠を選ぶ</h2>
+      <p><strong>✓ 参加　× 不参加　? 未定</strong><br>選ぶと保存されます。変更するときも、同じ出欠欄を押します。</p>
+      <figure class="attendance-shot">
+        <img src="{% static 'tennis/how-to/attendance-choice.png' %}" width="390" height="208" loading="lazy" alt="出欠を選択する画面。参加、不参加、未定の3つのボタン">
+      </figure>
+    </li>
+  </ol>
+  <p class="guide-plan-note">画面は架空のサークル・メンバーを使った操作例です。</p>
+  <nav class="guide-actions" aria-label="利用を始める">
+    <a class="guide-button guide-button-primary" href="{% url 'tennis:demo' %}">デモで試す</a>
+    <a class="guide-button guide-button-secondary" href="{% url 'tennis:guide' %}">料金・利用案内</a>
+  </nav>
+</main>
+{% endblock %}

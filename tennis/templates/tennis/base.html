@@ -163,7 +163,8 @@
     </picture>
     <nav class="site-footer-links" aria-label="フッターナビゲーション">
       <a href="{% url 'tennis:index' %}">トップ</a>
-      {% if seo_canonical %}<a href="{% url 'tennis:guide' %}">利用案内</a>{% endif %}
+      {% if seo_canonical %}<a href="{% url 'tennis:guide' %}">利用案内</a>
+        <a href="{% url 'tennis:attendance_guide' %}">使い方</a>{% endif %}
       <a href="{% url 'tennis:privacy' %}">プライバシー</a>
       <a href="{% url 'tennis:terms' %}">利用規約</a>
     </nav>
