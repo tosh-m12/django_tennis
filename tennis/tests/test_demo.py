@@ -82,3 +82,68 @@ class DemoCleanupTests(TestCase):
         self.assertEqual(club.events.count(), 32)
         self.assertEqual(MatchSchedule.objects.filter(event__club=club).count(), 21)
         self.assertTrue(MatchScore.objects.filter(match_schedule__event__club=club).exists())
+
+
+class DemoModeTests(TestCase):
+    def test_modes_reuse_own_club_and_preserve_changes(self):
+        member = self.client.get(reverse('tennis:demo'))
+        club = Club.objects.get(pk=self.client.session['demo_club_id'])
+        club.name = '編集したデモ'
+        club.save()
+        admin = self.client.get(reverse('tennis:demo'), {'mode': 'admin'})
+        self.assertEqual(admin.url, reverse('tennis:club_home_admin', args=[club.admin_path_token, club.admin_token]))
+        page = self.client.get(admin.url)
+        self.assertContains(page, '編集したデモ')
+        self.assertContains(page, '?mode=member')
+        self.assertContains(page, '?mode=admin')
+        again = self.client.get(reverse('tennis:demo'), {'mode': 'member'})
+        self.assertEqual(again.url, member.url)
+        self.assertEqual(Club.objects.filter(is_demo=True).count(), 1)
+
+    def test_post_can_start_admin_demo(self):
+        response = self.client.post(reverse('tennis:demo'), {'mode': 'admin'})
+        club = Club.objects.get(pk=self.client.session['demo_club_id'])
+        self.assertEqual(response.url, reverse('tennis:club_home_admin', args=[club.admin_path_token, club.admin_token]))
+
+    def test_real_club_in_session_is_never_promoted_to_demo_admin(self):
+        real = make_club()
+        session = self.client.session
+        session['demo_club_id'] = real.id
+        session.save()
+        response = self.client.get(reverse('tennis:demo'), {'mode': 'admin'})
+        self.assertNotIn(real.admin_token, response.url)
+        self.assertNotEqual(self.client.session['demo_club_id'], real.id)
+        page = self.client.get(reverse('tennis:club_home', args=[real.public_token]))
+        self.assertNotContains(page, '?mode=admin')
+        self.assertNotContains(page, real.admin_token)
+
+    def test_other_visitor_does_not_receive_existing_demo_admin_url(self):
+        from django.test import Client
+        self.client.get(reverse('tennis:demo'))
+        club = Club.objects.get(pk=self.client.session['demo_club_id'])
+        other = Client()
+        page = other.get(reverse('tennis:club_home', args=[club.public_token]))
+        self.assertNotContains(page, '?mode=admin')
+        response = other.get(reverse('tennis:demo'), {'mode': 'admin'})
+        self.assertNotIn(club.admin_token, response.url)
+
+    def test_demo_email_and_url_reset_are_blocked_before_mutation(self):
+        from unittest.mock import patch
+        from tennis.models import ClubOrganizer
+        club = make_club()
+        club.is_demo = True
+        club.save()
+        member = make_member(club, 'デモ幹事', member_no=1)
+        data = {'club_id': club.id, 'admin_token': club.admin_token, 'member_id': member.id,
+                'email': 'demo@example.com', 'display_name': 'デモ幹事', 'reset_kind': 'public'}
+        with patch('tennis.organizer_email.send_mail') as send:
+            for name in ('organizer_set_email', 'organizer_resend_confirmation', 'organizer_self_register', 'club_reset_url'):
+                with self.subTest(name=name):
+                    response = self.client.post(reverse('tennis:' + name), data)
+                    self.assertEqual(response.status_code, 403)
+                    self.assertEqual(response.json()['error'], 'demo_disabled')
+            send.assert_not_called()
+        original = club.public_token
+        club.refresh_from_db()
+        self.assertEqual(club.public_token, original)
+        self.assertFalse(ClubOrganizer.objects.filter(club=club).exists())

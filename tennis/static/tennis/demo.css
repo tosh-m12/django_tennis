@@ -1,0 +1,8 @@
+.demo-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 16px; }
+.demo-label { color: var(--text-sub); font-size: .8rem; font-weight: 700; letter-spacing: .06em; }
+.demo-modes { display: flex; border: 1px solid var(--border-base); border-radius: 8px; overflow: hidden; }
+.demo-modes a { display: grid; place-items: center; min-height: 42px; padding: 0 16px; background: #fff; color: var(--text-main); font-size: .9rem; }
+.demo-modes a[aria-current] { background: var(--accent); color: #fff; font-weight: 700; }
+.demo-modes a:focus-visible { outline: 3px solid var(--accent-dark); outline-offset: -3px; }
+.demo-entry-actions { display: flex; flex-wrap: wrap; justify-content: center; gap: 12px; }
+.demo-entry-actions button { flex: 1 1 180px; min-height: 48px; }

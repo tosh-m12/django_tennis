@@ -4,6 +4,7 @@
 {% block title %}デモ - DeuceNet{% endblock %}
 
 {% block extra_head %}
+  <link rel="stylesheet" href="{% static 'tennis/demo.css' %}">
   {% if turnstile_enabled %}
     <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   {% endif %}
@@ -32,7 +33,11 @@
            data-action="demo-create"
            style="display:flex;justify-content:center;margin:24px 0;"></div>
     {% endif %}
-    <button type="submit" class="btn btn-pill btn-primary">デモを開始</button>
+    <p>同じサークルで、両方の画面を試せます。</p>
+    <div class="demo-entry-actions">
+      <button type="submit" name="mode" value="member" class="btn btn-pill btn-primary">メンバー用を開く</button>
+      <button type="submit" name="mode" value="admin" class="btn btn-pill btn-primary">幹事用を開く</button>
+    </div>
   </form>
 </div>
 {% endblock %}
