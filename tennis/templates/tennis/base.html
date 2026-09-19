@@ -21,6 +21,7 @@
   <script src="{% static 'tennis/ui_modal.js' %}" defer></script>
   <script src="{% static 'tennis/display_settings.js' %}" defer></script>
 
+  {% if club.is_demo %}<link rel="stylesheet" href="{% static 'tennis/demo.css' %}">{% endif %}
   {% block extra_head %}{% endblock %}
 </head>
 
@@ -133,12 +134,15 @@
 
   {# ★固定トップバー分だけ下げる #}
   <div class="container{% if show_topbar %} has-fixed-topbar{% endif %}">
-    {# デモサイトの目印：全ページ共通で右上に大きく表示 #}
     {% if club.is_demo %}
-      <div class="demo-badge-row" style="display:flex;justify-content:flex-end;margin:0 0 10px;">
-        <span style="font-weight:800;background:#f59e0b;color:#fff;
-              padding:4px 18px;border-radius:999px;font-size:26px;line-height:1;
-              letter-spacing:.06em;">DEMO</span>
+      <div class="demo-toolbar">
+        <span class="demo-label">DEMO</span>
+        {% if request.session.demo_club_id == club.id %}
+          <nav class="demo-modes" aria-label="デモの表示切替">
+            <a href="{% url 'tennis:demo' %}?mode=member"{% if not is_admin %} aria-current="page"{% endif %}>メンバー用</a>
+            <a href="{% url 'tennis:demo' %}?mode=admin"{% if is_admin %} aria-current="page"{% endif %}>幹事用</a>
+          </nav>
+        {% endif %}
       </div>
     {% endif %}
 

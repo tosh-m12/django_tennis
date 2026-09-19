@@ -876,7 +876,7 @@ def club_registration_continue(request):
 @require_http_methods(["GET", "POST"])
 def demo_entry(request):
     """
-    /demo : 訪問者（セッション）ごとに専用のデモクラブを発行してメンバーホームへ誘導する。
+    /demo : 訪問者（セッション）ごとに専用のデモクラブを発行して選択した画面へ誘導する。
     - 同じ人が再訪・更新しても、セッションが生きていれば同じクラブを使う。
     - 期限切れデモの掃除はWebリクエスト外の管理コマンドで行う。
     """
@@ -933,6 +933,10 @@ def demo_entry(request):
     else:
         Club.objects.filter(pk=club.pk).update(demo_last_seen=now)
 
+    mode = request.POST.get("mode") or request.GET.get("mode")
+    if mode == "admin":
+        return redirect("tennis:club_home_admin", club_public_token=club.admin_path_token,
+                        club_admin_token=club.admin_token)
     return redirect("tennis:club_home", club_public_token=club.public_token)
 
 
@@ -4874,6 +4878,9 @@ def club_reset_url(request):
         blocked = _require_club_admin_token(request, club)
         if blocked:
             return blocked
+        if club.is_demo:
+            return JsonResponse({"ok": False, "error": "demo_disabled",
+                                 "message": "デモではメール登録・送信とURLの再発行はできません。"}, status=403)
 
         if not organizer_email.delivery_enabled():
             return JsonResponse(
@@ -5054,6 +5061,9 @@ def organizer_set_email(request):
     blocked = _require_club_admin_token(request, club)
     if blocked:
         return blocked
+    if club.is_demo:
+        return JsonResponse({"ok": False, "error": "demo_disabled",
+                             "message": "デモではメール登録・送信とURLの再発行はできません。"}, status=403)
     if not organizer_email.delivery_enabled():
         return JsonResponse(
             {"ok": False, "error": "email_unavailable", "message": "現在メールを送信できません。時間をおいて再度お試しください。"},
@@ -5130,6 +5140,9 @@ def organizer_resend_confirmation(request):
     blocked = _require_club_admin_token(request, club)
     if blocked:
         return blocked
+    if club.is_demo:
+        return JsonResponse({"ok": False, "error": "demo_disabled",
+                             "message": "デモではメール登録・送信とURLの再発行はできません。"}, status=403)
 
     organizer = get_object_or_404(
         ClubOrganizer,
@@ -5290,6 +5303,9 @@ def organizer_self_register(request):
     blocked = _require_club_admin_token(request, club)
     if blocked:
         return blocked
+    if club.is_demo:
+        return JsonResponse({"ok": False, "error": "demo_disabled",
+                             "message": "デモではメール登録・送信とURLの再発行はできません。"}, status=403)
     if not organizer_email.delivery_enabled():
         return JsonResponse(
             {"ok": False, "error": "email_unavailable", "message": "現在メールを送信できません。時間をおいて再度お試しください。"},
