@@ -15,6 +15,21 @@ from tennis.security import rate_limit_exceeded
 log = logging.getLogger(__name__)
 
 
+class SearchIndexingMiddleware:
+    """Only successful public information pages may appear in search results."""
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        from tennis.seo import is_public_page
+
+        response = self.get_response(request)
+        if response.status_code != 200 or not is_public_page(request):
+            response["X-Robots-Tag"] = "noindex, nofollow"
+        return response
+
+
 class OriginVerifyMiddleware:
     """Cloudflareが付与する秘密ヘッダーを検証し、Railway直アクセスを拒否する。"""
 
