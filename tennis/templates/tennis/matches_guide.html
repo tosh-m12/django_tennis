@@ -1,0 +1,51 @@
+{% extends "tennis/base.html" %}
+{% load static %}
+{% block title %}テニスの対戦表の作り方｜DeuceNet{% endblock %}
+{% block extra_head %}
+  <meta name="description" content="DeuceNetでテニスの対戦表を作る手順を画面付きで紹介。幹事が試合参加者、シングルス・ダブルス、コート数、ラウンド数を指定し、作成した組み合わせをメンバーに公開できます。">
+  <link rel="stylesheet" href="{% static 'tennis/guide.css' %}">
+  <link rel="stylesheet" href="{% static 'tennis/attendance-guide.css' %}">
+{% endblock %}
+{% block header %}{% endblock %}
+{% block content %}
+<main class="public-document guide-page">
+  <a class="document-brand" href="{% url 'tennis:index' %}" aria-label="DeuceNet トップ">
+    <img src="{% static 'tennis/logo/wordmark.webp' %}" alt="DeuceNet">
+  </a>
+  <header class="guide-header">
+    <h1>対戦表の作り方</h1>
+    <p>幹事が参加者と試合条件を選ぶと、対戦表を作成できます。<br>公開すると、メンバーも同じ組み合わせを確認できます。</p>
+  </header>
+  <p class="organizer-note"><strong>幹事用URLから操作します</strong><br>カレンダーで、対戦表を作りたい練習会を開いてください。</p>
+  <ol class="attendance-steps">
+    <li>
+      <h2>試合に参加する人を確認する</h2>
+      <p>「出席者リスト」で、試合に出る人の「出欠」と「試合参加」が、どちらも ✓ になっているか確認します。「出欠」は練習会への参加、「試合参加」は対戦表に入れるかどうかです。</p>
+      <figure class="attendance-shot">
+        <img src="{% static 'tennis/how-to/matches-members.png' %}" width="390" height="400" alt="幹事用の出席者リスト。出欠と試合参加の両方がチェックされた参加者">
+      </figure>
+    </li>
+    <li>
+      <h2>条件を設定して作成する</h2>
+      <p>リストの下にある「ダブルス」や「面数」などのボタンを押します。試合形式・コート数・ラウンド数を選び、「条件を変更する」を押すと対戦表が作られます。</p>
+      <figure class="attendance-shot">
+        <img src="{% static 'tennis/how-to/matches-settings.png' %}" width="390" height="488" loading="lazy" alt="条件の設定画面。ダブルス、8人、2面、8ラウンドを指定した例">
+      </figure>
+    </li>
+    <li>
+      <h2>内容を確認して公開する</h2>
+      <p>組み合わせを確認し、「対戦表を公開」を押します。「公開済み」になれば、メンバー用の画面にも表示されます。</p>
+      <figure class="attendance-shot">
+        <img src="{% static 'tennis/how-to/matches-publish.png' %}" width="390" height="650" loading="lazy" alt="公開済みになった対戦表。ラウンド1の各コートの組み合わせ">
+      </figure>
+      <p>公開後に作り直した場合は、「再公開」を押して変更を反映します。</p>
+    </li>
+  </ol>
+  <p class="guide-plan-note">画面は架空のサークル・メンバーを使った操作例です。</p>
+  <p class="guide-section"><a href="{% url 'tennis:attendance_guide' %}">出欠管理の使い方 →</a></p>
+  <nav class="guide-actions" aria-label="利用を始める">
+    <a class="guide-button guide-button-primary" href="{% url 'tennis:demo' %}?mode=admin">幹事用デモで試す</a>
+    <a class="guide-button guide-button-secondary" href="{% url 'tennis:guide' %}">料金・利用案内</a>
+  </nav>
+</main>
+{% endblock %}

@@ -7,7 +7,7 @@ from django.views.decorators.http import require_safe
 
 
 PUBLIC_ORIGIN = "https://deucenet.app"
-PUBLIC_PAGES = ("tennis:index", "tennis:privacy", "tennis:terms", "tennis:guide", "tennis:attendance_guide")
+PUBLIC_PAGES = ("tennis:index", "tennis:privacy", "tennis:terms", "tennis:guide", "tennis:attendance_guide", "tennis:matches_guide")
 
 
 def is_public_page(request):
