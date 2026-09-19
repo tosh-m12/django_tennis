@@ -3,7 +3,7 @@ from django.contrib import admin
 from django.urls import path
 from django.views.generic import TemplateView
 
-from . import views
+from . import views, seo
 
 app_name = "tennis"
 
@@ -18,6 +18,8 @@ urlpatterns = [
     #  - Create club
     # ============================================================
     path("", views.index, name="index"),
+    path("robots.txt", seo.robots, name="robots"),
+    path("sitemap.xml", seo.sitemap, name="sitemap"),
     path(
         "registration/continue/",
         views.club_registration_continue,

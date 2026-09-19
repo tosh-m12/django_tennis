@@ -6,6 +6,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>{% block title %}DeuceNet{% endblock %}</title>
+  {% if seo_canonical %}<link rel="canonical" href="{{ seo_canonical }}">{% endif %}
+  {% if seo_is_home %}<meta name="google-site-verification" content="k09NZjHGO_96MIhJaBv-zSbovJs3bNUD8tJpWWb7ekQ">{% endif %}
 
   <link rel="icon" type="image/png" sizes="32x32" href="{% static 'tennis/logo/favicon_32.png' %}">
   <link rel="icon" type="image/png" sizes="16x16" href="{% static 'tennis/logo/favicon_16.png' %}">

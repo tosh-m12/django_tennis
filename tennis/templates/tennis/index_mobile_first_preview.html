@@ -1,10 +1,10 @@
 {% extends "tennis/base.html" %}
 {% load static %}
 
-{% block title %}DeuceNet - トップ{% endblock %}
+{% block title %}テニスサークルの出欠・対戦表・戦績管理｜DeuceNet{% endblock %}
 
 {% block extra_head %}
-  <meta name="description" content="テニスサークルの練習会スケジュール、出欠、対戦表、個人・クラブ戦績をURLひとつで管理できます。">
+  <meta name="description" content="DeuceNet（デュースネット）は、テニスサークルの出欠・対戦表・スコア・戦績をURLひとつで管理するアプリです。一般メンバーはログイン・メール登録不要。幹事は名前とメールアドレスの登録が必要です。">
   <link rel="stylesheet" href="{% static 'tennis/index.css' %}">
   <link rel="stylesheet" href="{% static 'tennis/index_mobile_first_preview.css' %}?v=69">
   {% if turnstile_enabled %}

@@ -165,6 +165,7 @@ MIDDLEWARE = [
     "tennis_project.middleware.CanonicalHostRedirectMiddleware",  # 旧ドメイン→正規ドメインへ301
     "django.middleware.gzip.GZipMiddleware",  # 動的HTMLレスポンスを gzip 圧縮（静的は WhiteNoise が担当）
     "whitenoise.middleware.WhiteNoiseMiddleware",  # static 配信
+    "tennis_project.middleware.SearchIndexingMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "tennis_project.middleware.WriteRateLimitMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -185,6 +186,7 @@ TEMPLATES = [
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
+                "tennis.seo.metadata",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
             ],
