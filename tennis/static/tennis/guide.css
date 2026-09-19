@@ -1,0 +1,41 @@
+.guide-page { max-width: 740px; color: var(--text-main); }
+.guide-header { padding: 40px 0 28px; }
+.guide-header h1 { margin: 0; font-size: 1.6rem; }
+.guide-header p { margin: 12px 0 0; line-height: 1.8; color: var(--text-sub); }
+.guide-offer { padding: 28px; border: 1px solid var(--accent-border); border-radius: 12px; background: var(--accent-soft); }
+.guide-offer-label { margin: 0 0 8px; color: var(--accent-dark); font-size: .88rem; font-weight: 700; }
+.guide-offer h2 { margin: 0; font-size: clamp(1.35rem, 5vw, 1.85rem); color: var(--accent-dark); }
+.guide-offer > p:last-child { margin: 16px 0 0; line-height: 1.9; }
+.guide-section { margin-top: 36px; }
+.guide-section h2 { margin: 0 0 16px; font-size: 1.12rem; }
+.guide-plans { width: 100%; table-layout: fixed; border-collapse: collapse; font-size: .94rem; }
+.guide-plans th, .guide-plans td { padding: 16px 12px; border-bottom: 1px solid var(--border-base); line-height: 1.6; }
+.guide-plans thead th { text-align: center; background: var(--bg-soft); font-weight: 600; }
+.guide-plans thead th:first-child { width: 48%; }
+.guide-plans tbody th { text-align: left; font-weight: 400; background: #fff; }
+.guide-plans td { text-align: center; font-variant-numeric: tabular-nums; }
+.guide-plan-note { margin: 14px 0 0; font-size: .9rem; line-height: 1.8; color: var(--text-sub); }
+.guide-conditions { margin: 0; }
+.guide-conditions > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 16px; padding: 16px 0; border-bottom: 1px solid var(--border-base); font-size: .94rem; line-height: 1.8; }
+.guide-conditions dt { font-weight: 600; }
+.guide-conditions dd { margin: 0; }
+.guide-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-top: 32px; }
+.guide-button { display: flex; align-items: center; justify-content: center; min-height: 48px; border: 1px solid var(--accent); border-radius: 8px; font-weight: 700; text-align: center; }
+.guide-button-primary { background: var(--accent); color: #fff; }
+.guide-button-primary:hover { background: var(--accent-dark); color: #fff; }
+.guide-button-secondary { background: #fff; color: var(--accent-dark); }
+.guide-button-secondary:hover { background: var(--accent-soft); }
+.guide-button:focus-visible { outline: 3px solid var(--accent-dark); outline-offset: 3px; }
+@media (max-width: 480px) {
+  .guide-page { padding-top: 24px; }
+  .guide-header { padding: 28px 0 24px; }
+  .guide-offer { padding: 20px 16px; }
+  .guide-desktop-break { display: none; }
+  .guide-plans { font-size: .84rem; }
+  .guide-feature-rest { display: block; }
+  .guide-plans thead th { font-size: .75rem; white-space: nowrap; }
+  .guide-plans th, .guide-plans td { padding: 14px 6px; }
+  .guide-plans thead th:first-child { width: 46%; }
+  .guide-conditions > div { grid-template-columns: 76px minmax(0, 1fr); gap: 12px; }
+  .guide-actions { grid-template-columns: 1fr; }
+}

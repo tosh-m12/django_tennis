@@ -1,0 +1,63 @@
+{% extends "tennis/base.html" %}
+{% load static %}
+
+{% block title %}料金・利用案内｜DeuceNet（デュースネット）{% endblock %}
+{% block extra_head %}
+  <meta name="description" content="DeuceNetは期間限定で全機能無料。ベータ期間中にサークルを登録すると、正式版開始から1年間も全機能を無料で利用できます。無料・有料プランの機能と登録条件をご案内します。">
+  <link rel="stylesheet" href="{% static 'tennis/guide.css' %}">
+{% endblock %}
+{% block header %}{% endblock %}
+
+{% block content %}
+<main class="public-document guide-page">
+  <a class="document-brand" href="{% url 'tennis:index' %}" aria-label="DeuceNet トップ">
+    <picture>
+      <source srcset="{% static 'tennis/logo/wordmark.webp' %}" type="image/webp">
+      <img src="{% static 'tennis/logo/wordmark.png' %}" alt="DeuceNet">
+    </picture>
+  </a>
+  <header class="guide-header">
+    <h1>利用案内</h1>
+    <p>テニスサークルの出欠・対戦表・スコア・戦績を、URLひとつで管理。</p>
+  </header>
+
+  <section class="guide-offer" aria-labelledby="offer-title">
+    <p class="guide-offer-label">ベータ版 登録特典</p>
+    <h2 id="offer-title">期間限定・全機能無料</h2>
+    <p>ベータ期間中にサークルを登録すると、<br class="guide-desktop-break">正式版の提供開始から<strong>1年間</strong>、すべての機能を無料で利用できます。</p>
+  </section>
+
+  <section class="guide-section" aria-labelledby="plans-title">
+    <h2 id="plans-title">通常プランの機能比較</h2>
+    <table class="guide-plans">
+      <thead>
+        <tr><th scope="col">機能</th><th scope="col">無料プラン</th><th scope="col">有料プラン</th></tr>
+      </thead>
+      <tbody>
+        <tr><th scope="row">出欠管理</th><td aria-label="利用可">○</td><td aria-label="利用可">○</td></tr>
+        <tr><th scope="row">対戦表作成</th><td aria-label="利用可">○</td><td aria-label="利用可">○</td></tr>
+        <tr><th scope="row">スコア記録・<span class="guide-feature-rest">当日の結果</span></th><td aria-label="利用可">○</td><td aria-label="利用可">○</td></tr>
+        <tr><th scope="row">累計ランキング・<span class="guide-feature-rest">個人戦績</span></th><td aria-label="対象外">—</td><td aria-label="利用可">○</td></tr>
+        <tr><th scope="row">データ出力・<span class="guide-feature-rest">バックアップ</span></th><td aria-label="対象外">—</td><td aria-label="利用可">○</td></tr>
+      </tbody>
+    </table>
+    <p class="guide-plan-note">無料特典の期間中は、有料プランの機能もすべて使えます。</p>
+    <p class="guide-plan-note">特典終了後、有料機能の継続利用には有料プランへの加入が必要です。料金は決まり次第ご案内します。</p>
+  </section>
+
+  <section class="guide-section" aria-labelledby="conditions-title">
+    <h2 id="conditions-title">利用条件</h2>
+    <dl class="guide-conditions">
+      <div><dt>幹事</dt><dd>サークル作成時に、名前とメールアドレスを登録します。</dd></div>
+      <div><dt>メンバー</dt><dd>メール登録・ログインは不要です。幹事から共有されたURLで利用できます。</dd></div>
+      <div><dt>利用環境</dt><dd>スマートフォン・パソコンのブラウザで利用できます。インストールは不要です。</dd></div>
+      <div><dt>URLの管理</dt><dd>メンバー用URLはサークル内で共有し、幹事用URLは管理を担当する人だけで保管してください。</dd></div>
+    </dl>
+  </section>
+
+  <nav class="guide-actions" aria-label="利用を始める">
+    <a class="guide-button guide-button-primary" href="{% url 'tennis:index' %}#club-name">サークルを登録</a>
+    <a class="guide-button guide-button-secondary" href="{% url 'tennis:demo' %}">デモを試す</a>
+  </nav>
+</main>
+{% endblock %}
