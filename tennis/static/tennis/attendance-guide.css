@@ -1,0 +1,11 @@
+.organizer-note { margin: 0; padding: 18px 20px; background: var(--bg-soft); border-radius: 8px; line-height: 1.8; font-size: .94rem; }
+.attendance-steps { list-style: none; counter-reset: step; padding: 0; margin: 36px 0 0; }
+.attendance-steps > li { counter-increment: step; margin-bottom: 40px; }
+.attendance-steps h2 { display: flex; align-items: center; gap: 12px; margin: 0; font-size: 1.15rem; }
+.attendance-steps h2::before { content: counter(step); display: grid; place-items: center; flex: 0 0 32px; height: 32px; border-radius: 50%; background: var(--accent); color: #fff; font-size: 1rem; }
+.attendance-steps p { margin: 12px 0 20px; line-height: 1.8; }
+.attendance-shot { position: relative; width: 100%; max-width: 390px; margin: 0 auto; border: 1px solid var(--border-base); border-radius: 8px; overflow: hidden; }
+.attendance-shot img { display: block; width: 100%; height: auto; }
+.shot-focus { position: absolute; box-sizing: border-box; border: 3px solid var(--accent-dark); border-radius: 6px; pointer-events: none; }
+.calendar-shot .shot-focus { left: 31%; top: 72.7%; width: 12.5%; height: 4.8%; }
+.members-shot .shot-focus { left: 50%; top: 41.8%; width: 9.5%; height: 6.8%; }

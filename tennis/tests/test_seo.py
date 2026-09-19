@@ -31,7 +31,7 @@ class SearchDiscoveryTests(SimpleTestCase):
         self.assertNotIn("X-Robots-Tag", response)
 
     def test_public_legal_pages_have_their_own_canonical(self):
-        for path in ("/privacy/", "/terms/", "/guide/"):
+        for path in ("/privacy/", "/terms/", "/guide/", "/how-to/attendance/"):
             with self.subTest(path=path):
                 response = self.client.get(path)
                 self.assertContains(response, f'rel="canonical" href="https://deucenet.app{path}"')
@@ -42,7 +42,7 @@ class SearchDiscoveryTests(SimpleTestCase):
         self.assertEqual(response.status_code, 200)
         root = ElementTree.fromstring(response.content)
         locations = [element.text for element in root.iter("{http://www.sitemaps.org/schemas/sitemap/0.9}loc")]
-        self.assertEqual(locations, ["https://deucenet.app/", "https://deucenet.app/privacy/", "https://deucenet.app/terms/", "https://deucenet.app/guide/"])
+        self.assertEqual(locations, ["https://deucenet.app/", "https://deucenet.app/privacy/", "https://deucenet.app/terms/", "https://deucenet.app/guide/", "https://deucenet.app/how-to/attendance/"])
 
     def test_robots_allows_search_and_noindex_observation(self):
         response = self.client.get("/robots.txt")
@@ -51,7 +51,7 @@ class SearchDiscoveryTests(SimpleTestCase):
         parser.parse(response.content.decode().splitlines())
         self.assertEqual(parser.site_maps(), ["https://deucenet.app/sitemap.xml"])
         for bot in ("Googlebot", "Bingbot", "OAI-SearchBot"):
-            for path in ("/", "/privacy/", "/terms/", "/guide/", "/sitemap.xml", "/c/test/"):
+            for path in ("/", "/privacy/", "/terms/", "/guide/", "/how-to/attendance/", "/sitemap.xml", "/c/test/"):
                 self.assertTrue(parser.can_fetch(bot, path), (bot, path))
             self.assertFalse(parser.can_fetch(bot, "/admin/"))
 
