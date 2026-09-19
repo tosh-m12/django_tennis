@@ -27,6 +27,7 @@ urlpatterns = [
     ),
 
     # サービス案内・法務ページ（クラブトークン不要）
+    path("guide/", TemplateView.as_view(template_name="tennis/guide.html"), name="guide"),
     path(
         "privacy/",
         TemplateView.as_view(template_name="tennis/privacy.html"),
