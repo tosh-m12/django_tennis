@@ -187,6 +187,7 @@ TEMPLATES = [
             "context_processors": [
                 "django.template.context_processors.request",
                 "tennis.seo.metadata",
+                "tennis.analytics.context",
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
             ],
@@ -354,3 +355,7 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = 31536000  # 1年
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
+
+# Public measurement ID; only the production host sends analytics.
+GA4_MEASUREMENT_ID = os.environ.get("GA4_MEASUREMENT_ID", "G-F55BNG3CBE")
+GA4_HOSTS = ["deucenet.app"]

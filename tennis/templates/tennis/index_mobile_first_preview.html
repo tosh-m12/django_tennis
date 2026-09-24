@@ -363,6 +363,7 @@
       clubName.reportValidity();
       return;
     }
+    document.dispatchEvent(new Event("deucenet:registration-start"));
     openModal();
   });
 
