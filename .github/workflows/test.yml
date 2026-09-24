@@ -24,6 +24,8 @@ jobs:
         env:
           DEBUG: "1"
         run: python manage.py test tennis.tests
+      - name: Test analytics payload filtering
+        run: node --test tennis/tests/js/analytics.test.cjs
       - name: Collect production static files
         env:
           DEBUG: "0"

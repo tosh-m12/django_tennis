@@ -764,3 +764,12 @@ def _mark_event_participants_on_member_delete(sender, instance, **kwargs):
         return
 
     EventParticipant.objects.filter(member=instance).update(member_deleted=True)
+
+
+class ClubAcquisition(models.Model):
+    """One-off conversion markers for new registrations, independent of email changes."""
+    club = models.OneToOneField(Club, on_delete=models.CASCADE)
+    organizer = models.OneToOneField(ClubOrganizer, on_delete=models.CASCADE)
+    client_id = models.CharField(max_length=64, blank=True)
+    confirmed_at = models.DateTimeField(null=True, blank=True)
+    first_event_at = models.DateTimeField(null=True, blank=True)

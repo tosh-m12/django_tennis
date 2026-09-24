@@ -183,5 +183,9 @@
   <script src="{% static 'tennis/topbar_hamburger.js' %}" defer></script>
 
   {% block extra_scripts %}{% endblock %}
+{% if analytics_config %}
+  {{ analytics_config|json_script:"analytics-config" }}
+  <script src="{% static 'tennis/analytics.js' %}" defer></script>
+{% endif %}
 </body>
 </html>

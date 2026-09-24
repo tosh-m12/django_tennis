@@ -40,8 +40,9 @@ from .models import (
     EventDisplaySetting,
     ClubMemberClass,
     ClubOrganizer,
+    ClubAcquisition,
 )
-from . import organizer_email
+from . import organizer_email, analytics
 
 # ============================================================
 # Config
@@ -848,11 +849,14 @@ def index(request):
                     email=email,
                 )
                 organizer_email.send_confirmation_email(request, organizer)
+                if analytics.enabled(request):
+                    ClubAcquisition.objects.create(club=club, organizer=organizer, client_id=analytics.client_id(request))
         except Exception:
             log.exception("Failed to create club registration")
             context["registration_error"] = "登録できませんでした。時間をおいてからもう一度お試しください。"
             return render(request, "tennis/index_mobile_first_preview.html", context, status=503)
 
+        analytics.queue(request, "registration_email_sent")
         request.session[CLUB_REGISTRATION_SUCCESS_SESSION_KEY] = True
         return redirect("tennis:index")
 
@@ -934,6 +938,12 @@ def demo_entry(request):
         Club.objects.filter(pk=club.pk).update(demo_last_seen=now)
 
     mode = request.POST.get("mode") or request.GET.get("mode")
+    mode = "admin" if mode == "admin" else "member"
+    marker = "analytics_demo_" + mode
+    previous = request.session.get(marker, 0)
+    if now.timestamp() - previous >= 1800:
+        analytics.queue(request, "demo_start", mode=mode)
+    request.session[marker] = now.timestamp()
     if mode == "admin":
         return redirect("tennis:club_home_admin", club_public_token=club.admin_path_token,
                         club_admin_token=club.admin_token)
@@ -3049,6 +3059,11 @@ def club_create_event(request):
 
         if eps:
             EventParticipant.objects.bulk_create(eps)
+
+        if analytics.enabled(request) and not club.is_demo:
+            acquisition = ClubAcquisition.objects.filter(club=club).first()
+            if acquisition and ClubAcquisition.objects.filter(pk=acquisition.pk, first_event_at__isnull=True).update(first_event_at=timezone.now()):
+                analytics.queue(request, "first_event_created", cid=acquisition.client_id)
 
     return JsonResponse({
         "ok": True,
@@ -5236,6 +5251,10 @@ def verify_email(request, token):
         ctx["reason"] = "invalid"
         return render(request, "tennis/verify_email.html", ctx)
 
+    if analytics.enabled(request) and not org.club.is_demo:
+        acquisition = ClubAcquisition.objects.filter(organizer=org).first()
+        if acquisition and ClubAcquisition.objects.filter(pk=acquisition.pk, confirmed_at__isnull=True).update(confirmed_at=timezone.now()):
+            analytics.queue(request, "sign_up", cid=acquisition.client_id)
     ctx["ok"] = True
     ctx["club_name"] = org.club.name
     ctx["club_url"] = reverse(
