@@ -292,6 +292,18 @@ def _build_score_map(match_schedule: MatchSchedule):
     return score_map
 
 
+def _build_score_maps(schedules):
+    """Load scores once for a request, including an empty map for unscored schedules."""
+    maps = {ms.pk: {} for ms in schedules}
+    if maps:
+        rows = MatchScore.objects.filter(match_schedule_id__in=maps).values_list(
+            "match_schedule_id", "round_no", "court_no", "side_a_score", "side_b_score"
+        )
+        for schedule_id, round_no, court_no, a, b in rows:
+            maps[schedule_id][(int(round_no), int(court_no))] = (a, b)
+    return maps
+
+
 def _merge_scores_into_schedule(schedule_json, score_map):
     """schedule_json に score_map を合成して、テンプレ表示用構造へ整形。"""
     if not schedule_json:
@@ -644,7 +656,7 @@ def _finalize_ranking(stats, config):
     return {"ranked": ranked, "others": others}
 
 
-def _compute_ranking_from(events, ms_by_event, ep_map, config):
+def _compute_ranking_from(events, ms_by_event, ep_map, config, score_maps):
     """
     1ゲームタイプ分の集計（旧 build_month_ranking 本体）。
     ms_by_event / ep_map は呼び出し側で用意して渡す（クエリ共有のため）。
@@ -669,7 +681,7 @@ def _compute_ranking_from(events, ms_by_event, ep_map, config):
         if not ms or not ms.schedule_json:
             continue
 
-        score_map = _build_score_map(ms)
+        score_map = score_maps[ms.pk]
 
         for r in (ms.schedule_json or []):
             round_no = int(r.get("round") or 0)
@@ -751,8 +763,11 @@ def build_month_rankings(events_qs, game_types, config=None):
         for ep in EventParticipant.objects.filter(id__in=list(ep_ids)).select_related("member")
     }
 
+    score_maps = _build_score_maps(
+        [ms for bucket in ms_by_type.values() for ms in bucket.values()]
+    )
     for gt in game_types:
-        result[gt] = _compute_ranking_from(events, ms_by_type[gt], ep_map, config)
+        result[gt] = _compute_ranking_from(events, ms_by_type[gt], ep_map, config, score_maps)
     return result
 
 
@@ -1843,7 +1858,9 @@ def _ranking_period_start(as_of, config):
     return _ranking_period_bounds(as_of, config)[0]
 
 
-def _member_rank_trend(club, member_id, config, start_d, end_d):
+def _member_rank_trend(
+    club, member_id, config, start_d, end_d, *, schedules=None, ep_map=None, score_maps=None
+):
     """
     [start_d, end_d] の「試合があった日ごと」に、その日のクラブランキングでの本人の順位を返す。
     各日のランキングはクラブの算出基準（日数方式または期間方式）で計算する
@@ -1854,20 +1871,30 @@ def _member_rank_trend(club, member_id, config, start_d, end_d):
     """
     # 表示期間の先頭(start_d)の点もクラブ設定の算出窓で計算できるところまで遡る。
     load_start = _ranking_period_start(start_d, config)
-    schedules = list(
-        MatchSchedule.objects
-        .filter(event__club=club, published=True, event__cancelled=False,
-                event__date__gte=load_start, event__date__lte=end_d)
-        .select_related("event")
-        .order_by("event__date", "event__id")
-    )
-    ep_ids = set()
-    for ms in schedules:
-        _collect_schedule_ep_ids(ms.schedule_json, ep_ids)
-    ep_map = {
-        ep.id: ep for ep in
-        EventParticipant.objects.filter(id__in=list(ep_ids)).select_related("member")
-    }
+    if schedules is None:
+        schedules = list(
+            MatchSchedule.objects
+            .filter(event__club=club, published=True, event__cancelled=False,
+                    event__date__gte=load_start, event__date__lte=end_d)
+            .select_related("event")
+            .order_by("event__date", "event__id")
+        )
+    else:
+        # The history also includes older and future matches; only the trend window applies here.
+        schedules = sorted(
+            (ms for ms in schedules if load_start <= ms.event.date <= end_d),
+            key=lambda ms: (ms.event.date, ms.event_id),
+        )
+    if ep_map is None:
+        ep_ids = set()
+        for ms in schedules:
+            _collect_schedule_ep_ids(ms.schedule_json, ep_ids)
+        ep_map = {
+            ep.id: ep for ep in
+            EventParticipant.objects.filter(id__in=list(ep_ids)).select_related("member")
+        }
+    if score_maps is None:
+        score_maps = _build_score_maps(schedules)
 
     # gt -> 日付 -> その日の [(team1キー群, team2キー群, s1, s2), ...]（スコア確定分のみ）
     by_gt_date = {"singles": {}, "doubles": {}}
@@ -1876,7 +1903,7 @@ def _member_rank_trend(club, member_id, config, start_d, end_d):
         if gt not in by_gt_date or not ms.schedule_json:
             continue
         the_date = ms.event.date
-        score_map = _build_score_map(ms)
+        score_map = score_maps[ms.pk]
         for r in (ms.schedule_json or []):
             round_no = int(r.get("round") or 0)
             for m in (r.get("matches") or []):
@@ -2085,8 +2112,9 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
     }
     matches_history = []
 
+    score_maps = _build_score_maps(schedules)
     for ms in schedules:
-        score_map = _build_score_map(ms)
+        score_map = score_maps[ms.pk]
         game_type = ms.game_type or GameType.DOUBLES
         # 戦績集計はクラブ統一期間内の試合だけ（履歴は全件なので gate しない）。
         in_period = stats_start <= ms.event.date <= today
@@ -2173,7 +2201,10 @@ def member_detail(request, club_public_token, member_id, club_admin_token=None):
     # 過去180日のランキング推移（試合日ごと・階段グラフ）。各戦績表の直下に出すため st に SVG を持たせる。
     trend_today = today
     trend_start = trend_today - dt.timedelta(days=180)
-    trends = _member_rank_trend(club, member.id, ranking_config, trend_start, trend_today)
+    trends = _member_rank_trend(
+        club, member.id, ranking_config, trend_start, trend_today,
+        schedules=schedules, ep_map=ep_map, score_maps=score_maps,
+    )
     for gt in ("singles", "doubles"):
         stats[gt]["trend_svg"] = _rank_trend_svg(trends[gt], trend_start, trend_today)
 
